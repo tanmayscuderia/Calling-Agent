@@ -302,3 +302,27 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 3. **Godrej Tropical Isle** — Sector 146, Noida — 3BHK — ₹2.2–3.2 Cr — Under Construction
 4. **Central Noida Residency** — Sector 76, Noida — 2BHK — ₹95L–1.25 Cr — Ready
 5. **Luxury Greens Villa** — Greater Noida West — Villa — ₹2.8–4 Cr
+
+---
+
+## 14. UI Animation & Polish ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Route Transitions** | Every page change animates with a smooth fade+slide via `AnimatePresence` in the root layout |
+| **Staggered Card Entrances** | Dashboard stat cards cascade in with 40ms stagger delays for organic reveals |
+| **Spring Hover Interactions** | Cards lift with spring physics (`stiffness: 400, damping: 20`) on mouse hover |
+| **Button Tap Springs** | All interactive buttons have `whileTap` scale-down for tactile feedback |
+| **Animated Modals** | `AnimatedModal` component handles backdrop fade + panel spring entrance/exit |
+| **Chat Bubble Animations** | Call demo transcript bubbles animate in with direction-aware variants (inbound left, outbound right) |
+| **Typing Indicator** | Three pulsing dots animate while the AI agent is "thinking" during calls |
+| **Login Entrance** | Logo springs in with rotation, form fields stagger-fade into view |
+| **Call Status Pulse** | Active call indicator has a live pulse dot animation |
+| **Shimmer Loading** | Dashboard numbers show shimmer placeholder while data loads |
+| **Tabular Numbers** | All numeric displays use `font-variant-numeric: tabular-nums` to prevent layout shift |
+| **Auto-Scroll** | Call transcript auto-scrolls to newest message smoothly |
+
+### Animation Files
+- `frontend/src/lib/animations.ts` — Shared motion variants, easing curves, stagger containers
+- `frontend/src/components/motion/MotionPrimitives.tsx` — `MotionPage`, `MotionCard`, `MotionButton`, `AnimatedModal`
+- `frontend/src/app/layout.tsx` — `AnimatePresence` route transition wrapper

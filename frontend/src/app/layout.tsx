@@ -4,7 +4,9 @@ import './globals.css';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { pageVariants } from '@/lib/animations';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
@@ -179,7 +181,17 @@ function AppShell({ children }: { children: ReactNode }) {
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar />
       <main style={{ flex: 1, padding: 32, overflowY: 'auto', maxWidth: '100%' }}>
-        {children}
+        <AnimatePresence mode="wait">
+          <m.div
+            key={pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            {children}
+          </m.div>
+        </AnimatePresence>
       </main>
     </div>
   );
@@ -193,9 +205,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
       </head>
       <body>
-        <AuthProvider>
-          <AppShell>{children}</AppShell>
-        </AuthProvider>
+        {/* LazyMotion with domAnimation bundle = ~15KB instead of ~50KB */}
+        <LazyMotion features={domAnimation} strict>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
+        </LazyMotion>
       </body>
     </html>
   );

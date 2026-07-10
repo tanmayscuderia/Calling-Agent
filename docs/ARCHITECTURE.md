@@ -543,6 +543,48 @@ frontend/src/app/
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `CallDemoModal` | `src/components/CallDemoModal.tsx` | Browser call UI with TTS, transcript, input box |
+| `MotionPage` | `src/components/motion/MotionPrimitives.tsx` | Wrapper for page-level enter animations |
+| `MotionCard` | `src/components/motion/MotionPrimitives.tsx` | Card with spring hover lift + stagger entrance |
+| `MotionButton` | `src/components/motion/MotionPrimitives.tsx` | Button with `whileTap` scale spring |
+| `AnimatedModal` | `src/components/motion/MotionPrimitives.tsx` | Modal with backdrop fade + panel spring |
+
+### Animation Layer (Framer Motion)
+
+The frontend uses a shared animation system built on Framer Motion for consistent motion across all pages.
+
+```
+frontend/src/
+├── lib/
+│   └── animations.ts          ← Shared motion variants + easing curves
+│       • easeOutExpo, easeOutQuart
+│       • staggerContainer (children cascade, 40ms delay)
+│       • cardHover (spring lift: stiffness 400, damping 20)
+│       • buttonTap (scale 0.97 spring)
+│       • chatBubbleVariants (direction-aware slide)
+│       • modalBackdrop / modalPanel (fade + spring)
+│       • routeVariant (fade + slide for page transitions)
+│
+├── components/motion/
+│   └── MotionPrimitives.tsx   ← Reusable animated components
+│       • MotionPage  — wraps page content with entrance animation
+│       • MotionCard  — stagger children + hover spring
+│       • MotionButton — tap spring
+│       • AnimatedModal — AnimatePresence enter/exit
+│
+└── app/
+    └── layout.tsx             ← AnimatePresence wraps router
+                                 → every route change fades + slides
+```
+
+**Where animations are used:**
+
+| Page | Animations |
+|------|------------|
+| **Root layout** | `AnimatePresence` route transitions (fade + slide on every page change) |
+| **Dashboard** | Staggered stat cards, spring hover lift, shimmer loading numbers |
+| **Login** | Logo spring-in with rotation, staggered form fields, `whileTap` submit |
+| **CallDemoModal** | Backdrop fade, panel spring, chat bubble slide-in, typing indicator pulse, summary stagger |
+| **All pages** | `MotionPage` entrance animation on route change |
 
 ### State Management
 

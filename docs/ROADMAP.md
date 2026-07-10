@@ -64,6 +64,19 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Template API** — `GET /api/agent/templates`, `POST /api/agent/apply-template`
 - **5-minute config cache** with automatic invalidation on update
 
+### Phase E1: UI Animation & Polish ✅
+- **Framer Motion** integration across the entire frontend
+- **Route transitions** — `AnimatePresence` in root layout (fade + slide on every page change)
+- **Staggered card entrances** — Dashboard stat cards cascade in with 40ms delays
+- **Spring hover interactions** — Cards lift with spring physics (`stiffness: 400, damping: 20`)
+- **Animated modals** — `AnimatedModal` component with backdrop fade + panel spring
+- **Chat bubble animations** — Call demo transcript bubbles slide in direction-aware
+- **Typing indicator** — Three pulsing dots during AI "thinking" state
+- **Login entrance** — Logo spring-in with rotation, staggered form fields
+- **Tabular numbers** — `font-variant-numeric: tabular-nums` to prevent layout shift
+- **Auto-scroll** — Call transcript smooth-scrolls to newest message
+- **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
+
 ### Phase E: Quality Testing ✅
 - **169 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter (9 files)
 - **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
@@ -83,7 +96,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 | Database | Production-ready | 10 migrations, multi-tenant, idempotent |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
-| Frontend | Prototype+ | Functional but not polished — needs design pass |
+| Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals |
 | Testing | Strong | 260 tests covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
@@ -104,7 +117,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 ### Phase F: Production Polish (Next)
 - [ ] Meta Cloud API WhatsApp adapter (replace Baileys for production)
 - [ ] Real voice calling integration (Exotel/Twilio)
-- [ ] Frontend redesign — polished dashboard UI
+- [ ] Frontend redesign — full production design system
 - [ ] WebSocket real-time message updates (no polling)
 - [ ] Notification system (in-app + email alerts for hot leads)
 - [ ] Analytics dashboard (conversion funnels, response times)

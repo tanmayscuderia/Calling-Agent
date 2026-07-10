@@ -13,8 +13,9 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 7. **AI call-agent demo** (browser speechSynthesis + text input)
 8. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection
 9. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
-10. **260 tests** — 169 unit tests + 91 LLM eval tests, all green
-11. Clean migration path to Meta Cloud API later
+10. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
+11. **260 tests** — 169 unit tests + 91 LLM eval tests, all green
+12. Clean migration path to Meta Cloud API later
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
 
@@ -31,6 +32,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 | **WhatsApp Bridge** | Baileys (WhatsApp Web protocol) |
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
+| **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
 | **Testing** | Vitest (260 tests: 169 unit + 91 LLM evals) |
 
 ---
@@ -156,7 +158,10 @@ Calling Agent/
 │   │   └── uploads/      # CSV import + storage
 │   └── tests/            # 169 unit tests + 91 LLM evals
 ├── frontend/             # Next.js dashboard
-│   └── src/app/dashboard/  # leads, conversations, inventory, calls, settings
+│   └── src/
+│       ├── app/dashboard/  # leads, conversations, inventory, calls, settings
+│       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
+│       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
 ├── supabase/migrations/  # 9 SQL migration files
 └── docs/                 # 8 documentation files
 ```

@@ -30,7 +30,7 @@ This runs:
 ```bash
 npm install                    # Root
 cd backend && npm install      # Backend
-cd frontend && npm install     # Frontend
+cd frontend && npm install     # Frontend (includes framer-motion for animations)
 ```
 
 ---

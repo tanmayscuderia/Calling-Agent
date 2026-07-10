@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { m } from 'framer-motion';
+import { staggerContainer, staggerItem, cardHover, buttonTap, EASE } from '@/lib/animations';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -39,80 +41,120 @@ export default function DashboardPage() {
     { label: 'Pending Follow-ups', value: stats?.pendingFollowups ?? 0, color: '#d97706', bg: '#fef3c7', icon: '📋' },
   ];
 
+  const quickActions = [
+    { href: '/dashboard/whatsapp', icon: '📱', bg: '#dcfce7', title: 'Connect WhatsApp', desc: 'Scan QR to start monitoring' },
+    { href: '/dashboard/upload', icon: '📤', bg: '#ede9fe', title: 'Upload Inventory', desc: 'Import property CSV' },
+    { href: '/dashboard/playground', icon: '🧪', bg: '#fef3c7', title: 'AI Playground', desc: 'Test AI replies without a phone' },
+  ];
+
+  const demoSteps = [
+    { step: '1', title: 'Upload Inventory', desc: 'CSV import properties', color: '#2563eb' },
+    { step: '2', title: 'Connect WhatsApp', desc: 'Scan QR in terminal', color: '#16a34a' },
+    { step: '3', title: 'AI Auto-Replies', desc: 'Lead qualification', color: '#d97706' },
+    { step: '4', title: 'Call Demo', desc: 'AI calling agent Priya', color: '#7c3aed' },
+  ];
+
   return (
-    <div className="stagger" style={{ maxWidth: 1100 }}>
-      <div style={{ marginBottom: 32 }}>
+    <m.div
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+      style={{ maxWidth: 1100 }}
+    >
+      {/* Header */}
+      <m.div variants={staggerItem} style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.03em' }}>
           Dashboard Overview
         </h1>
         <p style={{ color: '#475569', fontSize: 15, margin: 0 }}>
           Real estate WhatsApp AI agent — lead qualification & calling demo
         </p>
-      </div>
+      </m.div>
 
+      {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>
         {statCards.map((stat) => (
-          <div key={stat.label} className="stat-card">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                {stat.icon}
+          <m.div key={stat.label} variants={staggerItem}>
+            <m.div
+              className="stat-card"
+              {...cardHover}
+              style={{ cursor: 'default' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                <m.div
+                  whileHover={{ scale: 1.1, rotate: 3 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                  style={{ width: 40, height: 40, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}
+                >
+                  {stat.icon}
+                </m.div>
               </div>
-            </div>
-            <div className="tnum" style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, marginBottom: 4, letterSpacing: '-0.03em' }}>
-              {loading ? '—' : stat.value}
-            </div>
-            <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>{stat.label}</div>
-          </div>
+              <m.div
+                className="tnum"
+                style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, marginBottom: 4, letterSpacing: '-0.03em' }}
+              >
+                {loading ? (
+                  <m.span
+                    animate={{ opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    —
+                  </m.span>
+                ) : (
+                  stat.value
+                )}
+              </m.div>
+              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>{stat.label}</div>
+            </m.div>
+          </m.div>
         ))}
       </div>
 
+      {/* Quick actions */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 32 }}>
-        <Link href="/dashboard/whatsapp" className="card card-hover" style={{ padding: 24, display: 'block', textDecoration: 'none', color: 'inherit' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>📱</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>Connect WhatsApp</div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>Scan QR to start monitoring</div>
-            </div>
-          </div>
-        </Link>
-        <Link href="/dashboard/upload" className="card card-hover" style={{ padding: 24, display: 'block', textDecoration: 'none', color: 'inherit' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>📤</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>Upload Inventory</div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>Import property CSV</div>
-            </div>
-          </div>
-        </Link>
-        <Link href="/dashboard/playground" className="card card-hover" style={{ padding: 24, display: 'block', textDecoration: 'none', color: 'inherit' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🧪</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>AI Playground</div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>Test AI replies without a phone</div>
-            </div>
-          </div>
-        </Link>
+        {quickActions.map((action) => (
+          <m.div key={action.href} variants={staggerItem}>
+            <m.div {...cardHover}>
+              <Link href={action.href} className="card" style={{ padding: 24, display: 'block', textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <m.div
+                    whileHover={{ scale: 1.08 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                    style={{ width: 48, height: 48, borderRadius: 12, background: action.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}
+                  >
+                    {action.icon}
+                  </m.div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{action.title}</div>
+                    <div style={{ fontSize: 13, color: '#64748b' }}>{action.desc}</div>
+                  </div>
+                </div>
+              </Link>
+            </m.div>
+          </m.div>
+        ))}
       </div>
 
-      <div className="card" style={{ padding: 28 }}>
+      {/* Demo flow */}
+      <m.div variants={staggerItem} className="card" style={{ padding: 28 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 20px' }}>Demo Flow</h3>
         <div style={{ display: 'flex', gap: 12 }}>
-          {[
-            { step: '1', title: 'Upload Inventory', desc: 'CSV import properties', color: '#2563eb' },
-            { step: '2', title: 'Connect WhatsApp', desc: 'Scan QR in terminal', color: '#16a34a' },
-            { step: '3', title: 'AI Auto-Replies', desc: 'Lead qualification', color: '#d97706' },
-            { step: '4', title: 'Call Demo', desc: 'AI calling agent Priya', color: '#7c3aed' },
-          ].map((item, i) => (
-            <div key={item.step} className="anim-in" style={{ flex: 1, padding: 16, borderRadius: 12, background: '#f8fafc', border: `2px solid ${item.color}15`, animationDelay: `${i * 100}ms` }}>
+          {demoSteps.map((item, i) => (
+            <m.div
+              key={item.step}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + i * 0.08, duration: 0.35, ease: EASE }}
+              whileHover={{ y: -2 }}
+              style={{ flex: 1, padding: 16, borderRadius: 12, background: '#f8fafc', border: `2px solid ${item.color}15` }}
+            >
               <div style={{ width: 28, height: 28, borderRadius: 8, background: item.color, color: 'white', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>{item.step}</div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{item.title}</div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{item.desc}</div>
-            </div>
+            </m.div>
           ))}
         </div>
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   );
 }

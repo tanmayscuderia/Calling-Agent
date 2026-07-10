@@ -57,6 +57,9 @@ Step-by-step walkthrough to demonstrate the full product to a client.
 
 **Show:**
 - Stat cards (Total Leads, Hot Leads, Open Conversations, AI Replies Today, Calls, Properties)
+- Notice the staggered card entrance animations and smooth spring hovers
+
+**Optional UI Polish note:** "Every interaction has been polished — route transitions, hover states, the call modal. This isn't a rough prototype; the UI feels like a finished product."
 
 ---
 
@@ -260,6 +263,7 @@ Please share your preferred time slot.
 - Lead scoring is **automatic** (hot/warm/cold)
 - Every AI action is **logged** for audit
 - **Multi-channel ready** (WhatsApp today, Telegram/Web tomorrow)
+- **Polished UX** — Framer Motion animations throughout (route transitions, spring hovers, animated call modal, staggered card entrances)
 
 ---
 
