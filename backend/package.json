@@ -1,0 +1,37 @@
+{
+  "name": "calling-agent-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run tests/unit/",
+    "test:watch": "vitest tests/unit/",
+    "eval": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run tests/evals/",
+    "eval:safety": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run tests/evals/llm-safety.eval.ts",
+    "eval:watch": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest tests/evals/"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/cors": "^8.5.0",
+    "@fastify/multipart": "^8.1.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@whiskeysockets/baileys": "^6.7.0",
+    "csv-parse": "^5.5.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.0",
+    "pino": "^9.3.0",
+    "pino-pretty": "^11.2.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.10"
+  }
+}

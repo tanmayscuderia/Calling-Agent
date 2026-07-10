@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# Build output
+backend/dist/
+frontend/.next/
+frontend/out/
+
+# WhatsApp sessions (contains auth state)
+.sessions/
+backend/.sessions/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Supabase
+supabase/.temp/
+
+# Misc
+*.pem

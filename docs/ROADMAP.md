@@ -1,0 +1,127 @@
+# Production Evolution Roadmap
+
+## Overview
+
+This document tracks the evolution from single-org prototype to multi-tenant, multi-industry production platform.
+
+---
+
+## Completed Phases
+
+### Phase 1: Core Prototype ✅
+- WhatsApp Web bridge (Baileys) with QR login + session persistence
+- Real estate AI lead qualification agent (DeepSeek/OpenAI)
+- Property inventory CSV upload + structured search
+- CRM dashboard (leads, conversations, inventory, calls)
+- Browser-based AI calling agent demo with TTS
+- 5 demo properties seeded
+
+### Phase 2: Database Schema ✅
+- 15 tables: CRM, WhatsApp, AI, calls, inventory, queue, agent configs
+- All tables multi-tenant (`org_id` → `organizations`)
+- Auto-updating `updated_at` triggers
+- Lead deduplication unique indexes
+- 10 migrations, all idempotent (`IF NOT EXISTS`)
+
+### Phase A: Multi-Tenant Auth ✅
+- Supabase Auth with httpOnly cookies (access + refresh tokens)
+- `authMiddleware` resolves `req.orgId`, `req.memberId`, `req.role` from cookie
+- Role-based visibility: admins see all, members see own data
+- Backward-compatible: falls back to `DEFAULT_ORG_ID` when no cookie (prototype mode)
+- Rate limiting on login endpoint
+- Frontend AuthProvider + route guard → `/login` redirect
+
+### Phase B: Multi-Instance WhatsApp Manager ✅
+- `WhatsAppConnectionManager` singleton manages N concurrent Baileys connections
+- Each `whatsapp_accounts` row = one live connection
+- Auto-boots all `connected` accounts on server start (survives VPS restart)
+- Per-account session directories (fixes collision bug)
+- Incoming messages routed to correct org pipeline via `account.org_id`
+- Per-chat monitoring toggle (groups + individuals)
+
+### Phase C: Durable Job Queue + LLM Hardening ✅
+- **Durable `job_queue` table** in Postgres (survives crashes, not in-memory)
+- **Atomic dequeue RPC** (`dequeue_job()`) via `FOR UPDATE SKIP LOCKED` — race-safe
+- **5 retries with exponential backoff** (3s → 6s → 12s → 24s → 48s + jitter for 429s)
+- **Stale recovery** — `reclaim_stale_jobs()` resets crashed workers' locks on boot
+- **Async message pipeline** — Baileys event loop never blocks on AI:
+  - `enqueueIncomingMessage()` (fast path): save inbound → insert job → return
+  - `processMessageJob()` (worker): load context → AI agent → save → enqueue send
+  - `processSendReplyJob()` (worker): actual WhatsApp delivery
+- **LLM concurrency limiter** — configurable `LLM_MAX_CONCURRENT` (default 3), prevents 429s
+- **LLM min-delay** — configurable `LLM_MIN_DELAY_MS`, prevents burst rate-limits
+- **Thinking-mode fallback** — if DeepSeek returns empty content (reasoning consumed all tokens), auto-retries without thinking
+- **Token budget fix** — `generateJson` uses 4096 maxTokens when thinking enabled
+- **Monitoring endpoint** `GET /api/system/status` — queue depth, LLM stats, WA connections
+
+### Phase D: Multi-Industry Platform ✅
+- **Config-driven architecture** — `agent_configs` table stores per-org AI configuration
+- **12 industry templates** — Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance
+- **Prompt Engine** (`promptEngine.ts`) — dynamically generates system + extraction prompts from config
+- **Generic Inventory Search** (`inventorySearch.ts`) — searches any table using configurable field mappings
+- **Generic Base Agent** (`baseAgent.ts`) — industry-agnostic message processing
+- **Agent Settings UI** — full visual editor: persona, fields, intents, statuses, search, templates
+- **Template API** — `GET /api/agent/templates`, `POST /api/agent/apply-template`
+- **5-minute config cache** with automatic invalidation on update
+
+### Phase E: Quality Testing ✅
+- **169 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter (9 files)
+- **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
+- **260 total tests, ALL GREEN**
+- **Eval harness** with rate-limit-safe sequential execution
+- **Safety evals** verifying chain-of-thought never leaks to users
+- **Golden cases** with curated expected outcomes
+
+---
+
+## Architecture Maturity
+
+| Layer | Status | Notes |
+|-------|--------|-------|
+| WhatsApp Bridge | Production-ready for BSP swap | Baileys now, Meta Cloud API later via `MessagingAdapter` interface |
+| AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search |
+| Database | Production-ready | 10 migrations, multi-tenant, idempotent |
+| Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
+| Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
+| Frontend | Prototype+ | Functional but not polished — needs design pass |
+| Testing | Strong | 260 tests covering unit + LLM quality |
+| Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
+
+---
+
+## Latency Optimizations (Applied)
+- In-memory LRU cache for org config (5-min TTL), member context
+- Parallel DB queries where possible (Promise.all)
+- Connection pooling via Supabase client reuse
+- Minimal query columns (select only needed fields)
+- Precompiled prompt templates (no string building per request)
+- Async pipeline — Baileys event loop returns in <50ms
+
+---
+
+## Future Phases
+
+### Phase F: Production Polish (Next)
+- [ ] Meta Cloud API WhatsApp adapter (replace Baileys for production)
+- [ ] Real voice calling integration (Exotel/Twilio)
+- [ ] Frontend redesign — polished dashboard UI
+- [ ] WebSocket real-time message updates (no polling)
+- [ ] Notification system (in-app + email alerts for hot leads)
+- [ ] Analytics dashboard (conversion funnels, response times)
+- [ ] Team assignment workflow (round-robin, skill-based routing)
+
+### Phase G: Scale
+- [ ] Read replicas for dashboard queries
+- [ ] Connection pooling via PgBouncer
+- [ ] Redis for session cache + rate limiting
+- [ ] CDN for frontend assets
+- [ ] Horizontal scaling for queue workers
+- [ ] Vector search (pgvector) for knowledge base RAG
+
+### Phase H: Advanced AI
+- [ ] Multi-turn conversation memory (sliding window + summary)
+- [ ] Function calling / tool use for live inventory queries
+- [ ] Sentiment analysis on customer messages
+- [ ] A/B testing for prompt variants
+- [ ] Fine-tuned industry-specific models
+- [ ] Voice-to-voice calling agent (STT + TTS pipeline)

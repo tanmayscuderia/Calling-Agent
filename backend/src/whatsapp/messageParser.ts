@@ -1,0 +1,69 @@
+import { ParsedWhatsAppMessage } from './types';
+import { jidToPhone, isGroupJid } from '../utils/phone';
+
+/**
+ * Parse a raw Baileys message into our normalized shape.
+ * Extracts media metadata (mime type, filename) so the service layer
+ * can download and store media files via downloadWhatsAppMedia().
+ */
+export function parseWhatsAppMessage(msg: any): ParsedWhatsAppMessage | null {
+  if (!msg) return null;
+  const chatId: string = msg.key?.remoteJid ?? '';
+  const externalMessageId: string = msg.key?.id ?? '';
+  const isGroup = isGroupJid(chatId);
+  const senderId: string = isGroup ? msg.key?.participant ?? chatId : chatId;
+
+  // Extract text from various message types
+  let text = '';
+  let messageType: ParsedWhatsAppMessage['messageType'] = 'unknown';
+  let mediaMimeType: string | null = null;
+  let mediaFileName: string | null = null;
+
+  const m = msg.message;
+  if (!m) return null;
+
+  if (m.conversation) {
+    text = m.conversation;
+    messageType = 'text';
+  } else if (m.extendedTextMessage?.text) {
+    text = m.extendedTextMessage.text;
+    messageType = 'text';
+  } else if (m.imageMessage) {
+    text = m.imageMessage.caption ?? '';
+    messageType = 'image';
+    mediaMimeType = m.imageMessage.mimetype ?? 'image/jpeg';
+  } else if (m.videoMessage) {
+    text = m.videoMessage.caption ?? '';
+    messageType = 'video';
+    mediaMimeType = m.videoMessage.mimetype ?? 'video/mp4';
+  } else if (m.audioMessage) {
+    text = '';
+    messageType = 'audio';
+    mediaMimeType = m.audioMessage.mimetype ?? 'audio/ogg';
+  } else if (m.documentMessage) {
+    text = m.documentMessage.caption ?? '';
+    messageType = 'document';
+    mediaMimeType = m.documentMessage.mimetype ?? 'application/octet-stream';
+    mediaFileName = m.documentMessage.fileName ?? null;
+  } else if (m.locationMessage) {
+    const lat = m.locationMessage.degreesLatitude;
+    const lon = m.locationMessage.degreesLongitude;
+    text = lat && lon ? `Location: ${lat}, ${lon}` : '';
+    messageType = 'location';
+  }
+
+  return {
+    externalMessageId,
+    chatId,
+    senderId,
+    senderPhone: jidToPhone(isGroup ? (msg.key?.participant ?? chatId) : chatId),
+    isGroup,
+    text,
+    messageType,
+    mediaUrl: null, // Filled by whatsappService after download
+    mediaMimeType,
+    mediaFileName,
+    raw: msg,
+    receivedAt: new Date(Math.max(0, (msg.messageTimestamp ?? 0) * 1000)).toISOString(),
+  };
+}

@@ -1,0 +1,272 @@
+{
+  "source": "https://api-docs.deepseek.com",
+  "generatedAt": "2026-07-08T16:46:33.832Z",
+  "pages": [
+    {
+      "title": "Create Chat Completion",
+      "url": "https://api-docs.deepseek.com/api/create-chat-completion",
+      "relativePath": "api/create-chat-completion.md"
+    },
+    {
+      "title": "Create FIM Completion (Beta)",
+      "url": "https://api-docs.deepseek.com/api/create-completion",
+      "relativePath": "api/create-completion.md"
+    },
+    {
+      "title": "DeepSeek API",
+      "url": "https://api-docs.deepseek.com/api/deepseek-api",
+      "relativePath": "api/deepseek-api.md"
+    },
+    {
+      "title": "Get User Balance",
+      "url": "https://api-docs.deepseek.com/api/get-user-balance",
+      "relativePath": "api/get-user-balance.md"
+    },
+    {
+      "title": "Lists Models",
+      "url": "https://api-docs.deepseek.com/api/list-models",
+      "relativePath": "api/list-models.md"
+    },
+    {
+      "title": "FAQ",
+      "url": "https://api-docs.deepseek.com/faq",
+      "relativePath": "faq.md"
+    },
+    {
+      "title": "Anthropic API",
+      "url": "https://api-docs.deepseek.com/guides/anthropic_api",
+      "relativePath": "guides/anthropic_api.md"
+    },
+    {
+      "title": "Chat Prefix Completion (Beta)",
+      "url": "https://api-docs.deepseek.com/guides/chat_prefix_completion",
+      "relativePath": "guides/chat_prefix_completion.md"
+    },
+    {
+      "title": "Integrate with AI Tools",
+      "url": "https://api-docs.deepseek.com/guides/coding_agents",
+      "relativePath": "guides/coding_agents.md"
+    },
+    {
+      "title": "V3.1-Terminus Comparison Testing",
+      "url": "https://api-docs.deepseek.com/guides/comparison_testing",
+      "relativePath": "guides/comparison_testing.md"
+    },
+    {
+      "title": "FIM Completion (Beta)",
+      "url": "https://api-docs.deepseek.com/guides/fim_completion",
+      "relativePath": "guides/fim_completion.md"
+    },
+    {
+      "title": "JSON Output",
+      "url": "https://api-docs.deepseek.com/guides/json_mode",
+      "relativePath": "guides/json_mode.md"
+    },
+    {
+      "title": "Context Caching",
+      "url": "https://api-docs.deepseek.com/guides/kv_cache",
+      "relativePath": "guides/kv_cache.md"
+    },
+    {
+      "title": "Multi-round Conversation",
+      "url": "https://api-docs.deepseek.com/guides/multi_round_chat",
+      "relativePath": "guides/multi_round_chat.md"
+    },
+    {
+      "title": "Thinking Mode",
+      "url": "https://api-docs.deepseek.com/guides/thinking_mode",
+      "relativePath": "guides/thinking_mode.md"
+    },
+    {
+      "title": "Tool Calls",
+      "url": "https://api-docs.deepseek.com/guides/tool_calls",
+      "relativePath": "guides/tool_calls.md"
+    },
+    {
+      "title": "Your First API Call",
+      "url": "https://api-docs.deepseek.com",
+      "relativePath": "index.md"
+    },
+    {
+      "title": "DeepSeek API Upgrade",
+      "url": "https://api-docs.deepseek.com/news/news0725",
+      "relativePath": "news/news0725.md"
+    },
+    {
+      "title": "DeepSeek API introduces Context Caching on Disk, cutting prices by an order of magnitude",
+      "url": "https://api-docs.deepseek.com/news/news0802",
+      "relativePath": "news/news0802.md"
+    },
+    {
+      "title": "DeepSeek-V2.5: A New Open-Source Model Combining General and Coding Capabilities",
+      "url": "https://api-docs.deepseek.com/news/news0905",
+      "relativePath": "news/news0905.md"
+    },
+    {
+      "title": "🚀 DeepSeek-R1-Lite-Preview is now live: unleashing supercharged reasoning power!",
+      "url": "https://api-docs.deepseek.com/news/news1120",
+      "relativePath": "news/news1120.md"
+    },
+    {
+      "title": "🚀 DeepSeek V2.5: The Grand Finale 🎉",
+      "url": "https://api-docs.deepseek.com/news/news1210",
+      "relativePath": "news/news1210.md"
+    },
+    {
+      "title": "🚀 Introducing DeepSeek-V3",
+      "url": "https://api-docs.deepseek.com/news/news1226",
+      "relativePath": "news/news1226.md"
+    },
+    {
+      "title": "Introducing DeepSeek App",
+      "url": "https://api-docs.deepseek.com/news/news250115",
+      "relativePath": "news/news250115.md"
+    },
+    {
+      "title": "DeepSeek-R1 Release",
+      "url": "https://api-docs.deepseek.com/news/news250120",
+      "relativePath": "news/news250120.md"
+    },
+    {
+      "title": "DeepSeek-V3-0324 Release",
+      "url": "https://api-docs.deepseek.com/news/news250325",
+      "relativePath": "news/news250325.md"
+    },
+    {
+      "title": "DeepSeek-R1-0528 Release",
+      "url": "https://api-docs.deepseek.com/news/news250528",
+      "relativePath": "news/news250528.md"
+    },
+    {
+      "title": "DeepSeek-V3.1 Release",
+      "url": "https://api-docs.deepseek.com/news/news250821",
+      "relativePath": "news/news250821.md"
+    },
+    {
+      "title": "DeepSeek-V3.1-Terminus",
+      "url": "https://api-docs.deepseek.com/news/news250922",
+      "relativePath": "news/news250922.md"
+    },
+    {
+      "title": "Introducing DeepSeek-V3.2-Exp",
+      "url": "https://api-docs.deepseek.com/news/news250929",
+      "relativePath": "news/news250929.md"
+    },
+    {
+      "title": "DeepSeek-V3.2 Release",
+      "url": "https://api-docs.deepseek.com/news/news251201",
+      "relativePath": "news/news251201.md"
+    },
+    {
+      "title": "DeepSeek V4 Preview Release",
+      "url": "https://api-docs.deepseek.com/news/news260424",
+      "relativePath": "news/news260424.md"
+    },
+    {
+      "title": "Integrate with AstrBot",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/astrbot",
+      "relativePath": "quick_start/agent_integrations/astrbot.md"
+    },
+    {
+      "title": "Integrate with Claude Code",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code",
+      "relativePath": "quick_start/agent_integrations/claude_code.md"
+    },
+    {
+      "title": "Integrate with GitHub Copilot CLI",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/copilot_cli",
+      "relativePath": "quick_start/agent_integrations/copilot_cli.md"
+    },
+    {
+      "title": "Integrate with Crush",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/crush",
+      "relativePath": "quick_start/agent_integrations/crush.md"
+    },
+    {
+      "title": "Integrate with Deep Code",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/deepcode",
+      "relativePath": "quick_start/agent_integrations/deepcode.md"
+    },
+    {
+      "title": "Integrate with GitHub Copilot",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/github_copilot",
+      "relativePath": "quick_start/agent_integrations/github_copilot.md"
+    },
+    {
+      "title": "Integrate with Hermes Agent",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/hermes",
+      "relativePath": "quick_start/agent_integrations/hermes.md"
+    },
+    {
+      "title": "Integrate with Kilo Code",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/kilo_code",
+      "relativePath": "quick_start/agent_integrations/kilo_code.md"
+    },
+    {
+      "title": "Integrate with Langcli",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/langcli",
+      "relativePath": "quick_start/agent_integrations/langcli.md"
+    },
+    {
+      "title": "Integrating nanobot",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/nanobot",
+      "relativePath": "quick_start/agent_integrations/nanobot.md"
+    },
+    {
+      "title": "Using DeepSeek with Oh My Pi",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/oh_my_pi",
+      "relativePath": "quick_start/agent_integrations/oh_my_pi.md"
+    },
+    {
+      "title": "Integrate with OpenClaw",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/openclaw",
+      "relativePath": "quick_start/agent_integrations/openclaw.md"
+    },
+    {
+      "title": "Integrate with OpenCode",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/opencode",
+      "relativePath": "quick_start/agent_integrations/opencode.md"
+    },
+    {
+      "title": "Integrate with Pi",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono",
+      "relativePath": "quick_start/agent_integrations/pi_mono.md"
+    },
+    {
+      "title": "Integrate with Reasonix",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/reasonix",
+      "relativePath": "quick_start/agent_integrations/reasonix.md"
+    },
+    {
+      "title": "Integrate with WorkBuddy/CodeBuddy",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/workbuddy",
+      "relativePath": "quick_start/agent_integrations/workbuddy.md"
+    },
+    {
+      "title": "Error Codes",
+      "url": "https://api-docs.deepseek.com/quick_start/error_codes",
+      "relativePath": "quick_start/error_codes.md"
+    },
+    {
+      "title": "Models & Pricing",
+      "url": "https://api-docs.deepseek.com/quick_start/pricing",
+      "relativePath": "quick_start/pricing.md"
+    },
+    {
+      "title": "Rate Limit & Isolation",
+      "url": "https://api-docs.deepseek.com/quick_start/rate_limit",
+      "relativePath": "quick_start/rate_limit.md"
+    },
+    {
+      "title": "Token & Token Usage",
+      "url": "https://api-docs.deepseek.com/quick_start/token_usage",
+      "relativePath": "quick_start/token_usage.md"
+    },
+    {
+      "title": "Change Log",
+      "url": "https://api-docs.deepseek.com/updates",
+      "relativePath": "updates.md"
+    }
+  ],
+  "failures": []
+}

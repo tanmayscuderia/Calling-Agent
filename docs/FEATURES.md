@@ -1,0 +1,304 @@
+# Features — Multi-Industry WhatsApp AI + Calling Agent Platform
+
+Complete list of every capability the app has, organized by module.
+
+---
+
+## 0. Authentication ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Email + Password Login** | Users log in via Supabase Auth (`POST /api/auth/login`) |
+| **httpOnly Cookies** | Access + refresh tokens stored in httpOnly cookies — XSS-proof |
+| **No Token in JavaScript** | Token never appears in frontend JS or localStorage |
+| **Auto Session Check** | On page load, frontend calls `/api/auth/me` to restore session |
+| **Route Guard** | Unauthenticated users redirected to `/login`; logged-in users skip login |
+| **Cookie Middleware** | `authMiddleware` reads cookie on every request → resolves org context |
+| **Token Refresh** | `POST /api/auth/refresh` exchanges refresh cookie for new access token |
+| **Logout** | Clears cookies + revokes Supabase session server-side |
+| **Rate Limiting** | Login endpoint rate-limited to prevent brute force |
+| **Prototype Fallback** | If no cookie present, falls back to `DEFAULT_ORG_ID` so WhatsApp still works |
+| **CORS + Credentials** | Backend CORS allows `credentials: true`, frontend sends `credentials: 'include'` |
+
+### Auth Files
+- `backend/src/routes/auth.routes.ts` — login, me, refresh, logout
+- `backend/src/auth/authMiddleware.ts` — cookie → org context resolver
+- `backend/src/auth/rateLimiter.ts` — brute force protection
+- `frontend/src/lib/auth.tsx` — AuthProvider + useAuth() context
+- `frontend/src/lib/api.ts` — fetch with `credentials: 'include'`
+- `frontend/src/app/login/page.tsx` — login form
+
+---
+
+## 1. WhatsApp Bridge (Baileys)
+
+| Feature | Description |
+|---------|-------------|
+| **QR Login** | Scan QR code from WhatsApp → Linked Devices to connect |
+| **Session Persistence** | Session stored locally in `.sessions/whatsapp/` — no re-scan on restart |
+| **Connection Status** | Real-time status: `connected`, `disconnected`, `qr_pending`, `error` |
+| **Auto-Reconnect** | Automatically reconnects if connection drops |
+| **Incoming Message Listener** | Listens to `messages.upsert` events and processes them |
+| **Outbound Sending** | Send text replies back through WhatsApp |
+| **Group Filtering** | Ignores group messages by default (`AI_IGNORE_GROUPS=true`) |
+| **Allowlist** | Only respond to numbers in `AI_ALLOWED_NUMBERS` env var |
+| **Own Message Filter** | Ignores messages sent by the bot itself (`key.fromMe`) |
+| **Multi-format Parsing** | Handles text, image, audio, video, document, location messages |
+| **MessagingAdapter Interface** | Clean interface so Baileys can be swapped for Meta Cloud API later |
+
+---
+
+## 2. AI Lead Qualification Agent
+
+| Feature | Description |
+|---------|-------------|
+| **Intent Extraction** | Uses LLM to extract: intent, configuration, city, sector, budget, possession, purpose, timeline |
+| **Property Matching** | Structured search with progressive relaxation (sector → config → budget) |
+| **Grounded Replies** | Only recommends from actual inventory — never invents properties |
+| **WhatsApp-Style Replies** | Short, natural, Indian real-estate sales tone |
+| **One Question Rule** | Asks only one follow-up question at a time when info is missing |
+| **Lead Temperature Scoring** | Classifies leads as hot/warm/cold/unknown based on intent signals |
+| **Lead Status Pipeline** | new → contacted → qualified → site_visit_scheduled → negotiation → won/lost |
+| **Property Match Records** | Every recommended property saved with score + reason in `crm_lead_property_matches` |
+| **AI Run Logging** | Every LLM call logged with input, output, latency, extracted data |
+| **Human Handoff Detection** | Detects legal/financial questions and suggests human advisor |
+| **Callback Scheduling** | Recognizes callback requests and asks for preferred time |
+
+### Intent Types Detected
+- `property_search` — customer looking for property
+- `callback_request` — wants a phone call
+- `site_visit` — wants to visit a property
+- `brochure_request` — wants brochure/details
+- `pricing_question` — asking about prices
+- `general_question` — general enquiry
+- `unrelated` — off-topic
+
+---
+
+## 3. Property Inventory Management
+
+| Feature | Description |
+|---------|-------------|
+| **CSV Upload** | Upload CSV file via multipart form → parsed into projects + units |
+| **Auto Project Grouping** | Groups units by `project_name + city + sector` |
+| **Import Batch Tracking** | Every upload tracked in `real_estate_import_batches` with row counts |
+| **Error Reporting** | Failed rows counted with error details |
+| **Structured Search** | Filter by: org, city, sector, configuration, budget, possession status |
+| **Budget Overlap Logic** | Matches units where `price_min ≤ budget_max AND price_max ≥ budget_min` |
+| **Progressive Relaxation** | If no exact match: relax sector → then relax configuration → ask follow-up |
+| **Top 3 Results** | Returns best 3 matches to keep replies concise |
+| **Pre-seeded Demo Data** | 5 demo properties ready for testing |
+
+### CSV Columns
+**Required:** `project_name`, `configuration`, `price_min`, `price_max`
+**Optional:** `developer_name`, `city`, `sector`, `location`, `address`, `unit_type`, `possession_status`, `possession_date`, `status`, `amenities`, `description`, `brochure_url`
+
+---
+
+## 4. CRM Dashboard
+
+| Feature | Description |
+|---------|-------------|
+| **Leads List** | All leads with name, phone, source, temperature badge, status, last contact |
+| **Lead Detail** | Full profile: preferences, AI summary, conversation, matched properties, calls, follow-ups |
+| **Temperature Badges** | Color-coded: red (hot), orange (warm), blue (cold), gray (unknown) |
+| **Status Filter** | Filter leads by pipeline status |
+| **Lead Editing** | Update lead info, assignment, notes via API |
+| **Conversation Inbox** | WhatsApp-style inbox — conversation list + chat view |
+| **Manual Send** | Send manual messages from dashboard |
+| **Human Handoff Toggle** | Turn AI off for any conversation — human takes over |
+| **AI Enabled Toggle** | Per-conversation AI auto-reply control |
+| **Dashboard Stats** | Total leads, hot leads, open conversations, AI replies today, calls, properties |
+
+---
+
+## 5. AI Calling Agent Demo
+
+| Feature | Description |
+|---------|-------------|
+| **Browser-Based** | No phone integration — simulated call in browser |
+| **Text-to-Speech** | Uses `window.speechSynthesis` to actually speak AI lines |
+| **Turn-by-Turn** | Customer types reply → AI responds → repeat |
+| **Opening Line** | "Hi, this is Priya from {{businessName}}..." |
+| **Requirement Gathering** | Confirms time, asks location/config/budget/purpose/timeline |
+| **Property Suggestion** | Suggests one matching property from inventory if available |
+| **Call Transcript** | Every turn saved in `call_session_turns` |
+| **Call Summary** | End call generates summary + outcome (interested/not_interested/callback/etc.) |
+| **Lead Update** | Call outcome updates lead temperature and follow-up schedule |
+| **Live Transcript UI** | Real-time transcript display during call |
+
+### Call Outcomes
+- `interested` — wants to proceed
+- `not_interested` — declined
+- `callback_requested` — wants another call
+- `site_visit_requested` — wants property visit
+- `wrong_number` — invalid lead
+- `follow_up_later` — call back later
+
+---
+
+## 6. Conversations Module
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Channel Support** | Schema supports WhatsApp, Telegram, Web, Phone, Email |
+| **Conversation Threading** | Messages grouped by `external_chat_id` |
+| **Message Direction** | Tracks inbound vs outbound |
+| **Message Types** | Text, image, audio, video, document, location, button |
+| **AI Generated Flag** | Each message tagged if AI-generated |
+| **AI Model Tracking** | Records which LLM model generated each reply |
+| **Conversation Summary** | AI-generated conversation summaries |
+| **Status Management** | Open, pending_human, closed, blocked |
+
+---
+
+## 7. Follow-ups & Task Management
+
+| Feature | Description |
+|---------|-------------|
+| **Follow-up Scheduling** | Create follow-ups: call, whatsapp, site_visit, email, meeting |
+| **Auto-Scheduling from Calls** | AI call outcomes auto-create follow-ups |
+| **Follow-up Status** | Pending, completed, missed, cancelled |
+| **Assignment** | Assign follow-ups to team members |
+| **Next Follow-up Display** | Shows next scheduled follow-up on lead cards |
+
+---
+
+## 8. Safety & Abuse Controls
+
+| # | Control |
+|---|---------|
+| 1 | Group messages ignored by default |
+| 2 | Allowlist support via env |
+| 3 | No auto-reply when `human_handoff=true` |
+| 4 | No auto-reply when conversation is `blocked` |
+| 5 | No mass outbound messages |
+| 6 | Reply only to inbound user messages |
+| 7 | All AI runs logged for audit |
+| 8 | Never claims unavailable inventory |
+| 9 | Manual takeover button |
+| 10 | Own messages ignored (`fromMe` filter) |
+
+---
+
+## 9. LLM Integration
+
+| Feature | Description |
+|---------|-------------|
+| **DeepSeek (Default)** | V4-flash for speed, V4-pro for quality |
+| **OpenAI (Fallback)** | GPT-4.1-mini supported |
+| **Provider Switching** | Change `LLM_PROVIDER` env var — no code change needed |
+| **Native JSON Mode** | `response_format: {type: "json_object"}` for reliable extraction |
+| **Thinking Mode** | Optional DeepSeek reasoning mode for complex tasks |
+| **Token Usage Logging** | Tracks prompt/completion/total tokens per call |
+| **Graceful Fallback** | Returns friendly message if API key missing |
+
+See **[DEEPSEEK_GUIDE.md](./DEEPSEEK_GUIDE.md)** for DeepSeek-specific details.
+
+---
+
+## 9.5. Production Queue & Reliability ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Durable Job Queue** | All AI message processing runs through a Postgres-backed `job_queue` table — survives crashes |
+| **Async Pipeline** | Baileys event loop never blocks on LLM calls (enqueue → worker → send) |
+| **Atomic Dequeue** | `dequeue_job()` RPC uses `FOR UPDATE SKIP LOCKED` — race-safe for multi-worker |
+| **Retry with Backoff** | Failed jobs retry up to 5× with exponential backoff (3s → 6s → 12s → 24s → 48s + jitter for 429s) |
+| **Stale Job Recovery** | `reclaim_stale_jobs()` RPC resets crashed workers' locks on boot |
+| **LLM Concurrency Limit** | Configurable via `LLM_MAX_CONCURRENT` env (default 3, evals use 1) — prevents rate limit (429) |
+| **LLM Min-Delay** | Configurable inter-call delay via `LLM_MIN_DELAY_MS` env — prevents burst 429s during evals |
+| **LLM Timeout** | 30s `AbortController` timeout — no hanging requests |
+| **LLM Retry on 429** | 5 retries with aggressive exponential backoff (3s base for 429, 1s for 5xx) + jitter |
+| **Thinking-Mode Fallback** | If DeepSeek thinking mode returns empty content (all tokens consumed by reasoning), automatically retries without thinking |
+| **Token Budget Fix** | `generateJson` uses 4096 maxTokens when thinking is enabled (was 1200, consumed entirely by reasoning) |
+| **Decoupled Send** | WhatsApp delivery is a separate job (`send_reply`) — decoupled from AI processing |
+| **Queue Monitoring** | `GET /api/system/status` shows pending/processing/completed/failed counts |
+| **Graceful Shutdown** | SIGTERM stops worker cleanly, in-progress jobs recovered on next boot |
+
+### Queue Files
+- `backend/src/queue/queueWorker.ts` — poll loop + concurrent job processor
+- `backend/src/queue/jobHandler.ts` — handlers: `process_message`, `send_reply`, `generate_summary`
+- `backend/src/queue/staleRecovery.ts` — boot-time crash recovery + stats
+
+---
+
+## 10. Multi-Industry Platform ✅ COMPLETE
+
+The platform is no longer real-estate-only. Every org configures their own AI agent.
+
+| Feature | Description |
+|---------|-------------|
+| **12 Industry Templates** | Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance |
+| **Config-Driven AI** | No hardcoded industry logic — all behavior comes from `agent_configs` table |
+| **Per-Org Independence** | Each org has its own agent config — persona, fields, intents, statuses, inventory |
+| **Template Switching** | Apply any template anytime — instant reconfigure, then customize |
+| **Prompt Engine** | System + extraction prompts dynamically generated from config (`promptEngine.ts`) |
+| **Generic Inventory Search** | Searches any inventory table using configurable field mappings |
+| **Configurable Status Pipeline** | Each org defines its own lead status stages |
+| **Configurable Intents** | Each org defines what intent types the AI extracts |
+
+### Agent Settings — Full Visual Editor ✅
+
+| Feature | Description |
+|---------|-------------|
+| **Industry Template Picker** | Click any of 12 presets to apply — shows icon, name, description |
+| **Persona Editor** | Agent name, role, business name, tone (5 options), business description |
+| **Qualifying Fields Editor** | Add/remove/edit fields — key, label, type (text/number/enum/boolean), essential toggle, enum options |
+| **Intent Types Editor** | Add/remove/edit intent categories |
+| **Status Pipeline Editor** | Add/remove/reorder stages with ↑↓ buttons |
+| **Reply Templates** | Match/no-match/missing-info fallbacks with `{{count}}` variable |
+| **Inventory Search Config** | Toggle on/off, set table name, add/remove search field mappings |
+| **Call Agent Config** | Opening line template with `{{persona_name}}` / `{{business_name}}` variables |
+| **System Prompt Override** | Advanced collapsible section — full custom prompt replaces auto-generated one |
+
+### Agent Settings Files
+- `frontend/src/app/dashboard/agent-settings/page.tsx` — Full visual editor UI
+- `backend/src/routes/agent.routes.ts` — GET/PUT config, GET templates, POST apply-template
+- `backend/src/ai/agentConfigService.ts` — Config loader with 5-min cache + fallback chain
+- `backend/src/ai/promptEngine.ts` — Config-driven prompt builder
+- `backend/src/ai/baseAgent.ts` — Industry-agnostic agent
+- `backend/src/ai/inventorySearch.ts` — Generic inventory search
+
+---
+
+## 11. Lead Deduplication ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Unique Phone Constraint** | `(org_id, phone)` unique index prevents duplicate leads by phone |
+| **Unique WhatsApp Constraint** | `(org_id, whatsapp_number)` unique index prevents duplicates by WhatsApp |
+| **Auto-Update on Conflict** | New lead creation uses `ON CONFLICT DO UPDATE` — existing lead updated, not duplicated |
+
+---
+
+## 12. LLM Quality Testing ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Eval Harness** | Framework for measuring LLM reply/extraction quality |
+| **Reply Quality Evals** | Tests reply naturalness, correctness, WhatsApp-friendliness |
+| **Extraction Accuracy Evals** | Tests structured data extraction from customer messages |
+| **E2E Pipeline Evals** | Tests full message → reply → lead update flow |
+| **Call Agent Evals** | Tests calling agent conversation quality |
+| **LLM Safety Evals** | Verifies chain-of-thought (`reasoning_content`) never leaks to users |
+| **Template-Driven Evals** | Tests config-driven extraction + reply across industries |
+| **Cross-Industry Evals** | Education industry e2e — validates multi-industry support |
+| **Golden Cases** | Curated test cases with expected outcomes |
+| **169 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter |
+| **Rate-Limit Safe** | Evals run sequential (`fileParallelism: false`), 1 concurrent LLM call, 2s min-delay |
+
+### Test Files
+- `backend/tests/unit/` — 169 tests (9 files)
+- `backend/tests/evals/` — 91 eval tests (8 files)
+
+---
+
+## 13. Seed Data
+
+5 demo properties pre-loaded:
+1. **Demo Heights** — Sector 150, Noida — 3BHK — ₹1.65–2.1 Cr — Under Construction (2027)
+2. **ATS Knightsbridge** — Sector 124, Noida — 4BHK — ₹7.5–12 Cr — Ready
+3. **Godrej Tropical Isle** — Sector 146, Noida — 3BHK — ₹2.2–3.2 Cr — Under Construction
+4. **Central Noida Residency** — Sector 76, Noida — 2BHK — ₹95L–1.25 Cr — Ready
+5. **Luxury Greens Villa** — Greater Noida West — Villa — ₹2.8–4 Cr

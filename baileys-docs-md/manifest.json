@@ -1,0 +1,267 @@
+{
+  "source": "https://whiskeysockets-baileys-94.mintlify.app/introduction",
+  "generatedAt": "2026-07-08T19:45:19.429Z",
+  "pages": [
+    {
+      "title": "Baileys - WhatsApp Web API",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/introduction",
+      "relativePath": "..md"
+    },
+    {
+      "title": "Writing Custom Functionality",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/advanced/custom-functionality",
+      "relativePath": "advanced/custom-functionality.md"
+    },
+    {
+      "title": "Debugging & Troubleshooting",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/advanced/debugging",
+      "relativePath": "advanced/debugging.md"
+    },
+    {
+      "title": "Protocol Details",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/advanced/protocol-details",
+      "relativePath": "advanced/protocol-details.md"
+    },
+    {
+      "title": "WebSocket Events",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/advanced/websocket-events",
+      "relativePath": "advanced/websocket-events.md"
+    },
+    {
+      "title": "AuthenticationState",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/auth/auth-state",
+      "relativePath": "api/auth/auth-state.md"
+    },
+    {
+      "title": "makeCacheableSignalKeyStore",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/auth/cacheable-signal-keystore",
+      "relativePath": "api/auth/cacheable-signal-keystore.md"
+    },
+    {
+      "title": "useMultiFileAuthState",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/auth/multi-file-auth-state",
+      "relativePath": "api/auth/multi-file-auth-state.md"
+    },
+    {
+      "title": "Browsers",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/browsers",
+      "relativePath": "api/browsers.md"
+    },
+    {
+      "title": "makeWASocket",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/makewasocket",
+      "relativePath": "api/makewasocket.md"
+    },
+    {
+      "title": "SocketConfig",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/socket-config",
+      "relativePath": "api/socket-config.md"
+    },
+    {
+      "title": "Chat Types",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/types/chat",
+      "relativePath": "api/types/chat.md"
+    },
+    {
+      "title": "Contact Types",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/types/contact",
+      "relativePath": "api/types/contact.md"
+    },
+    {
+      "title": "Event Types",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/types/events",
+      "relativePath": "api/types/events.md"
+    },
+    {
+      "title": "Message Types",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/types/messages",
+      "relativePath": "api/types/messages.md"
+    },
+    {
+      "title": "Socket Configuration",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/types/socket",
+      "relativePath": "api/types/socket.md"
+    },
+    {
+      "title": "Chat & JID Utilities",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/utils/chat-utils",
+      "relativePath": "api/utils/chat-utils.md"
+    },
+    {
+      "title": "Generic Utilities",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/utils/generic-utils",
+      "relativePath": "api/utils/generic-utils.md"
+    },
+    {
+      "title": "Media Utilities",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/utils/media-utils",
+      "relativePath": "api/utils/media-utils.md"
+    },
+    {
+      "title": "Message Utilities",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/api/utils/message-utils",
+      "relativePath": "api/utils/message-utils.md"
+    },
+    {
+      "title": "Chat State Management",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/chats/chat-state",
+      "relativePath": "chats/chat-state.md"
+    },
+    {
+      "title": "Modifying Chats",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/chats/modifying-chats",
+      "relativePath": "chats/modifying-chats.md"
+    },
+    {
+      "title": "Presence Updates",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/chats/presence",
+      "relativePath": "chats/presence.md"
+    },
+    {
+      "title": "User Queries",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/chats/user-queries",
+      "relativePath": "chats/user-queries.md"
+    },
+    {
+      "title": "Authentication",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/concepts/authentication",
+      "relativePath": "concepts/authentication.md"
+    },
+    {
+      "title": "Connection Lifecycle",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/concepts/connection",
+      "relativePath": "concepts/connection.md"
+    },
+    {
+      "title": "Event System",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/concepts/events",
+      "relativePath": "concepts/events.md"
+    },
+    {
+      "title": "Message Store",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/concepts/message-store",
+      "relativePath": "concepts/message-store.md"
+    },
+    {
+      "title": "WhatsApp IDs (JIDs)",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/concepts/whatsapp-ids",
+      "relativePath": "concepts/whatsapp-ids.md"
+    },
+    {
+      "title": "Creating Groups",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/groups/creating-groups",
+      "relativePath": "groups/creating-groups.md"
+    },
+    {
+      "title": "Group Metadata",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/groups/group-metadata",
+      "relativePath": "groups/group-metadata.md"
+    },
+    {
+      "title": "Group Settings",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/groups/group-settings",
+      "relativePath": "groups/group-settings.md"
+    },
+    {
+      "title": "Invite Codes",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/groups/invite-codes",
+      "relativePath": "groups/invite-codes.md"
+    },
+    {
+      "title": "Managing Participants",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/groups/managing-participants",
+      "relativePath": "groups/managing-participants.md"
+    },
+    {
+      "title": "Connecting with Pairing Code",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/guides/connecting-pairing-code",
+      "relativePath": "guides/connecting-pairing-code.md"
+    },
+    {
+      "title": "Connecting with QR Code",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/guides/connecting-qr-code",
+      "relativePath": "guides/connecting-qr-code.md"
+    },
+    {
+      "title": "Handling Events",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/guides/handling-events",
+      "relativePath": "guides/handling-events.md"
+    },
+    {
+      "title": "Session Management",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/guides/session-management",
+      "relativePath": "guides/session-management.md"
+    },
+    {
+      "title": "Socket Configuration",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/guides/socket-configuration",
+      "relativePath": "guides/socket-configuration.md"
+    },
+    {
+      "title": "Baileys - WhatsApp Web API",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app",
+      "relativePath": "index.md"
+    },
+    {
+      "title": "Installation",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/installation",
+      "relativePath": "installation.md"
+    },
+    {
+      "title": "Downloading Media",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/downloading-media",
+      "relativePath": "messaging/downloading-media.md"
+    },
+    {
+      "title": "Media Messages",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/media-messages",
+      "relativePath": "messaging/media-messages.md"
+    },
+    {
+      "title": "Message Options",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/message-options",
+      "relativePath": "messaging/message-options.md"
+    },
+    {
+      "title": "Modifying Messages",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/modifying-messages",
+      "relativePath": "messaging/modifying-messages.md"
+    },
+    {
+      "title": "Sending Messages",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/sending-messages",
+      "relativePath": "messaging/sending-messages.md"
+    },
+    {
+      "title": "Text Messages",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/messaging/text-messages",
+      "relativePath": "messaging/text-messages.md"
+    },
+    {
+      "title": "Blocking Users",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/privacy/blocking-users",
+      "relativePath": "privacy/blocking-users.md"
+    },
+    {
+      "title": "Disappearing Messages",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/privacy/disappearing-messages",
+      "relativePath": "privacy/disappearing-messages.md"
+    },
+    {
+      "title": "Privacy Settings",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/privacy/privacy-settings",
+      "relativePath": "privacy/privacy-settings.md"
+    },
+    {
+      "title": "Quick Start",
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/quickstart",
+      "relativePath": "quickstart.md"
+    }
+  ],
+  "failures": [
+    {
+      "url": "https://whiskeysockets-baileys-94.mintlify.app/llms.txt",
+      "error": "Skipped non-HTML content-type: text/plain; charset=utf-8"
+    }
+  ]
+}
