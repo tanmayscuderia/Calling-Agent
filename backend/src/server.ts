@@ -19,6 +19,7 @@ import { whatsappRoutes } from './routes/whatsapp.routes';
 import { callsRoutes } from './routes/calls.routes';
 import { aiRoutes } from './routes/ai.routes';
 import { agentRoutes } from './routes/agent.routes';
+import systemRoutes from './routes/system.routes';
 
 async function start() {
   const app = Fastify({ logger: false });
@@ -50,6 +51,7 @@ async function start() {
   await app.register(callsRoutes);
   await app.register(aiRoutes);
   await app.register(agentRoutes);
+  await app.register(systemRoutes);
 
   // Dashboard stats endpoint
   app.get('/api/dashboard/stats', async (req) => {

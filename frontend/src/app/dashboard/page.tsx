@@ -7,6 +7,7 @@ import { staggerContainer, staggerItem, cardHover, buttonTap, EASE } from '@/lib
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
+  const [llmUsage, setLlmUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,8 +16,9 @@ export default function DashboardPage() {
       api('/api/conversations'),
       api('/api/inventory/projects'),
       api('/api/followups?status=pending').catch(() => ({ followups: [] })),
+      api('/api/system/llm-usage').catch(() => null),
     ])
-      .then(([leadsRes, convRes, projRes, followupsRes]) => {
+      .then(([leadsRes, convRes, projRes, followupsRes, usageRes]) => {
         const leads = leadsRes.leads ?? [];
         const conversations = convRes.conversations ?? [];
         const projects = projRes.projects ?? [];
@@ -28,6 +30,7 @@ export default function DashboardPage() {
           properties: projects.length,
           pendingFollowups: followups.length,
         });
+        if (usageRes) setLlmUsage(usageRes);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -67,9 +70,42 @@ export default function DashboardPage() {
           Dashboard Overview
         </h1>
         <p style={{ color: '#475569', fontSize: 15, margin: 0 }}>
-          Real estate WhatsApp AI agent — lead qualification & calling demo
-        </p>
-      </m.div>
+           Real estate WhatsApp AI agent — lead qualification & calling demo
+         </p>
+
+        {/* LLM Usage Badge */}
+        {llmUsage && (
+          <m.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 12,
+              padding: '6px 14px',
+              borderRadius: 20,
+              background: llmUsage.percentUsed >= 80 ? '#fef2f2' : llmUsage.percentUsed >= 50 ? '#fffbeb' : '#f0fdf4',
+              border: `1px solid ${llmUsage.percentUsed >= 80 ? '#fecaca' : llmUsage.percentUsed >= 50 ? '#fde68a' : '#bbf7d0'}`,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ fontSize: 14 }}>
+              {llmUsage.percentUsed >= 80 ? '🔴' : llmUsage.percentUsed >= 50 ? '🟡' : '🟢'}
+            </span>
+            <span className="tnum">
+              LLM: {llmUsage.totalCalls}/{llmUsage.limit} calls today
+            </span>
+            {llmUsage.totalCalls > 0 && llmUsage.bySource && (
+              <span style={{ color: '#64748b', fontWeight: 500 }}>
+                ({Object.entries(llmUsage.bySource).map(([k, v]) => `${k}: ${v}`).join(', ')})
+              </span>
+            )}
+          </m.div>
+        )}
+       </m.div>
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>

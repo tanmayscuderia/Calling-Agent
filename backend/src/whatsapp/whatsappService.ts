@@ -13,6 +13,26 @@ import { respondToMessage } from '../ai/baseAgent';
 import { getAgentConfig } from '../ai/agentConfigService';
 import { llm } from '../ai/llmClient';
 
+/**
+ * Deduplication check — Baileys replays messages on reconnect.
+ * Returns true if this external_message_id was already processed.
+ */
+async function isDuplicateMessage(orgId: string, externalMessageId?: string): Promise<boolean> {
+  if (!externalMessageId) return false;
+  try {
+    const { data } = await supabaseAdmin()
+      .from('customer_messages')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('external_message_id', externalMessageId)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
 /** Resolve (create if missing) the default WhatsApp account row for an org. */
 export async function resolveAccountId(orgId: string): Promise<string> {
   const sb = supabaseAdmin();
@@ -139,7 +159,12 @@ export async function handleIncomingMessage(
     whatsappAccountId: accountId,
   });
 
-  // 5) inbound message (with media metadata if present)
+  // 5) inbound message (with deduplication — Baileys replays on reconnect)
+  if (await isDuplicateMessage(orgId, parsed.externalMessageId)) {
+    logger.info({ externalMessageId: parsed.externalMessageId, chatId: parsed.chatId }, 'Duplicate message detected, skipping (sync path)');
+    return { reply: "", leadId: lead.id, conversationId: conversation.id };
+  }
+
   await insertMessage({
     orgId,
     conversationId: conversation.id,
@@ -198,6 +223,7 @@ export async function handleIncomingMessage(
       decision: result.shouldHandoff ? 'handoff' : 'auto_reply',
       confidence: result.matchedProperties[0]?.score ?? null,
       latency_ms: result.latencyMs,
+      metadata: { source: 'whatsapp' },
     })
     .select()
     .single();
@@ -335,7 +361,12 @@ export async function enqueueIncomingMessage(
     whatsappAccountId: resolvedAccountId,
   });
 
-  // 3) save inbound message
+  // 3) save inbound message (with deduplication)
+  if (await isDuplicateMessage(resolvedOrgId, parsed.externalMessageId)) {
+    logger.info({ externalMessageId: parsed.externalMessageId, chatId: parsed.chatId }, 'Duplicate message detected, skipping (async path)');
+    return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'duplicate_message' };
+  }
+
   await insertMessage({
     orgId: resolvedOrgId,
     conversationId: conversation.id,

@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { recordLlmCall } from './usageTracker';
 
 // ============================================================
 // LLM Hardening: Concurrency Limit, Retry, Timeout
@@ -125,6 +126,8 @@ export interface ChatOptions {
   thinking?: boolean;
   /** Reasoning effort when thinking is enabled: low | medium | high */
   reasoningEffort?: 'low' | 'medium' | 'high';
+  /** Source tag for usage tracking: 'whatsapp' | 'eval' | 'playground' | 'call_demo' | 'other' */
+  source?: string;
 }
 
 /**
@@ -183,6 +186,17 @@ class LlmClient {
       return {
         text: 'Thank you for your message. Our team will get back to you shortly.',
         model: 'fallback',
+        latencyMs: Date.now() - start,
+      };
+    }
+
+    // 🚨 Daily budget check — prevent cost overruns
+    const source = opts.source ?? 'other';
+    if (!recordLlmCall(source)) {
+      logger.error({ source, model }, 'LLM call blocked — daily budget exhausted');
+      return {
+        text: 'Thank you for your message. Our team will get back to you shortly.',
+        model: 'budget_exhausted',
         latencyMs: Date.now() - start,
       };
     }
