@@ -179,7 +179,7 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     if (configuration && u.configuration) {
       if (norm(u.configuration).includes(norm(configuration))) {
         score += 0.2;
-        reasons.push(`matches ${u.configuration}`);
+        reasons.push(`${u.configuration}`);
       } else {
         score -= 0.1;
       }
@@ -193,7 +193,7 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
 
       if (wantSector && norm(p.sector).includes(wantSector)) {
         score += 0.15;
-        reasons.push(`${p.sector}`);
+        reasons.push(`in ${p.sector}`);
       } else if (wantSector) {
         score -= 0.08;
       }
@@ -203,10 +203,22 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
       }
       if (wantLoc && (norm(p.location).includes(wantLoc) || norm(p.sector).includes(wantLoc))) {
         score += 0.05;
+        reasons.push(p.location ?? p.sector ?? '');
       }
     }
 
     if (score <= 0) continue;
+
+    // Build a human-readable reason string
+    const reasonParts: string[] = [];
+    if (u.configuration) reasonParts.push(u.configuration);
+    const locStr = [p?.sector, p?.city].filter(Boolean).join(', ');
+    if (locStr) reasonParts.push(`in ${locStr}`);
+    if (budgetMax != null && uMin != null && uMax != null) {
+      const overlaps = uMin <= budgetMax && uMax >= (budgetMin ?? 0);
+      if (overlaps) reasonParts.push('within budget');
+    }
+    if (u.possession_status) reasonParts.push(u.possession_status.replace(/_/g, ' '));
 
     scored.push({
       projectId: p?.id ?? '',
@@ -224,7 +236,7 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
       superAreaSqft: u.super_area_sqft ?? null,
       brochureUrl: u.brochure_url ?? null,
       score: Math.max(0, Math.min(1, score)),
-      reason: reasons.join(', ') || 'available listing',
+      reason: reasonParts.join(', ') || 'available listing',
     });
   }
 

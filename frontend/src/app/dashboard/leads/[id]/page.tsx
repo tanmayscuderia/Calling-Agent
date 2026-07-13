@@ -21,7 +21,9 @@ export default function LeadDetailPage() {
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCall, setShowCall] = useState(false);
-  const [handoff, setHandoff] = useState(false);
+  const [conversation, setConversation] = useState<any>(null);
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [togglingAi, setTogglingAi] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -29,13 +31,17 @@ export default function LeadDetailPage() {
       api(`/api/leads/${id}`),
       api(`/api/leads/${id}/messages`),
       api(`/api/leads/${id}/calls`),
+      api(`/api/conversations?limit=100`).catch(() => ({ conversations: [] })),
     ])
-      .then(([l, m, c]) => {
+      .then(([l, m, c, convData]) => {
         setLead(l.lead);
         setMessages(m.messages ?? []);
         setCalls(c.calls ?? []);
         setMatches(l.matches ?? []);
-        setHandoff(l.lead?.metadata?.human_handoff ?? false);
+        // Find conversation linked to this lead
+        const conv = (convData.conversations ?? []).find((cv: any) => cv.lead_id === id);
+        setConversation(conv);
+        setAiEnabled(conv?.ai_enabled ?? true);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -43,9 +49,20 @@ export default function LeadDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  const doHandoff = async () => {
-    await api(`/api/leads/${id}`, { method: 'PATCH', body: { metadata: { human_handoff: !handoff } } });
-    setHandoff(!handoff);
+  const toggleAi = async () => {
+    if (!conversation) return;
+    setTogglingAi(true);
+    try {
+      await api(`/api/conversations/${conversation.id}`, {
+        method: 'PATCH',
+        body: { ai_enabled: !aiEnabled, human_handoff: false },
+      });
+      setAiEnabled(!aiEnabled);
+    } catch (e) {
+      console.error('Failed to toggle AI:', e);
+    } finally {
+      setTogglingAi(false);
+    }
   };
 
   if (loading) return <div className="skeleton" style={{ height: 400, borderRadius: 16 }} />;
@@ -53,8 +70,30 @@ export default function LeadDetailPage() {
   return (
     <div style={{ maxWidth: 1100 }}>
       {/* Breadcrumb + header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <Link href="/dashboard/leads" style={{ fontSize: 13, color: '#64748b', textDecoration: 'none' }}>← Back to Leads</Link>
+        {/* AI Replies Toggle */}
+        {conversation && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderRadius: 12, background: aiEnabled ? '#dcfce7' : '#fee2e2', border: `1px solid ${aiEnabled ? '#86efac' : '#fca5a5'}` }}>
+            <span style={{ fontSize: 16 }}>{aiEnabled ? '🤖' : '🚫'}</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: aiEnabled ? '#16a34a' : '#dc2626' }}>
+                {aiEnabled ? 'AI Replies: ON' : 'AI Replies: OFF'}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>
+                {aiEnabled ? 'AI is handling this conversation' : 'AI is paused — human must reply'}
+              </div>
+            </div>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '6px 14px', fontSize: 12 }}
+              disabled={togglingAi}
+              onClick={toggleAi}
+            >
+              {togglingAi ? '...' : aiEnabled ? 'Pause AI' : 'Resume AI'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
@@ -180,9 +219,6 @@ export default function LeadDetailPage() {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={() => setShowCall(true)}>
           📞 Start AI Call Demo
-        </button>
-        <button className="btn btn-secondary" onClick={doHandoff}>
-          {handoff ? '🤖 Re-enable AI' : '👤 Human Handoff'}
         </button>
         <Link href="/dashboard/conversations" className="btn btn-ghost">💬 Open Conversation</Link>
       </div>

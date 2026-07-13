@@ -70,14 +70,18 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
   const { text: reply, model: replyModel } = await llm.generateText(
     replyUserPrompt,
     systemPrompt,
-    { temperature: 0.5, maxTokens: 400 }
+    { temperature: 0.7, maxTokens: 400 }
   );
 
   const finalReply = reply?.trim() || fallbackReply(ex, matches, cfg);
 
   // 5. Lead updates
   const leadUpdates = computeLeadUpdates(ex, matches, cfg);
-  const shouldHandoff = !!ex.needs_human || (ex.intent === 'general_question' && /human|agent|advisor/i.test(inboundText));
+  // Only hand off when the customer EXPLICITLY asks for a human/agent.
+  // Site visits, callbacks, and scheduling should NOT trigger handoff —
+  // the AI handles those itself and continues the conversation.
+  const wantsHuman = /(?:talk|speak|chat) to (?:a |an )?(?:human|agent|person|manager|supervisor)|connect me to (?:a |an )?(?:human|agent)|human (?:agent|support|advisor)|i want a human/i.test(inboundText);
+  const shouldHandoff = wantsHuman && !ex.intent?.includes('property_search');
 
   // 6. Quick replies
   const quickReplies = generateQuickReplies(ex, matches, lead, cfg);
@@ -156,7 +160,15 @@ function buildReplyUserPrompt(
           if (m.sublabel) parts.push(m.sublabel);
           if (m.priceRange) parts.push(m.priceRange);
           if (m.details?.configuration) parts.push(m.details.configuration);
-          if (m.details?.possessionStatus) parts.push(m.details.possessionStatus);
+          if (m.details?.possessionStatus) parts.push(m.details.possessionStatus.replace(/_/g, ' '));
+          // Rich details — developer, area, location
+          if (m.details?.developerName) parts.push(`by ${m.details.developerName}`);
+          if (m.details?.superAreaSqft) parts.push(`${m.details.superAreaSqft} sqft`);
+          if (m.details?.city || m.details?.sector) {
+            const locStr = [m.details?.sector, m.details?.city].filter(Boolean).join(', ');
+            parts.push(locStr);
+          }
+          if (m.details?.brochureUrl) parts.push('brochure available');
           return `${i + 1}. ${parts.join(' — ')}`;
         })
         .join('\n')
@@ -169,12 +181,15 @@ function buildReplyUserPrompt(
     }
   }
 
+  // Expanded history window: last 10 turns for full conversation context
   const history = input.recentMessages
-    .slice(-4)
+    .slice(-10)
     .map((m) => `${m.direction === 'inbound' ? 'Customer' : 'Assistant'}: ${m.body}`)
     .join('\n');
 
-  return `Inventory available for this reply (use ONLY these, do not invent):
+  return `IMPORTANT — USE THIS CONTEXT. Do not repeat questions or forget what was already shared above.
+
+Inventory available for this reply (use ONLY these, do not invent):
 ${inv}
 
 Customer preferences extracted:
@@ -182,8 +197,8 @@ ${JSON.stringify(ex, null, 2)}
 
 Missing key info: ${missing.join(', ') || 'none'}.
 
-Conversation so far:
-${history || '(start)'}
+Conversation so far (use this — don't re-ask anything already answered):
+${history || '(start of conversation)'}
 
 Customer's latest message:
 """${input.inboundText}"""`;

@@ -37,12 +37,14 @@ export default function PlaygroundPage() {
     if (!text.trim() || loading) return;
     setError(null);
     setInput('');
+    // Capture history BEFORE adding the new user turn, then add it to state
+    const history = turns.map((t) => ({ role: t.role, text: t.text }));
     setTurns((prev) => [...prev, { role: 'user', text }]);
     setLoading(true);
     try {
       const res = await api('/api/ai/simulate', {
         method: 'POST',
-        body: { text },
+        body: { text, history },
       });
       setTurns((prev) => [
         ...prev,

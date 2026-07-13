@@ -188,9 +188,20 @@ export async function handleIncomingMessage(
     logger.info({ chatId: parsed.chatId }, 'Conversation blocked; skipping AI');
     return { reply: "", leadId: lead.id, conversationId: conversation.id };
   }
-  if (conversation.human_handoff || !conversation.ai_enabled) {
-    logger.info({ chatId: parsed.chatId }, 'Human handoff active / AI disabled; skipping AI');
+  // AI replies ALWAYS — even if human_handoff or pending_human.
+  // The only way to silence AI is to manually toggle ai_enabled=false
+  // via the CRM dashboard.
+  if (!conversation.ai_enabled) {
+    logger.info({ chatId: parsed.chatId }, 'AI manually disabled for this conversation; skipping');
     return { reply: "", leadId: lead.id, conversationId: conversation.id };
+  }
+  // If human_handoff was active, clear it — customer is back and AI is responding.
+  if (conversation.human_handoff) {
+    logger.info({ chatId: parsed.chatId }, 'Clearing stale human_handoff — AI resuming');
+    await updateConversation(orgId, conversation.id, {
+      human_handoff: false,
+      status: 'open',
+    }).catch(() => {});
   }
 
   // recent history
@@ -293,12 +304,14 @@ export async function handleIncomingMessage(
   }
 
   // 11c) conversation summary + handoff
+  // NOTE: We no longer disable AI on handoff — the AI keeps replying.
+  // human_handoff is just a flag for the dashboard to show "human attention needed".
+  // Only ai_enabled=false (set manually via CRM) stops the bot.
   if (result.shouldHandoff) {
     await updateConversation(orgId, conversation.id, {
       human_handoff: true,
-      ai_enabled: false,
       status: 'pending_human',
-      summary: `AI handed off: ${result.reply}`,
+      summary: `Customer requested human agent: ${result.reply}`,
     });
   }
 
@@ -388,8 +401,17 @@ export async function enqueueIncomingMessage(
   if (conversation.status === 'blocked') {
     return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'blocked' };
   }
-  if (conversation.human_handoff || !conversation.ai_enabled) {
-    return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'human_handoff' };
+  // AI replies ALWAYS — even if pending_human or human_handoff was set.
+  // Only manual ai_enabled=false stops the bot.
+  if (!conversation.ai_enabled) {
+    return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'ai_disabled' };
+  }
+  // Clear stale handoff — AI is resuming
+  if (conversation.human_handoff) {
+    await updateConversation(resolvedOrgId, conversation.id, {
+      human_handoff: false,
+      status: 'open',
+    }).catch(() => {});
   }
 
   // 5) enqueue processing job
