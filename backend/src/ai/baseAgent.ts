@@ -14,7 +14,7 @@
 
 import { llm } from './llmClient';
 import { getAgentConfig } from './agentConfigService';
-import { buildSystemPrompt, buildExtractionPrompt } from './promptEngine';
+import { buildSystemPrompt, buildExtractionPrompt, buildTemplateContext } from './promptEngine';
 import { searchInventory, InventoryMatch } from './inventorySearch';
 import { normalizeEmail } from '../utils/email';
 import { normalizePhone } from '../utils/phone';
@@ -60,7 +60,13 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
 
   // 4. Generate reply
   const replyUserPrompt = buildReplyUserPrompt(input, cfg, ex, matches);
-  const systemPrompt = buildSystemPrompt(cfg);
+  const templateCtx = buildTemplateContext(cfg, {
+    customerName: lead.full_name ?? lead.customer_name,
+    customerPhone: lead.phone ?? lead.customer_phone,
+    inventoryCount: matches.length,
+    extractedData: ex,
+  });
+  const systemPrompt = buildSystemPrompt(cfg, templateCtx);
   const { text: reply, model: replyModel } = await llm.generateText(
     replyUserPrompt,
     systemPrompt,

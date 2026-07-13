@@ -47,7 +47,7 @@ export default function PropertyDetailPage() {
     const newStatus = unit.availability_status === 'available' ? 'inactive' : 'available';
     await api(`/api/inventory/units/${unit.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ availability_status: newStatus }),
+      body: { availability_status: newStatus },
     });
     load();
   };
@@ -248,9 +248,9 @@ function UnitFormModal({ projectId, unit, onClose, onSaved }: { projectId: strin
       };
 
       if (unit) {
-        await api(`/api/inventory/units/${unit.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        await api(`/api/inventory/units/${unit.id}`, { method: 'PATCH', body: payload });
       } else {
-        await api('/api/inventory/units', { method: 'POST', body: JSON.stringify({ ...payload, project_id: projectId }) });
+        await api('/api/inventory/units', { method: 'POST', body: { ...payload, project_id: projectId } });
       }
       onSaved();
     } catch {

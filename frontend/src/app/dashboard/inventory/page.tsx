@@ -57,7 +57,7 @@ export default function InventoryPage() {
     const newStatus = proj.status === 'active' ? 'inactive' : 'active';
     await api(`/api/inventory/projects/${proj.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: newStatus }),
+      body: { status: newStatus },
     });
     load();
   };

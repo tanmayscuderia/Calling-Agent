@@ -8,11 +8,12 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/unit/",
-    "test:watch": "vitest tests/unit/",
-    "eval": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run tests/evals/",
-    "eval:safety": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run tests/evals/llm-safety.eval.ts",
-    "eval:watch": "LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest tests/evals/"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:evals": "VITEST_EVAL_MODE=1 LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run",
+    "test:evals:fresh": "VITEST_EVAL_MODE=1 EVAL_NO_CACHE=1 LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run",
+    "test:evals:dry": "VITEST_EVAL_MODE=1 EVAL_DRY_RUN=1 vitest run",
+    "test:all": "npm test && npm run test:evals"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",

@@ -2,19 +2,22 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Both unit and eval tests live under tests/
-    // Scripts control which dir runs via --dir flag
-    include: ['tests/**/*.test.ts', 'tests/**/*.eval.ts'],
+    // In eval mode, load the cache + guard setup file automatically
+    setupFiles: process.env.VITEST_EVAL_MODE
+      ? ['./tests/evals/evalSetup.ts']
+      : [],
+    // By default, only run unit tests (0 API calls, instant).
+    // Evals are opt-in via `npm run test:evals`.
+    include: process.env.VITEST_EVAL_MODE
+      ? ['tests/evals/**/*.eval.ts']
+      : ['tests/unit/**/*.test.ts'],
     // Eval tests are slower (real LLM calls) — give generous timeouts
     testTimeout: 60_000,
     hookTimeout: 30_000,
-    // Prevent vitest from running eval tests during unit test runs
-    // (controlled by npm scripts passing --dir)
     globals: false,
     // Eval tests make real LLM API calls — running them in parallel
     // causes rate-limit (429) failures. fileParallelism:false ensures
-    // test files run sequentially. Combined with LLM_MAX_CONCURRENT=1
-    // and LLM_MIN_DELAY_MS=2000 in npm scripts, this prevents bursts.
+    // test files run sequentially.
     fileParallelism: false,
   },
 });

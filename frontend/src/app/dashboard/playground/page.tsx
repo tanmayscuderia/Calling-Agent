@@ -42,7 +42,7 @@ export default function PlaygroundPage() {
     try {
       const res = await api('/api/ai/simulate', {
         method: 'POST',
-        body: JSON.stringify({ text }),
+        body: { text },
       });
       setTurns((prev) => [
         ...prev,

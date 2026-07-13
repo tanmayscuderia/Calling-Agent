@@ -120,7 +120,12 @@
   }
 
   /* ---- BUTTONS ---- */
-  .btn {
+  /* Base styles applied to .btn and all variants so any can be used alone */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-ghost {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -138,8 +143,21 @@
     min-height: 40px; /* Principle: minimum 40px hit area */
   }
 
-  .btn:active {
+  .btn:active,
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-danger:active,
+  .btn-ghost:active {
     transform: scale(0.96);
+  }
+
+  .btn:disabled,
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-danger:disabled,
+  .btn-ghost:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .btn-primary {

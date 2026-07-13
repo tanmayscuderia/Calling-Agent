@@ -90,19 +90,19 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
       if (isEdit) {
         await api(`/api/inventory/projects/${project.id}`, {
           method: 'PATCH',
-          body: JSON.stringify(projectData),
+          body: projectData,
         });
       } else {
         const res = await api('/api/inventory/projects', {
           method: 'POST',
-          body: JSON.stringify(projectData),
+          body: projectData,
         });
 
         // Auto-create a unit if configuration + price are provided
         if (form.configuration && form.price_min) {
           await api('/api/inventory/units', {
             method: 'POST',
-            body: JSON.stringify({
+            body: {
               project_id: res.project.id,
               title: `${form.configuration} in ${form.name.trim()}`,
               configuration: form.configuration,
@@ -114,7 +114,7 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
               availability_status: form.availability_status,
               brochure_url: form.brochure_url || null,
               description: form.unit_description || null,
-            }),
+            },
           });
         }
       }

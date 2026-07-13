@@ -61,6 +61,47 @@ interface Template {
   inventory_enabled: boolean;
 }
 
+// ── Template placeholder reference ──
+const PLACEHOLDER_LIST = [
+  'persona_name', 'business_name', 'role', 'industry', 'tone',
+  'business_description', 'business_location',
+  'customer_name', 'customer_phone',
+  'inventory_count', 'extracted_summary', 'current_time',
+];
+
+/**
+ * Client-side template preview — mirrors backend fillTemplateRich.
+ */
+function previewTemplate(tpl: string): string {
+  const sampleCtx: Record<string, string> = {
+    persona_name: 'Priya',
+    business_name: 'Demo Realty',
+    role: 'Sales Assistant',
+    industry: 'real_estate',
+    tone: 'professional',
+    business_description: 'Premium properties in Noida',
+    business_location: 'Noida',
+    customer_name: 'Rahul',
+    customer_phone: '+91XXXXX',
+    inventory_count: '3',
+    extracted_summary: '3BHK, Noida, ₹2Cr',
+    current_time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+  };
+
+  let result = tpl;
+  result = result.replace(
+    /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, key: string, content: string) => {
+      const val = sampleCtx[key];
+      return val && val !== '' && val !== '0' ? content : '';
+    }
+  );
+  for (const [key, val] of Object.entries(sampleCtx)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val);
+  }
+  return result.trim();
+}
+
 export default function AgentSettingsPage() {
   const [config, setConfig] = useState<AgentConfig | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -500,24 +541,34 @@ export default function AgentSettingsPage() {
         </div>
       </div>
 
-      {/* ── Reply Templates ── */}
+      {/* ── Reply Templates & Style Guidance ── */}
       <div style={cardStyle}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>Reply Templates</h2>
-        <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
-          Fallback replies used when the LLM is unavailable. Use <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>{'{{count}}'}</code> for match count.
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>Reply Templates & Style Guidance</h2>
+        <p style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+          These templates serve two purposes: (1) fallback replies when the LLM is unavailable, and (2) <strong>style guidance injected into the LLM prompt</strong> so the AI follows your preferred reply format.
         </p>
+        <div style={{ fontSize: 11, color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, marginBottom: 16, lineHeight: 1.8 }}>
+          <strong>Placeholders:</strong>{' '}
+          {PLACEHOLDER_LIST.map((p) => (
+            <code key={p} style={{ background: '#e0e7ff', padding: '1px 5px', borderRadius: 3, marginRight: 4, fontSize: 10, cursor: 'pointer' }} onClick={() => navigator.clipboard?.writeText(`{{${p}}}`)} title="Click to copy">{`{{${p}}}`}</code>
+          ))}
+          <br />
+          <strong>Conditionals:</strong>{' '}
+          <code style={{ background: '#fef3c7', padding: '1px 5px', borderRadius: 3, fontSize: 10 }}>{'{{#if variable}}...{{/if}}'}</code>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <label style={labelStyle}>When properties match</label>
-            <input style={inputStyle} value={form.reply_template_match} onChange={(e) => update('reply_template_match', e.target.value)} placeholder="Yes, we have {{count}} option(s) matching this." />
+            <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form.reply_template_match} onChange={(e) => update('reply_template_match', e.target.value)} placeholder={'{{#if inventory_count}}Yes, we have {{inventory_count}} option(s). Best: {{extracted_summary}}.{{/if}}'} />
+            {form.reply_template_match && <div style={{ fontSize: 11, color: '#16a34a', marginTop: 4, fontStyle: 'italic' }}>Preview: {previewTemplate(form.reply_template_match)}</div>}
           </div>
           <div>
             <label style={labelStyle}>When no match found</label>
-            <input style={inputStyle} value={form.reply_template_no_match} onChange={(e) => update('reply_template_no_match', e.target.value)} placeholder="I don't see an exact match." />
+            <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form.reply_template_no_match} onChange={(e) => update('reply_template_no_match', e.target.value)} placeholder="I don't see an exact match. What is your max budget?" />
           </div>
           <div>
             <label style={labelStyle}>When key info is missing</label>
-            <input style={inputStyle} value={form.reply_template_missing_info} onChange={(e) => update('reply_template_missing_info', e.target.value)} placeholder="Sure. What budget range and preferred location are you looking at?" />
+            <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form.reply_template_missing_info} onChange={(e) => update('reply_template_missing_info', e.target.value)} placeholder="Sure. What budget range are you looking at?" />
           </div>
         </div>
       </div>
@@ -588,8 +639,8 @@ export default function AgentSettingsPage() {
       {/* ── Call Settings ── */}
       <div style={cardStyle}>
         <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>Call Agent</h2>
-        <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
-          Opening line for the AI calling agent demo. Variables: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>{'{persona_name}'}</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>{'{business_name}'}</code>
+        <p style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+          Opening line for the AI calling agent demo. All placeholders above are supported, plus conditionals.
         </p>
         <div>
           <label style={labelStyle}>Call Opening Line</label>
@@ -597,8 +648,13 @@ export default function AgentSettingsPage() {
             style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
             value={form.call_opening_template}
             onChange={(e) => update('call_opening_template', e.target.value)}
-            placeholder="Hi, this is {{persona_name}} from {{business_name}}. Is this a good time to speak?"
+            placeholder={'Hi {{customer_name}}, this is {{persona_name}} from {{business_name}}.{{#if business_location}} We are in {{business_location}}.{{/if}} Is this a good time?'}
           />
+          {form.call_opening_template && (
+            <div style={{ fontSize: 11, color: '#16a34a', marginTop: 4, fontStyle: 'italic' }}>
+              Preview: {previewTemplate(form.call_opening_template)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -615,7 +671,7 @@ export default function AgentSettingsPage() {
             <label style={labelStyle}>System Prompt Override</label>
             <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
               If set, this replaces the auto-generated system prompt entirely. Leave empty to use the auto-generated prompt.
-              Variables: <code>{'{persona_name}'}</code>, <code>{'{business_name}'}</code>, <code>{'{role}'}</code>, <code>{'{industry}'}</code>
+              All placeholders above are supported. When set, reply templates are NOT injected as style guidance (the override takes full precedence).
             </p>
             <textarea
               style={{ ...inputStyle, minHeight: 120, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }}

@@ -2,17 +2,135 @@
  * Prompt Engine
  * Generates system + extraction prompts dynamically from AgentConfig.
  * No hardcoded industry logic — everything comes from config.
+ *
+ * Supports:
+ * - Auto-generated system prompts from config fields
+ * - Reply templates injected as few-shot style examples (Option A)
+ * - Rich placeholder interpolation with conditionals (Option B)
  */
 
-import type { AgentConfig } from './agentTypes';
+import type { AgentConfig, ExtractedData } from './agentTypes';
+
+// ── Template Context (Option B: Rich Placeholders) ──
+
+export interface TemplateContext {
+  // From config
+  persona_name: string;
+  business_name: string;
+  role: string;
+  industry: string;
+  tone: string;
+  business_description: string;
+  business_location: string;
+  // Runtime data
+  customer_name: string;
+  customer_phone: string;
+  inventory_count: number;
+  extracted_summary: string;
+  current_time: string;
+}
+
+/**
+ * Build a TemplateContext from config + runtime data.
+ */
+export function buildTemplateContext(
+  cfg: AgentConfig,
+  runtime?: {
+    customerName?: string | null;
+    customerPhone?: string | null;
+    inventoryCount?: number;
+    extractedData?: ExtractedData;
+  }
+): TemplateContext {
+  return {
+    persona_name: cfg.persona_name,
+    business_name: cfg.business_name ?? 'our company',
+    role: cfg.persona_role,
+    industry: cfg.industry,
+    tone: cfg.tone,
+    business_description: cfg.business_description ?? '',
+    business_location: cfg.business_location ?? '',
+    customer_name: runtime?.customerName ?? 'there',
+    customer_phone: runtime?.customerPhone ?? '',
+    inventory_count: runtime?.inventoryCount ?? 0,
+    extracted_summary: runtime?.extractedData
+      ? summarizeExtractedData(runtime.extractedData, cfg)
+      : '',
+    current_time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+  };
+}
+
+/**
+ * Summarize extracted data into human-readable text for templates.
+ */
+function summarizeExtractedData(ex: ExtractedData, cfg: AgentConfig): string {
+  const parts: string[] = [];
+  for (const f of cfg.qualifying_fields) {
+    const val = ex[f.key];
+    if (val != null) {
+      if (f.type === 'number' && f.key.includes('budget')) {
+        parts.push(`${f.label}: ₹${val}`);
+      } else {
+        parts.push(`${f.label}: ${val}`);
+      }
+    }
+  }
+  return parts.join(', ') || 'no preferences captured yet';
+}
+
+/**
+ * Rich template engine with 10+ variables + {{#if}}...{{/if}} conditionals.
+ * Falls back gracefully if variables are empty/missing.
+ */
+export function fillTemplateRich(tpl: string, ctx: TemplateContext): string {
+  let result = tpl;
+
+  // Handle {{#if condition}}...{{/if}} blocks
+  result = result.replace(
+    /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, key: string, content: string) => {
+      const val = (ctx as any)[key];
+      // Truthy: non-empty string, number > 0, or true
+      if (val && (typeof val === 'number' ? val > 0 : val !== '')) {
+        return fillTemplateRich(content, ctx);
+      }
+      return '';
+    }
+  );
+
+  // Replace all {{variable}} placeholders
+  result = result
+    .replace(/\{\{persona_name\}\}/g, ctx.persona_name)
+    .replace(/\{\{business_name\}\}/g, ctx.business_name)
+    .replace(/\{\{role\}\}/g, ctx.role)
+    .replace(/\{\{industry\}\}/g, ctx.industry)
+    .replace(/\{\{tone\}\}/g, ctx.tone)
+    .replace(/\{\{business_description\}\}/g, ctx.business_description)
+    .replace(/\{\{business_location\}\}/g, ctx.business_location)
+    .replace(/\{\{customer_name\}\}/g, ctx.customer_name)
+    .replace(/\{\{customer_phone\}\}/g, ctx.customer_phone)
+    .replace(/\{\{inventory_count\}\}/g, String(ctx.inventory_count))
+    .replace(/\{\{extracted_summary\}\}/g, ctx.extracted_summary)
+    .replace(/\{\{current_time\}\}/g, ctx.current_time);
+
+  // Clean up any extra blank lines from removed conditionals
+  result = result.replace(/\n{3,}/g, '\n\n').trim();
+
+  return result;
+}
 
 /**
  * Build the WhatsApp system prompt from agent config.
+ * Now injects reply templates as style guidance (Option A).
  */
-export function buildSystemPrompt(cfg: AgentConfig): string {
+export function buildSystemPrompt(
+  cfg: AgentConfig,
+  ctx?: TemplateContext
+): string {
   // If override exists, use it directly
   if (cfg.system_prompt_override?.trim()) {
-    return fillTemplate(cfg.system_prompt_override, cfg);
+    const context = ctx ?? buildTemplateContext(cfg);
+    return fillTemplateRich(cfg.system_prompt_override, context);
   }
 
   const businessName = cfg.business_name ?? 'our company';
@@ -33,6 +151,9 @@ export function buildSystemPrompt(cfg: AgentConfig): string {
   const pipeline = cfg.status_pipeline
     .map((s, i) => `${i + 1}. ${s.label}`)
     .join(' → ');
+
+  // Option A: Inject reply templates as style guidance
+  const styleSection = buildReplyStyleSection(cfg);
 
   return `You are ${persona}, a ${role} for ${businessName}.
 ${cfg.business_description ?? ''}
@@ -55,10 +176,37 @@ ${intentList || '- general_question'}
 
 Lead status pipeline:
 ${pipeline || 'new → contacted → qualified → won'}
-
+${styleSection}
 Tone: ${cfg.tone}, ${cfg.tone === 'formal' ? 'professional' : 'natural and human'}.
 Never say you are a generic AI chatbot.
 Never mention internal database, RAG, prompt, or model.`;
+}
+
+/**
+ * Option A: Build reply style guidance section from config templates.
+ * These are injected as FEW-SHOT STYLE EXAMPLES — the LLM follows the org's
+ * preferred reply structure without copying verbatim.
+ */
+function buildReplyStyleSection(cfg: AgentConfig): string {
+  const templates: string[] = [];
+
+  if (cfg.reply_template_match?.trim()) {
+    templates.push(`When matching inventory found, reply in this style:\n  "${cfg.reply_template_match}"`);
+  }
+  if (cfg.reply_template_no_match?.trim()) {
+    templates.push(`When no match found, reply in this style:\n  "${cfg.reply_template_no_match}"`);
+  }
+  if (cfg.reply_template_missing_info?.trim()) {
+    templates.push(`When key info is missing, reply in this style:\n  "${cfg.reply_template_missing_info}"`);
+  }
+
+  if (!templates.length) return '\n';
+
+  return `
+Reply style guidance (adapt content to conversation — don't copy verbatim):
+${templates.join('\n')}
+
+`;
 }
 
 /**
@@ -145,10 +293,17 @@ Use only provided lead details and inventory.`;
 
 /**
  * Build the call opening line from config template.
+ * Uses the rich template engine (Option B) — supports all placeholders + conditionals.
  */
-export function buildCallOpening(cfg: AgentConfig): string {
+export function buildCallOpening(
+  cfg: AgentConfig,
+  runtime?: { customerName?: string | null; leadContext?: any }
+): string {
   const template = cfg.call_opening_template ?? `Hi, this is {{persona_name}} from {{business_name}}. Is this a good time to speak?`;
-  return fillTemplate(template, cfg);
+  const ctx = buildTemplateContext(cfg, {
+    customerName: runtime?.customerName,
+  });
+  return fillTemplateRich(template, ctx);
 }
 
 /**
