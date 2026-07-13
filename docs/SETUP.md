@@ -84,6 +84,8 @@ psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambigu
 | `0001_more_industry_templates` | 4 more templates (legal, automotive, salon, insurance) |
 | `0001_fix_dequeue_rpc_ambiguous` | Fix column ambiguity in dequeue RPC |
 
+> **Total: 9 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+
 ---
 
 ## Step 3: Create a Login User
@@ -253,6 +255,18 @@ If login fails:
 ---
 
 ## Step 10: Test the AI
+
+### Option A: AI Playground (no WhatsApp needed)
+
+Open **http://localhost:3000/dashboard/playground**:
+
+1. Type: `Hi, I am looking for a 3BHK in Noida around 2 crore`
+2. Click **Send**
+3. See the AI reply, extracted data, and matched properties
+
+> Fastest way to verify the AI is working — no WhatsApp setup required.
+
+### Option B: WhatsApp (full flow)
 
 From a **different phone**, send a WhatsApp message to the connected number:
 

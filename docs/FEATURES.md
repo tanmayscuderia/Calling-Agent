@@ -106,8 +106,8 @@ Complete list of every capability the app has, organized by module.
 | **Lead Editing** | Update lead info, assignment, notes via API |
 | **Conversation Inbox** | WhatsApp-style inbox — conversation list + chat view |
 | **Manual Send** | Send manual messages from dashboard |
-| **Human Handoff Toggle** | Turn AI off for any conversation — human takes over |
-| **AI Enabled Toggle** | Per-conversation AI auto-reply control |
+| **Human Handoff Toggle** | Flag a conversation as needing human attention — sets dashboard status |
+| **AI ON/OFF Toggle** | Per-conversation AI auto-reply control — the actual toggle that silences/resumes AI replies |
 | **Dashboard Stats** | Total leads, hot leads, open conversations, AI replies today, calls, properties |
 
 ---
@@ -170,7 +170,7 @@ Complete list of every capability the app has, organized by module.
 |---|---------|
 | 1 | Group messages ignored by default |
 | 2 | Allowlist support via env |
-| 3 | No auto-reply when `human_handoff=true` |
+| 3 | No auto-reply when `ai_enabled=false` (the explicit AI ON/OFF toggle) |
 | 4 | No auto-reply when conversation is `blocked` |
 | 5 | No mass outbound messages |
 | 6 | Reply only to inbound user messages |
@@ -285,11 +285,11 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 | **Template-Driven Evals** | Tests config-driven extraction + reply across industries |
 | **Cross-Industry Evals** | Education industry e2e — validates multi-industry support |
 | **Golden Cases** | Curated test cases with expected outcomes |
-| **169 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter |
+| **150 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter |
 | **Rate-Limit Safe** | Evals run sequential (`fileParallelism: false`), 1 concurrent LLM call, 2s min-delay |
 
 ### Test Files
-- `backend/tests/unit/` — 169 tests (9 files)
+- `backend/tests/unit/` — 150 tests (9 files)
 - `backend/tests/evals/` — 91 eval tests (8 files)
 
 ---
@@ -326,3 +326,19 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 - `frontend/src/lib/animations.ts` — Shared motion variants, easing curves, stagger containers
 - `frontend/src/components/motion/MotionPrimitives.tsx` — `MotionPage`, `MotionCard`, `MotionButton`, `AnimatedModal`
 - `frontend/src/app/layout.tsx` — `AnimatePresence` route transition wrapper
+
+---
+
+## 15. AI Playground ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Live Extraction Test** | Type any customer message → see what the AI extracts (intent, budget, config, location, etc.) |
+| **Live Reply Test** | Type a message → get the actual AI reply that would be sent on WhatsApp |
+| **Config-Aware** | Uses the org's current `agent_config` — tests the real persona and prompt |
+| **Instant Feedback** | Shows extracted JSON + generated reply side-by-side |
+| **No WhatsApp Needed** | Test AI behavior without connecting WhatsApp bridge |
+
+### Playground Files
+- `frontend/src/app/dashboard/playground/page.tsx` — Extraction + reply testing UI
+- `backend/src/routes/ai.routes.ts` — `POST /api/ai/test-extraction`, `POST /api/ai/test-reply`

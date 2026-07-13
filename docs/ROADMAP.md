@@ -78,12 +78,19 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **169 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter (9 files)
+- **150 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter (9 files)
 - **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
-- **260 total tests, ALL GREEN**
+- **241 total tests, ALL GREEN**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
+
+### Phase E2: AI Playground ✅
+- **Playground page** — test extraction + reply without WhatsApp
+- **History support** — up to 12 prior turns for conversational context
+- **Live extraction** — see what the AI extracts from any message
+- **Live reply** — see the actual reply that would be sent on WhatsApp
+- **Config-aware** — uses the org's current agent config
 
 ---
 
@@ -97,7 +104,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
 | Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals |
-| Testing | Strong | 260 tests covering unit + LLM quality |
+| Testing | Strong | 241 tests covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---

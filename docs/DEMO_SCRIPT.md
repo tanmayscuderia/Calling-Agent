@@ -283,13 +283,28 @@ Please share your preferred time slot.
 
 ```bash
 # Test AI without WhatsApp
-curl -X POST http://localhost:3001/api/ai/simulate \
+curl -X POST http://localhost:4000/api/ai/simulate \
   -H "Content-Type: application/json" \
   -d '{"text":"I want a 3BHK in Noida around 2 crore"}'
 
 # Check LLM status
-curl http://localhost:3001/api/ai/status
+curl http://localhost:4000/api/ai/status
 
 # Check inventory
-curl "http://localhost:3001/api/inventory/search?configuration=3BHK&budgetMax=20000000"
+curl "http://localhost:4000/api/inventory/search?configuration=3BHK&budgetMax=20000000"
 ```
+
+---
+
+## Alternative: AI Playground (No WhatsApp Needed)
+
+**Open:** http://localhost:3000/dashboard/playground
+
+This is the fastest way to show AI quality without setting up WhatsApp:
+
+1. Type a customer message (e.g., "I want a 3BHK in Noida around 2 crore")
+2. Click **Send**
+3. See the AI reply, extracted data, and matched properties — all live
+4. Continue the conversation to show multi-turn context
+
+> Great for quick demos where WhatsApp scanning isn't practical.

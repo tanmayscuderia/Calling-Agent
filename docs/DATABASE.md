@@ -12,6 +12,7 @@ All tables, columns, relationships, and indexes.
 > - `20260103_0001_agent_configs_templates.sql` — Agent config + template tables + 8 seed templates
 > - `20260103_0002_lead_dedup_unique_indexes.sql` — Lead dedup unique constraints
 > - `20260104_0001_more_industry_templates.sql` — 4 more templates (legal, automotive, salon, insurance)
+> - `20260105_0001_fix_dequeue_rpc_ambiguous.sql` — Fix column ambiguity in `dequeue_job()` RPC
 
 ---
 

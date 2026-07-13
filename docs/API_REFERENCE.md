@@ -630,16 +630,22 @@ Check LLM provider configuration.
 
 ---
 
-### `POST /api/simulate`
-Test the AI agent without WhatsApp. Sends text, gets AI reply.
+### `POST /api/ai/simulate`
+Test the AI agent without WhatsApp. Sends text, gets AI reply. Used by the AI Playground page.
 
 **Request:**
 ```json
 {
   "text": "I want a 3BHK in Noida around 2 crore",
-  "leadId": null
+  "leadId": null,
+  "history": [
+    { "role": "user", "text": "Looking for 3BHK" },
+    { "role": "assistant", "text": "Yes, we have options..." }
+  ]
 }
 ```
+
+> `history` is optional — include up to 12 prior turns for conversational context.
 
 **Response:**
 ```json

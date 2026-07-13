@@ -1,6 +1,6 @@
 # Architecture — Calling Agent Platform
 
-> **Last Updated:** 2026-07-11
+> **Last Updated:** 2026-07-13
 > **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · Baileys (WhatsApp) · DeepSeek/OpenAI (LLM)
 
 ---
@@ -125,7 +125,6 @@ Customer sends WhatsApp message
 │ 4. Save inbound message         │  → customer_messages
 │ 5. Check guards:                │
 │    - ai_enabled?                │
-│    - human_handoff?             │
 │    - status != blocked?         │
 │ 6. ENQUEUE async job (non-block)│  → job_queue table
 └───────────────┬─────────────────┘
@@ -534,6 +533,12 @@ frontend/src/app/
     ├── whatsapp/
     │   └── page.tsx            → WhatsApp bridge status + QR + controls
     │
+    ├── followups/
+    │   └── page.tsx            → Follow-up management (all pending/scheduled)
+    │
+    ├── playground/
+    │   └── page.tsx            → AI testing playground (extraction + reply)
+    │
     └── agent-settings/
         └── page.tsx            → Agent config editor (12 templates, fields, prompts)
 ```
@@ -825,7 +830,8 @@ Safety checks:
 |---------|--------|--------|
 | Ignore groups | `AI_IGNORE_GROUPS=true` | Skip group messages entirely |
 | Allowlist | `AI_ALLOWED_NUMBERS=...` | Only auto-reply to listed numbers |
-| Human handoff | Per-conversation toggle | Disables AI auto-reply |
+| AI ON/OFF toggle | `ai_enabled=false` (per-conversation) | The actual toggle that silences AI auto-reply |
+| Human handoff flag | Per-conversation flag | Dashboard indicator only — does NOT silence AI |
 | Blocked status | Per-conversation | No AI processing for blocked chats |
 | No mass outbound | Architecture rule | AI only replies to inbound messages |
 
@@ -837,7 +843,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 169 tests (no LLM, instant)
+├── unit/                          ← 150 tests (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing
@@ -878,7 +884,7 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 260 tests (169 unit + 91 eval) — ALL GREEN**
+**Total: 241 tests (150 unit + 91 eval) — ALL GREEN**
 
 ---
 
