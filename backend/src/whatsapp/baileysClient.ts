@@ -309,7 +309,14 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // INCOMING MESSAGES
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
-        if (type !== 'notify') return;
+        // FIX: Process BOTH 'notify' (real-time) and 'append' (offline/backfill).
+        // Previously only 'notify' was processed, so messages that arrived during
+        // a reconnect were silently dropped — a common reason new numbers "didn't trigger".
+        // Dedup is handled downstream by whatsappService (external_message_id unique check).
+        if (type !== 'notify' && type !== 'append') return;
+
+        logger.info({ type, count: messages?.length ?? 0 }, '📨 messages.upsert received');
+
         for (const msg of messages) {
           if (!msg.message) continue;
           // DEBUG: Allow self-messages when WHATSAPP_SELF_TEST=true.
@@ -349,7 +356,34 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             }
           }
 
-          if (!parsed.text) continue;
+          // FIX: Previously, messages with no text (audio, stickers, contacts, reactions,
+          // protocol messages) were silently dropped here with `if (!parsed.text) continue`.
+          // For a new number whose FIRST message is a voice note or sticker, the bot
+          // would never see it and never respond — making it seem like the number "didn't sync".
+          // Now we synthesize placeholder text so the message flows through the pipeline.
+          // The AI can then ask the customer to send text, or we handle it gracefully.
+          if (!parsed.text || parsed.text.trim() === '') {
+            if (parsed.messageType === 'audio') {
+              parsed.text = '[voice note — please send your query as text]';
+            } else if (parsed.messageType === 'image' || parsed.messageType === 'video') {
+              parsed.text = '[media message]';
+            } else if (parsed.messageType === 'document') {
+              parsed.text = `[document${parsed.mediaFileName ? ': ' + parsed.mediaFileName : ''}]`;
+            } else if (parsed.messageType === 'location') {
+              // Location messages already have synthesized text from the parser
+            } else {
+              // Stickers, reactions, contacts, protocol messages, etc.
+              logger.info(
+                { chatId: parsed.chatId, messageType: parsed.messageType },
+                '⏭️ Skipping non-text message with no synthesized content'
+              );
+              continue;
+            }
+            logger.info(
+              { chatId: parsed.chatId, messageType: parsed.messageType, synthesizedText: parsed.text },
+              '📝 Synthesized placeholder text for non-text message'
+            );
+          }
 
           // Update chat list with last message
           this.updateChatFromMessage(parsed);
@@ -361,8 +395,24 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             this.contactNames.get(parsed.senderId) ??
             null;
 
-          // Dynamic monitoring: only process chats that are toggled ON
-          if (!this.monitoredChatIds.has(parsed.chatId)) continue;
+          // ── ROOT CAUSE FIX ──
+          // For GROUPS: only process chats that are toggled ON in the dashboard.
+          // For individual DMs: ALWAYS process — no manual toggle required.
+          // Previously this check applied to ALL chats, so any number not in
+          // the in-memory monitoredChatIds Set was silently dropped (the Set
+          // resets on every server restart). This was the #1 reason the bot
+          // "didn't reply" to new numbers.
+          const isGroupChat = parsed.chatId.endsWith('@g.us');
+          if (isGroupChat && !this.monitoredChatIds.has(parsed.chatId)) {
+            logger.info({ chatId: parsed.chatId }, 'Skipping group message: not monitored');
+            continue;
+          }
+          if (!isGroupChat) {
+            logger.info(
+              { chatId: parsed.chatId, phone: parsed.senderPhone, text: parsed.text?.slice(0, 50) },
+              '📨 DM received — processing'
+            );
+          }
 
           // Allowlist (still works as a top-level safety)
           if (config.whatsapp.allowedNumbers.length > 0) {

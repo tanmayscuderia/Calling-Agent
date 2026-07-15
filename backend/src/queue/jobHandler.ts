@@ -177,13 +177,19 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
   }
 
   // 10. Handoff if needed
+  // NOTE: We intentionally do NOT set ai_enabled=false here.
+  // Setting ai_enabled=false permanently kills the bot for that number —
+  // even after the human jumps in, the bot would never reply again.
+  // Instead, human_handoff=true is enough to pause AI replies, and the
+  // enqueue path in whatsappService.ts automatically clears it when the
+  // customer sends a NEW message (giving the human the last word).
   if (result.shouldHandoff) {
     await updateConversation(orgId, conversationId, {
       human_handoff: true,
-      ai_enabled: false,
       status: 'pending_human',
       summary: `AI handed off: ${result.reply}`,
     });
+    logger.info({ conversationId }, '[Queue] Human handoff requested — bot paused until next customer message');
   }
 }
 

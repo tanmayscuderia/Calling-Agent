@@ -7,6 +7,7 @@ import { BaileysWhatsAppAdapter } from '../whatsapp/baileysClient';
 import { handleIncomingMessage } from '../whatsapp/whatsappService';
 import { waManager } from '../whatsapp/connectionManager';
 import { logger } from '../utils/logger';
+import { supabaseAdmin } from '../db/supabase';
 
 /**
  * Get the active WhatsApp adapter for an org.
@@ -108,6 +109,23 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const adapter = await getAdapter(orgId);
     if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
     const result = adapter.bulkToggleMonitor(chatIds, monitored);
+
+    // SYNC: Also update customer_conversations.ai_enabled in DB so this
+    // toggle is enforced at the message-processing layer and stays in
+    // sync with the Conversations page toggle.
+    const { error: dbErr } = await supabaseAdmin()
+      .from('customer_conversations')
+      .update({ ai_enabled: monitored })
+      .eq('org_id', orgId)
+      .eq('channel', 'whatsapp')
+      .in('external_chat_id', chatIds);
+
+    if (dbErr) {
+      logger.warn({ dbErr, count: chatIds.length, monitored }, '[bulk-toggle] DB sync failed — in-memory toggle still applied');
+    } else {
+      logger.info({ count: chatIds.length, monitored }, '[bulk-toggle] DB ai_enabled synced');
+    }
+
     return { ok: true, ...result };
   });
 
@@ -118,6 +136,23 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const adapter = await getAdapter(orgId);
     if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
     const monitored = adapter.toggleChatMonitor(chatId);
+
+    // SYNC: Also update customer_conversations.ai_enabled in DB so this
+    // toggle is enforced at the message-processing layer and stays in
+    // sync with the Conversations page toggle.
+    const { error: dbErr } = await supabaseAdmin()
+      .from('customer_conversations')
+      .update({ ai_enabled: monitored })
+      .eq('org_id', orgId)
+      .eq('channel', 'whatsapp')
+      .eq('external_chat_id', chatId);
+
+    if (dbErr) {
+      logger.warn({ dbErr, chatId, monitored }, '[toggle] DB sync failed — in-memory toggle still applied');
+    } else {
+      logger.info({ chatId, monitored }, '[toggle] DB ai_enabled synced');
+    }
+
     return { chatId, monitored };
   });
 
