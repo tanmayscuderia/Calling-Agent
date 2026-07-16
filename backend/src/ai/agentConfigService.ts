@@ -93,19 +93,23 @@ export async function applyTemplate(orgId: string, industry: string, businessNam
     throw new Error(`Template not found for industry: ${industry}`);
   }
 
-  // Deactivate existing configs
+  const c = tmpl.config;
+  const configName = `${tmpl.label} Agent`;
+
+  // Deactivate ALL existing configs for this org first
   await supabaseAdmin()
     .from('agent_configs')
     .update({ is_active: false })
     .eq('org_id', orgId);
 
-  // Insert new config from template
-  const c = tmpl.config;
-  const { data: created, error: insertErr } = await supabaseAdmin()
+  // Upsert: if a config with same (org_id, name) exists (even if deactivated
+  // from a previous template switch), UPDATE it; otherwise INSERT.
+  // This prevents duplicate key violations on UNIQUE(org_id, name).
+  const { data: upserted, error: upsertErr } = await supabaseAdmin()
     .from('agent_configs')
-    .insert({
+    .upsert({
       org_id: orgId,
-      name: `${tmpl.label} Agent`,
+      name: configName,
       industry: tmpl.industry,
       persona_name: c.persona_name ?? 'Assistant',
       persona_role: c.persona_role ?? 'assistant',
@@ -124,18 +128,18 @@ export async function applyTemplate(orgId: string, industry: string, businessNam
       call_agent_enabled: true,
       call_opening_template: c.call_opening_template ?? null,
       is_active: true,
-    })
+    }, { onConflict: 'org_id,name' })
     .select('*')
     .single();
 
-  if (insertErr || !created) {
-    throw new Error(`Failed to create agent config: ${insertErr?.message}`);
+  if (upsertErr || !upserted) {
+    throw new Error(`Failed to apply agent config: ${upsertErr?.message}`);
   }
 
   // Invalidate cache
   cache.delete(orgId);
 
-  return normalizeConfig(created);
+  return normalizeConfig(upserted);
 }
 
 /**

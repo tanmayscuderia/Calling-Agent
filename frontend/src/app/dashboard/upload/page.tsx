@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { api } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import Link from 'next/link';
 
 const csvTemplate = `project_name,developer_name,city,sector,location,configuration,price_min,price_max,possession_status,possession_date,status,amenities,description,brochure_url
@@ -27,23 +28,21 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState('');
+  const toast = useToast();
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith('.csv')) {
-      setError('Please upload a CSV file');
+      toast.error('Please upload a CSV file');
       return;
     }
-    setError('');
     setFile(f);
   };
 
   const upload = async () => {
     if (!file) return;
     setUploading(true);
-    setError('');
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -55,7 +54,7 @@ export default function UploadPage() {
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setResult(data);
     } catch (e: any) {
-      setError(e.message);
+      toast.error(e.message || 'Upload failed');
     }
     setUploading(false);
   };
@@ -105,13 +104,12 @@ export default function UploadPage() {
           )}
         </div>
 
-        {error && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: '#fee2e2', color: '#dc2626', fontSize: 13 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button className="btn btn-primary" onClick={upload} disabled={!file || uploading}>
             {uploading ? 'Uploading...' : 'Upload CSV'}
           </button>
-          <button className="btn btn-secondary" onClick={() => { setFile(null); setResult(null); setError(''); }} disabled={!file}>
+          <button className="btn btn-secondary" onClick={() => { setFile(null); setResult(null); }} disabled={!file}>
             Clear
           </button>
         </div>

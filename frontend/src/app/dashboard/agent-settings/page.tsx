@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 
 // ── Types matching backend agentTypes.ts ──
 interface QualifyingField {
@@ -107,7 +108,7 @@ export default function AgentSettingsPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const toast = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Editable form state — all fields
@@ -160,7 +161,7 @@ export default function AgentSettingsPage() {
         search_fields: cfgRes.config.search_fields || [],
       });
     } catch (e: any) {
-      setMsg({ type: 'error', text: e.message });
+      toast.error(e.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -172,7 +173,6 @@ export default function AgentSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setMsg(null);
     try {
       const payload = {
         ...form,
@@ -183,9 +183,9 @@ export default function AgentSettingsPage() {
         body: payload,
       });
       setConfig(res.config);
-      setMsg({ type: 'success', text: 'Agent settings saved!' });
+      toast.success('Agent settings saved!');
     } catch (e: any) {
-      setMsg({ type: 'error', text: e.message });
+      toast.error(e.message || 'Something went wrong');
     } finally {
       setSaving(false);
     }
@@ -194,7 +194,6 @@ export default function AgentSettingsPage() {
   const applyTemplate = async (industry: string) => {
     if (!confirm(`Apply "${industry}" template? This will replace your current agent configuration.`)) return;
     setSaving(true);
-    setMsg(null);
     try {
       const res = await api<{ config: AgentConfig }>('/api/agent/apply-template', {
         method: 'POST',
@@ -219,9 +218,9 @@ export default function AgentSettingsPage() {
         status_pipeline: res.config.status_pipeline || [],
         search_fields: res.config.search_fields || [],
       });
-      setMsg({ type: 'success', text: `${industry} template applied!` });
+      toast.success(`${industry} template applied!`);
     } catch (e: any) {
-      setMsg({ type: 'error', text: e.message });
+      toast.error(e.message || 'Something went wrong');
     } finally {
       setSaving(false);
     }
@@ -317,22 +316,6 @@ export default function AgentSettingsPage() {
           Fully customize your AI agent. Pick a template to start, then edit any field — qualifying questions, intents, lead statuses, inventory search, and more.
         </p>
       </div>
-
-      {msg && (
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: 8,
-            marginBottom: 20,
-            background: msg.type === 'success' ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-            color: msg.type === 'success' ? '#166534' : '#991b1b',
-            fontSize: 13,
-          }}
-        >
-          {msg.text}
-        </div>
-      )}
 
       {/* ── Industry Templates ── */}
       <div style={cardStyle}>

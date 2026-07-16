@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 
 interface SimResult {
   reply: string;
@@ -26,7 +27,7 @@ export default function PlaygroundPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +36,6 @@ export default function PlaygroundPage() {
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
-    setError(null);
     setInput('');
     // Capture history BEFORE adding the new user turn, then add it to state
     const history = turns.map((t) => ({ role: t.role, text: t.text }));
@@ -51,7 +51,7 @@ export default function PlaygroundPage() {
         { role: 'assistant', text: res.reply, result: res },
       ]);
     } catch (e: any) {
-      setError(e.message || 'AI request failed');
+      toast.error(e.message || 'AI request failed');
     } finally {
       setLoading(false);
     }
@@ -59,7 +59,6 @@ export default function PlaygroundPage() {
 
   const reset = () => {
     setTurns([]);
-    setError(null);
   };
 
   return (
@@ -192,12 +191,6 @@ export default function PlaygroundPage() {
             <div style={{ padding: '12px 16px', borderRadius: 16, borderBottomLeftRadius: 4, background: '#f1f5f9', color: '#64748b', fontSize: 14 }}>
               <span className="pulse-dot-inline" /> AI thinking…
             </div>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ padding: 16, borderRadius: 12, background: '#fee2e2', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
-            ⚠️ {error}
           </div>
         )}
       </div>

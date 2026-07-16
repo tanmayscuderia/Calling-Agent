@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { api } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 
 interface ChatInfo {
   id: string;
@@ -15,6 +16,7 @@ interface ChatInfo {
 }
 
 export default function WhatsAppPage() {
+  const toast = useToast();
   const [status, setStatus] = useState<any>(null);
   const [chats, setChats] = useState<ChatInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -158,7 +160,7 @@ export default function WhatsAppPage() {
       setSelectedIds(new Set());
     } catch (e: any) {
       console.error('bulkToggleMonitored failed:', e?.message || e);
-      alert(`Failed to ${monitored ? 'monitor' : 'pause'} chats: ${e?.message || e}`);
+      toast.error(`Failed to ${monitored ? 'monitor' : 'pause'} chats: ${e?.message || e}`);
     } finally {
       setBulkLoading(false);
     }
