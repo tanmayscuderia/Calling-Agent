@@ -9,14 +9,16 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [llmUsage, setLlmUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [agentConfig, setAgentConfig] = useState<any>(null);
 
   useEffect(() => {
     Promise.all([
       api('/api/dashboard/stats').catch(() => null),
       api('/api/followups?status=pending').catch(() => ({ followups: [] })),
       api('/api/system/llm-usage').catch(() => null),
+      api('/api/agent/config').catch(() => null),
     ])
-      .then(([statsRes, followupsRes, usageRes]) => {
+      .then(([statsRes, followupsRes, usageRes, cfgRes]) => {
         setStats({
           totalLeads: statsRes?.totalLeads ?? 0,
           hotLeads: statsRes?.hotLeads ?? 0,
@@ -27,10 +29,18 @@ export default function DashboardPage() {
           pendingFollowups: followupsRes.followups?.length ?? 0,
         });
         if (usageRes) setLlmUsage(usageRes);
+        if (cfgRes?.config) setAgentConfig(cfgRes.config);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const isRealEstate = !agentConfig || agentConfig.industry === 'real_estate';
+  const itemLabel = agentConfig?.inventory_schema?.item_label ?? 'Properties';
+  const businessName = agentConfig?.business_name ?? (isRealEstate ? 'Demo Realty' : 'Your Business');
+  const subtitle = agentConfig?.tagline ?? (isRealEstate
+    ? 'Real estate WhatsApp AI agent — lead qualification & calling demo'
+    : `${businessName} AI agent — lead qualification & calling demo`);
 
   const statCards = [
     { label: 'Total Leads', value: stats?.totalLeads ?? 0, color: '#2563eb', bg: '#dbeafe', icon: '👥' },
@@ -38,18 +48,18 @@ export default function DashboardPage() {
     { label: 'Open Conversations', value: stats?.openConversations ?? 0, color: '#16a34a', bg: '#dcfce7', icon: '💬' },
     { label: 'AI Replies Today', value: stats?.aiRepliesToday ?? 0, color: '#0891b2', bg: '#cffafe', icon: '🤖' },
     { label: 'Calls Completed', value: stats?.callsCompleted ?? 0, color: '#9333ea', bg: '#f3e8ff', icon: '📞' },
-    { label: 'Properties', value: stats?.properties ?? 0, color: '#7c3aed', bg: '#ede9fe', icon: '🏠' },
+    { label: itemLabel, value: stats?.properties ?? 0, color: '#7c3aed', bg: '#ede9fe', icon: isRealEstate ? '🏠' : '📦' },
     { label: 'Pending Follow-ups', value: stats?.pendingFollowups ?? 0, color: '#d97706', bg: '#fef3c7', icon: '📋' },
   ];
 
   const quickActions = [
     { href: '/dashboard/whatsapp', icon: '📱', bg: '#dcfce7', title: 'Connect WhatsApp', desc: 'Scan QR to start monitoring' },
-    { href: '/dashboard/upload', icon: '📤', bg: '#ede9fe', title: 'Upload Inventory', desc: 'Import property CSV' },
+    { href: '/dashboard/upload', icon: '📤', bg: '#ede9fe', title: 'Upload Inventory', desc: `Import ${itemLabel.toLowerCase()} CSV` },
     { href: '/dashboard/playground', icon: '🧪', bg: '#fef3c7', title: 'AI Playground', desc: 'Test AI replies without a phone' },
   ];
 
   const demoSteps = [
-    { step: '1', title: 'Upload Inventory', desc: 'CSV import properties', color: '#2563eb' },
+    { step: '1', title: 'Upload Inventory', desc: `CSV import ${itemLabel.toLowerCase()}`, color: '#2563eb' },
     { step: '2', title: 'Connect WhatsApp', desc: 'Scan QR in terminal', color: '#16a34a' },
     { step: '3', title: 'AI Auto-Replies', desc: 'Lead qualification', color: '#d97706' },
     { step: '4', title: 'Call Demo', desc: 'AI calling agent Priya', color: '#7c3aed' },
@@ -67,9 +77,7 @@ export default function DashboardPage() {
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.03em' }}>
           Dashboard Overview
         </h1>
-        <p style={{ color: '#475569', fontSize: 15, margin: 0 }}>
-           Real estate WhatsApp AI agent — lead qualification & calling demo
-         </p>
+        <p style={{ color: '#475569', fontSize: 15, margin: 0 }}>{subtitle}</p>
 
         {/* LLM Usage Badge */}
         {llmUsage && (

@@ -641,6 +641,7 @@ backend/src/db/supabase.ts
 | 7 | `20260103_0002_lead_dedup_unique_indexes.sql` | Unique constraints on lead phone/whatsapp |
 | 8 | `20260104_0001_more_industry_templates.sql` | 4 more templates (legal, auto, salon, insurance) |
 | 9 | `20260105_0001_fix_dequeue_rpc_ambiguous.sql` | Fix column ambiguity in dequeue_job RPC |
+| 10 | `20260106_0001_generic_inventory_items.sql` | Generic inventory table + `inventory_schema` on agent_configs |
 
 ### Table Groups
 
@@ -649,6 +650,7 @@ CRM:          crm_leads, crm_lead_property_matches, lead_followups
 Messaging:    whatsapp_accounts, customer_conversations, customer_messages
 AI:           ai_agent_runs, agent_configs, agent_templates
 Inventory:    real_estate_projects, real_estate_units, real_estate_import_batches
+              generic_inventory_items (non-real-estate industries)
 Calls:        call_sessions, call_session_turns
 Queue:        job_queue
 Auth:         users, organizations, organization_members
@@ -897,8 +899,8 @@ npm run eval
 | **WhatsApp** | `POST /api/whatsapp/start`, `GET /api/whatsapp/status`, `POST /api/whatsapp/stop`, `POST /api/whatsapp/send` |
 | **Leads** | `GET /api/leads`, `GET /api/leads/:id`, `PATCH /api/leads/:id`, `GET /api/leads/:id/messages`, `GET /api/leads/:id/calls`, `POST /api/leads/:id/followups` |
 | **Conversations** | `GET /api/conversations`, `GET /api/conversations/:id`, `PATCH /api/conversations/:id`, `POST /api/conversations/:id/send`, `POST /api/conversations/:id/handoff` |
-| **Inventory** | `GET /api/inventory/projects`, `POST /api/inventory/projects`, `GET /api/inventory/units`, `POST /api/inventory/units`, `GET /api/inventory/search` |
-| **Upload** | `POST /api/upload/properties-csv` |
+| **Inventory** | `GET /api/inventory/projects`, `POST /api/inventory/projects`, `GET /api/inventory/units`, `POST /api/inventory/units`, `GET /api/inventory/search`, `GET/POST /api/inventory/items` (generic) |
+| **Upload** | `POST /api/upload/properties-csv`, `POST /api/upload/inventory-csv` (generic) |
 | **Calls** | `POST /api/calls/start-demo`, `POST /api/calls/:id/turn`, `POST /api/calls/:id/end`, `GET /api/calls/:id` |
 | **Agent Config** | `GET /api/agent/config`, `PUT /api/agent/config`, `GET /api/agent/templates`, `POST /api/agent/apply-template` |
 | **AI** | `POST /api/ai/test-extraction`, `POST /api/ai/test-reply` |

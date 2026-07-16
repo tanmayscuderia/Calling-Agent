@@ -54,7 +54,7 @@ Go to **Settings → API**:
 
 ### Run Migrations
 
-Run all 9 migration files in order:
+Run all 10 migration files in order:
 
 ```bash
 # Option A: via psql
@@ -67,6 +67,7 @@ psql "$DATABASE_URL" -f supabase/migrations/20260103_0001_agent_configs_template
 psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_indexes.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
 
 # Option B: via Supabase SQL Editor (paste each file and Run)
 ```
@@ -83,8 +84,9 @@ psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambigu
 | `0002_lead_dedup_unique_indexes` | Unique constraints on leads (phone/WhatsApp) |
 | `0001_more_industry_templates` | 4 more templates (legal, automotive, salon, insurance) |
 | `0001_fix_dequeue_rpc_ambiguous` | Fix column ambiguity in dequeue RPC |
+| `0001_generic_inventory_items` | Generic inventory table for non-real-estate industries + `inventory_schema` on agent_configs |
 
-> **Total: 9 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+> **Total: 10 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
 
 ---
 

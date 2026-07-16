@@ -249,6 +249,8 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 | **Generic Inventory Search** | Searches any inventory table using configurable field mappings |
 | **Configurable Status Pipeline** | Each org defines its own lead status stages |
 | **Configurable Intents** | Each org defines what intent types the AI extracts |
+| **Inventory Schema** | `inventory_schema` in agent config defines `item_label`, `item_label_plural`, `table`, `search_fields` per industry |
+| **Config-Driven UI** | Dashboard, Inventory, and Upload pages auto-adapt labels and layout based on selected industry |
 
 ### Agent Settings — Full Visual Editor ✅
 

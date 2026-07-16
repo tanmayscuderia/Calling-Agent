@@ -12,6 +12,14 @@ import {
   searchProperties,
   getProjectWithUnits,
 } from '../crm/propertyService';
+import {
+  listItems,
+  getItem,
+  createItem,
+  updateItem,
+  deleteItem,
+  searchItems,
+} from '../crm/inventoryItemService';
 import { config } from '../config';
 
 function orgId(req: any): string {
@@ -74,7 +82,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
     return result;
   });
 
-  // ── Search ────────────────────────────────────────────
+  // ── Real Estate Search ────────────────────────────────
 
   app.get('/api/inventory/search', async (req) => {
     const q = req.query as any;
@@ -87,6 +95,60 @@ export async function inventoryRoutes(app: FastifyInstance) {
       budgetMin: q.budgetMin ? Number(q.budgetMin) : null,
       budgetMax: q.budgetMax ? Number(q.budgetMax) : null,
       possessionStatus: q.possessionStatus || null,
+      limit: q.limit ? Number(q.limit) : 3,
+    });
+    return { matches };
+  });
+
+  // ── Generic Inventory Items (non-real-estate) ─────────
+
+  app.get('/api/inventory/items', async (req) => {
+    const q = req.query as any;
+    const result = await listItems(orgId(req), {
+      category: q.category || undefined,
+      city: q.city || undefined,
+      status: q.status || undefined,
+      limit: q.limit ? Number(q.limit) : 50,
+      offset: q.offset ? Number(q.offset) : 0,
+    });
+    return result;
+  });
+
+  app.get('/api/inventory/items/:id', async (req) => {
+    const id = (req.params as any).id;
+    const item = await getItem(orgId(req), id);
+    return { item };
+  });
+
+  app.post('/api/inventory/items', async (req) => {
+    const item = await createItem(orgId(req), req.body as any);
+    return { item };
+  });
+
+  app.patch('/api/inventory/items/:id', async (req) => {
+    const id = (req.params as any).id;
+    const item = await updateItem(orgId(req), id, req.body as any);
+    return { item };
+  });
+
+  app.delete('/api/inventory/items/:id', async (req) => {
+    const id = (req.params as any).id;
+    await deleteItem(orgId(req), id);
+    return { success: true };
+  });
+
+  // ── Generic Inventory Search ──────────────────────────
+
+  app.get('/api/inventory/items/search', async (req) => {
+    const q = req.query as any;
+    const matches = await searchItems({
+      orgId: orgId(req),
+      query: q.query || null,
+      category: q.category || null,
+      city: q.city || null,
+      location: q.location || null,
+      budgetMin: q.budgetMin ? Number(q.budgetMin) : null,
+      budgetMax: q.budgetMax ? Number(q.budgetMax) : null,
       limit: q.limit ? Number(q.limit) : 3,
     });
     return { matches };

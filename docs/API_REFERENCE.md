@@ -255,10 +255,53 @@ Search properties with filters.
 
 ---
 
+## Generic Inventory (Non-Real-Estate Industries)
+
+When the org's `inventory_table` is set to `generic_inventory_items` (any industry except real estate), these endpoints manage the inventory.
+
+### `GET /api/inventory/items`
+List all generic inventory items.
+
+**Query:** `?orgId=uuid&category=Courses&city=Mumbai&q=search`
+
+---
+
+### `POST /api/inventory/items`
+Create a new inventory item.
+
+**Request:**
+```json
+{
+  "orgId": "uuid",
+  "title": "B.Tech Computer Science",
+  "subtitle": "4-year engineering program",
+  "category": "Engineering",
+  "price_min": 400000,
+  "price_max": 800000,
+  "city": "Pune",
+  "attributes": {
+    "duration": "4 years",
+    "accreditation": "AICTE"
+  }
+}
+```
+
+---
+
+### `PATCH /api/inventory/items/:id`
+Update an inventory item.
+
+---
+
+### `DELETE /api/inventory/items/:id`
+Delete an inventory item.
+
+---
+
 ## Upload
 
 ### `POST /api/upload/properties-csv`
-Upload CSV file of properties.
+Upload CSV file of properties (real estate only).
 
 **Request:** `multipart/form-data`
 - `file`: CSV file
@@ -277,6 +320,19 @@ Upload CSV file of properties.
   ]
 }
 ```
+
+---
+
+### `POST /api/upload/inventory-csv`
+Upload CSV for **generic inventory** (any industry that uses `generic_inventory_items` table).
+
+**Request:** `multipart/form-data`
+- `file`: CSV file
+- `orgId`: UUID (form field)
+
+CSV columns map to: `title`, `subtitle`, `category`, `price_min`, `price_max`, `city`, `location`, `availability_status`, `description`, `brochure_url`, plus any custom attributes via columns prefixed with `attr_`.
+
+**Response:** Same shape as properties-csv — returns `batchId`, `totalRows`, `successRows`, `failedRows`.
 
 ---
 

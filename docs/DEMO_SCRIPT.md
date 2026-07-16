@@ -6,20 +6,20 @@ Step-by-step walkthrough to demonstrate the full product to a client.
 
 ## Supported Industries
 
-| Industry | Default Persona | Inventory Type |
+| Industry | Default Persona | Inventory Table |
 |----------|----------------|----------------|
-| 🏢 **Real Estate** *(default demo)* | Priya (Sales Assistant) | real_estate_units |
-| 🎓 Education | Meera (Admissions Counselor) | education_programs |
-| 🏥 Healthcare | Aarti (Appointment Coordinator) | — |
-| 💰 Finance | Arjun (Financial Advisor) | — |
-| 🛍️ E-Commerce | Riya (Shopping Assistant) | ecommerce_products |
-| ✈️ Travel | Karan (Travel Consultant) | travel_packages |
-| 💪 Fitness | Maya (Fitness Consultant) | fitness_plans |
-| 🍽️ Restaurant | Chef (Reservation Manager) | — |
-| ⚖️ Legal | Vikram (Legal Intake Specialist) | — |
-| 🚗 Automotive | Raj (Sales Advisor) | — |
-| 💅 Salon/Spa | Nikki (Booking Assistant) | salon_services |
-| 🛡️ Insurance | Anjali (Insurance Advisor) | — |
+| 🏢 **Real Estate** *(default demo)* | Priya (Sales Assistant) | `real_estate_units` |
+| 🎓 Education | Meera (Admissions Counselor) | `generic_inventory_items` |
+| 🏥 Healthcare | Aarti (Appointment Coordinator) | `generic_inventory_items` |
+| 💰 Finance | Arjun (Financial Advisor) | `generic_inventory_items` |
+| 🛍️ E-Commerce | Riya (Shopping Assistant) | `generic_inventory_items` |
+| ✈️ Travel | Karan (Travel Consultant) | `generic_inventory_items` |
+| 💪 Fitness | Maya (Fitness Consultant) | `generic_inventory_items` |
+| 🍽️ Restaurant | Chef (Reservation Manager) | `generic_inventory_items` |
+| ⚖️ Legal | Vikram (Legal Intake Specialist) | `generic_inventory_items` |
+| 🚗 Automotive | Raj (Sales Advisor) | `generic_inventory_items` |
+| 💅 Salon/Spa | Nikki (Booking Assistant) | `generic_inventory_items` |
+| 🛡️ Insurance | Anjali (Insurance Advisor) | `generic_inventory_items` |
 
 > **To demo a different industry:** Go to `/dashboard/agent-settings`, select an industry template, customize persona/name/inventory fields, then send test WhatsApp messages. The AI will adapt automatically.
 

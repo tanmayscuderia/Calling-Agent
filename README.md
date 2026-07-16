@@ -41,7 +41,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 
 ### 1. Database Setup
 
-Create a Supabase project, then run all 9 migrations in order:
+Create a Supabase project, then run all 10 migrations in order:
 
 ```bash
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
@@ -53,6 +53,7 @@ psql "$DATABASE_URL" -f supabase/migrations/20260103_0001_agent_configs_template
 psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_indexes.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
 ```
 
 > **Full setup (user creation, org linking, env config, troubleshooting):** [docs/SETUP.md](./docs/SETUP.md)
@@ -162,7 +163,7 @@ Calling Agent/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
 │       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
 │       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
-├── supabase/migrations/  # 9 SQL migration files
+├── supabase/migrations/  # 10 SQL migration files
 └── docs/                 # 8 documentation files
 ```
 

@@ -80,7 +80,19 @@ export async function listTemplates(): Promise<AgentTemplate[]> {
 }
 
 /**
+ * Helper: check if an error is a "column not found in schema cache" error.
+ */
+function isColumnMissingError(err: any, columnName: string): boolean {
+  if (!err) return false;
+  const msg = err.message || String(err);
+  return msg.includes(`'${columnName}'`) && (msg.includes('schema cache') || msg.includes('Could not find'));
+}
+
+/**
  * Apply a template to an org — creates/updates an agent_config.
+ *
+ * Bulletproof: tries with `inventory_schema` first, and if the DB rejects it
+ * (column not found), automatically retries without it.
  */
 export async function applyTemplate(orgId: string, industry: string, businessName?: string): Promise<AgentConfig> {
   const { data: tmpl, error } = await supabaseAdmin()
@@ -102,35 +114,50 @@ export async function applyTemplate(orgId: string, industry: string, businessNam
     .update({ is_active: false })
     .eq('org_id', orgId);
 
-  // Upsert: if a config with same (org_id, name) exists (even if deactivated
-  // from a previous template switch), UPDATE it; otherwise INSERT.
-  // This prevents duplicate key violations on UNIQUE(org_id, name).
-  const { data: upserted, error: upsertErr } = await supabaseAdmin()
+  // Build the upsert payload WITH inventory_schema
+  const upsertPayload: Record<string, any> = {
+    org_id: orgId,
+    name: configName,
+    industry: tmpl.industry,
+    persona_name: c.persona_name ?? 'Assistant',
+    persona_role: c.persona_role ?? 'assistant',
+    tone: c.tone ?? 'professional',
+    business_name: businessName ?? config.whatsapp.businessName,
+    business_description: c.business_description ?? null,
+    qualifying_fields: c.qualifying_fields ?? [],
+    intent_types: c.intent_types ?? [],
+    status_pipeline: c.status_pipeline ?? [],
+    inventory_enabled: !!c.inventory_table,
+    inventory_table: c.inventory_table ?? null,
+    search_fields: c.search_fields ?? [],
+    inventory_schema: c.inventory_schema ?? null, // may fail if migration #10 not applied
+    reply_template_match: c.reply_template_match ?? null,
+    reply_template_no_match: c.reply_template_no_match ?? null,
+    reply_template_missing_info: c.reply_template_missing_info ?? null,
+    call_agent_enabled: true,
+    call_opening_template: c.call_opening_template ?? null,
+    is_active: true,
+  };
+
+  // Attempt 1: with inventory_schema
+  let { data: upserted, error: upsertErr } = await supabaseAdmin()
     .from('agent_configs')
-    .upsert({
-      org_id: orgId,
-      name: configName,
-      industry: tmpl.industry,
-      persona_name: c.persona_name ?? 'Assistant',
-      persona_role: c.persona_role ?? 'assistant',
-      tone: c.tone ?? 'professional',
-      business_name: businessName ?? config.whatsapp.businessName,
-      business_description: c.business_description ?? null,
-      qualifying_fields: c.qualifying_fields ?? [],
-      intent_types: c.intent_types ?? [],
-      status_pipeline: c.status_pipeline ?? [],
-      inventory_enabled: !!c.inventory_table,
-      inventory_table: c.inventory_table ?? null,
-      search_fields: c.search_fields ?? [],
-      reply_template_match: c.reply_template_match ?? null,
-      reply_template_no_match: c.reply_template_no_match ?? null,
-      reply_template_missing_info: c.reply_template_missing_info ?? null,
-      call_agent_enabled: true,
-      call_opening_template: c.call_opening_template ?? null,
-      is_active: true,
-    }, { onConflict: 'org_id,name' })
+    .upsert(upsertPayload, { onConflict: 'org_id,name' })
     .select('*')
     .single();
+
+  // Attempt 2: if DB rejected inventory_schema column, retry WITHOUT it
+  if (upsertErr && isColumnMissingError(upsertErr, 'inventory_schema')) {
+    logger.warn('[AgentConfig] inventory_schema column rejected — retrying without it.');
+    delete upsertPayload.inventory_schema;
+    const retry = await supabaseAdmin()
+      .from('agent_configs')
+      .upsert(upsertPayload, { onConflict: 'org_id,name' })
+      .select('*')
+      .single();
+    upserted = retry.data;
+    upsertErr = retry.error;
+  }
 
   if (upsertErr || !upserted) {
     throw new Error(`Failed to apply agent config: ${upsertErr?.message}`);
@@ -152,6 +179,7 @@ export async function updateAgentConfig(orgId: string, configId: string, updates
     'system_prompt_override',
     'qualifying_fields', 'intent_types', 'status_pipeline',
     'inventory_enabled', 'inventory_table', 'search_fields',
+    'inventory_schema', // migration #10 — may not exist yet
     'reply_template_match', 'reply_template_no_match', 'reply_template_missing_info',
     'call_agent_enabled', 'call_opening_template',
     'is_active',
@@ -162,13 +190,29 @@ export async function updateAgentConfig(orgId: string, configId: string, updates
     if (key in updates) patch[key] = updates[key];
   }
 
-  const { data, error } = await supabaseAdmin()
+  // Attempt 1: full patch (includes inventory_schema if present)
+  let { data, error } = await supabaseAdmin()
     .from('agent_configs')
     .update(patch)
     .eq('id', configId)
     .eq('org_id', orgId)
     .select('*')
     .single();
+
+  // Attempt 2: if DB rejected inventory_schema column, retry without it
+  if (error && isColumnMissingError(error, 'inventory_schema') && 'inventory_schema' in patch) {
+    logger.warn('[AgentConfig] inventory_schema column rejected during update — retrying without it.');
+    delete patch.inventory_schema;
+    const retry = await supabaseAdmin()
+      .from('agent_configs')
+      .update(patch)
+      .eq('id', configId)
+      .eq('org_id', orgId)
+      .select('*')
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     throw new Error(`Failed to update agent config: ${error?.message}`);
@@ -210,6 +254,7 @@ function normalizeConfig(row: any): AgentConfig {
     inventory_enabled: row.inventory_enabled ?? true,
     inventory_table: row.inventory_table ?? null,
     search_fields: row.search_fields ?? [],
+    inventory_schema: row.inventory_schema ?? null,
     reply_template_match: row.reply_template_match,
     reply_template_no_match: row.reply_template_no_match,
     reply_template_missing_info: row.reply_template_missing_info,
@@ -241,6 +286,7 @@ function templateToConfig(orgId: string, tmpl: any): AgentConfig {
     inventory_enabled: !!c.inventory_table,
     inventory_table: c.inventory_table ?? null,
     search_fields: c.search_fields ?? [],
+    inventory_schema: c.inventory_schema ?? null,
     reply_template_match: c.reply_template_match,
     reply_template_no_match: c.reply_template_no_match,
     reply_template_missing_info: c.reply_template_missing_info,
@@ -290,6 +336,17 @@ function hardcodedRealEstateConfig(orgId: string): AgentConfig {
       { field: 'price_min', operator: 'lte', extract_key: 'budget_max' },
       { field: 'price_max', operator: 'gte', extract_key: 'budget_min' },
     ],
+    inventory_schema: {
+      table: 'real_estate_units',
+      item_label: 'Property',
+      item_label_plural: 'Properties',
+      display_fields: ['name', 'location', 'configuration', 'price_range', 'possession_status'],
+      csv_columns: ['project_name', 'configuration', 'price_min', 'price_max', 'city', 'sector', 'developer_name', 'possession_status'],
+      filter_fields: [
+        { field: 'city', label: 'City', type: 'select' },
+        { field: 'configuration', label: 'Configuration', type: 'select' },
+      ],
+    },
     reply_template_match: 'Yes, we have {{count}} option(s) matching this.',
     reply_template_no_match: 'I don\'t see an exact match. What is your max budget and preferred location?',
     reply_template_missing_info: 'Sure. What budget range and preferred location are you looking at?',

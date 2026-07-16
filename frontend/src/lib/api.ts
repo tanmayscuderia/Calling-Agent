@@ -29,11 +29,12 @@ export async function api<T = any>(
   }
 }
 
-export async function uploadCsv(file: File): Promise<any> {
+export async function uploadCsv(file: File, type: 'properties' | 'generic' = 'properties'): Promise<any> {
   const fd = new FormData();
   fd.append('file', file);
+  const endpoint = type === 'generic' ? '/api/upload/inventory-csv' : '/api/upload/properties-csv';
   try {
-    const res = await fetch(`${API_BASE}/api/upload/properties-csv`, {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       body: fd,
       credentials: 'include',

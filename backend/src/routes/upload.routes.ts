@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { importPropertiesCsv } from '../uploads/csvImportService';
+import { importPropertiesCsv, importGenericInventoryCsv } from '../uploads/csvImportService';
 import { config } from '../config';
 
 export async function uploadRoutes(app: FastifyInstance) {
@@ -38,6 +38,33 @@ export async function uploadRoutes(app: FastifyInstance) {
       return reply.send(result);
     } catch (e: any) {
       return reply.code(500).send({ error: e?.message ?? 'Seed failed' });
+    }
+  });
+
+  // Generic inventory CSV upload (non-real-estate industries)
+  app.post('/api/upload/inventory-csv', async (req, reply) => {
+    const orgId = (req.query as any).orgId || config.defaultOrgId;
+
+    let csvText: string | null = null;
+    let fileName = 'upload.csv';
+
+    const ct = req.headers['content-type'] || '';
+    if (ct.includes('multipart/form-data')) {
+      const file = await (req as any).file();
+      if (!file) return reply.code(400).send({ error: 'No file uploaded' });
+      csvText = await file.toBuffer();
+      fileName = file.filename;
+    } else {
+      csvText = (req.body as any)?.text ?? (typeof req.body === 'string' ? req.body : null);
+    }
+
+    if (!csvText) return reply.code(400).send({ error: 'No CSV content' });
+
+    try {
+      const result = await importGenericInventoryCsv(orgId, csvText, fileName, config.defaultMemberId);
+      return reply.send(result);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message ?? 'Import failed' });
     }
   });
 }

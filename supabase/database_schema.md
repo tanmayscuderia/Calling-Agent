@@ -98,6 +98,48 @@
 | `created_at` | `timestamptz` | Default now() |
 | `processed_at` | `timestamptz` | Nullable |
 
+## Table `generic_inventory_items`
+
+Used by non-real-estate industries (Education, Healthcare, E-Commerce, etc.). Unified single-table inventory.
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `org_id` | `uuid` | References organizations(id) |
+| `title` | `text` | Not null |
+| `subtitle` | `text` | Nullable |
+| `category` | `text` | Nullable |
+| `configuration` | `text` | Nullable |
+| `unit_type` | `text` | Default 'item' |
+| `price_min` | `numeric` | Nullable |
+| `price_max` | `numeric` | Nullable |
+| `currency` | `text` | Default 'INR' |
+| `city` | `text` | Nullable |
+| `sector` | `text` | Nullable |
+| `location` | `text` | Nullable |
+| `address` | `text` | Nullable |
+| `availability_status` | `text` | CHECK (available, reserved, sold, inactive) |
+| `possession_status` | `text` | Nullable |
+| `possession_date` | `date` | Nullable |
+| `facing` | `text` | Nullable |
+| `furnishing` | `text` | Nullable |
+| `parking` | `text` | Nullable |
+| `tower` | `text` | Nullable |
+| `floor` | `text` | Nullable |
+| `carpet_area_sqft` | `numeric` | Nullable |
+| `builtup_area_sqft` | `numeric` | Nullable |
+| `super_area_sqft` | `numeric` | Nullable |
+| `description` | `text` | Nullable |
+| `amenities` | `text[]` | Default '{}' |
+| `media_urls` | `text[]` | Default '{}' |
+| `brochure_url` | `text` | Nullable |
+| `attributes` | `jsonb` | Default '{}' — industry-specific fields |
+| `metadata` | `jsonb` | Default '{}' |
+| `created_at` | `timestamptz` | Default now() |
+| `updated_at` | `timestamptz` | Default now() |
+
 ## Table `crm_leads`
 
 ### Columns
@@ -343,8 +385,9 @@ Per-org AI agent configuration (industry, persona, prompt, inventory fields).
 | `persona_name` | `text` | e.g. Priya, Meera |
 | `persona_role` | `text` | e.g. Sales Assistant |
 | `system_prompt` | `text` | Full system prompt |
-| `inventory_table` | `text` | e.g. real_estate_units |
+| `inventory_table` | `text` | e.g. real_estate_units, generic_inventory_items |
 | `inventory_fields` | `jsonb` | Configurable fields |
+| `inventory_schema` | `jsonb` | Per-industry UI labels + search fields (item_label, item_label_plural, search_fields) |
 | `intent_mappings` | `jsonb` | Extraction schema |
 | `reply_templates` | `jsonb` | Customizable reply rules |
 | `metadata` | `jsonb` | Default '{}' |

@@ -92,6 +92,16 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Live reply** — see the actual reply that would be sent on WhatsApp
 - **Config-aware** — uses the org's current agent config
 
+### Phase E3: Generic Inventory System ✅
+- **`generic_inventory_items` table** — single unified inventory table for all non-real-estate industries
+- **`inventory_schema` column** on `agent_configs` — drives per-industry UI labels and search behavior
+- **Config-driven inventory page** — Dashboard inventory list auto-adapts (labels, columns, filters) based on selected industry
+- **Config-driven upload page** — Upload page shows correct CSV format and instructions per industry
+- **Generic CSV importer** — `POST /api/upload/inventory-csv` maps CSV columns to `generic_inventory_items` with `attr_` prefix for custom attributes
+- **Generic item CRUD** — `GET/POST/PATCH/DELETE /api/inventory/items` endpoints
+- **Per-industry templates** — Each of the 12 templates now includes `inventory_schema` with `item_label`, `item_label_plural`, `search_fields`
+- **Dashboard label updates** — Dashboard stats card label dynamically changes ("Properties Available" → "Courses Available" → "Services Available")
+
 ---
 
 ## Architecture Maturity

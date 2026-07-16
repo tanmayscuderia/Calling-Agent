@@ -33,6 +33,22 @@ export interface SearchFieldConfig {
   label?: string;
 }
 
+// ── Inventory Schema (config-driven UI/CSV/form) ──
+export interface InventoryFilterField {
+  field: string;
+  label: string;
+  type: 'select' | 'number' | 'text';
+}
+
+export interface InventorySchema {
+  table: string;                          // 'real_estate_units' | 'inventory_items'
+  item_label: string;                     // 'Property' | 'Vehicle' | 'Service'
+  item_label_plural: string;              // 'Properties' | 'Vehicles'
+  display_fields: string[];               // which fields to show in cards
+  csv_columns: string[];                  // expected CSV columns
+  filter_fields: InventoryFilterField[];  // filters shown in UI
+}
+
 // ── Full Agent Config (from DB) ──
 export interface AgentConfig {
   id: string;
@@ -62,6 +78,7 @@ export interface AgentConfig {
   inventory_enabled: boolean;
   inventory_table: string | null;
   search_fields: SearchFieldConfig[];
+  inventory_schema: InventorySchema | null;
 
   // Templates
   reply_template_match: string | null;

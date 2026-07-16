@@ -13,6 +13,7 @@ All tables, columns, relationships, and indexes.
 > - `20260103_0002_lead_dedup_unique_indexes.sql` — Lead dedup unique constraints
 > - `20260104_0001_more_industry_templates.sql` — 4 more templates (legal, automotive, salon, insurance)
 > - `20260105_0001_fix_dequeue_rpc_ambiguous.sql` — Fix column ambiguity in `dequeue_job()` RPC
+> - `20260106_0001_generic_inventory_items.sql` — Generic inventory table for non-real-estate industries + `inventory_schema` column on `agent_configs`
 
 ---
 
@@ -145,6 +146,58 @@ Tracks CSV/PDF upload jobs.
 | `uploaded_by` | uuid FK → organization_members | |
 | `created_at` | timestamptz | Default `now()` |
 | `processed_at` | timestamptz | |
+
+---
+
+## Generic Inventory Table (Multi-Industry)
+
+### `generic_inventory_items`
+
+Used by any non-real-estate industry (Education, Healthcare, E-Commerce, etc.). Replaces `real_estate_projects` + `real_estate_units` for industries that don't need the project/unit split.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `org_id` | uuid FK → organizations | CASCADE |
+| `title` | text | Required — e.g. "B.Tech CS" or "Dental Checkup" |
+| `subtitle` | text | e.g. "4-year engineering program" |
+| `category` | text | e.g. "Engineering", "Course", "Service" |
+| `configuration` | text | e.g. "3BHK" (kept for search compatibility) |
+| `unit_type` | text | Default `item` |
+| `price_min` | numeric | |
+| `price_max` | numeric | |
+| `currency` | text | Default `INR` |
+| `city` | text | |
+| `sector` | text | |
+| `location` | text | |
+| `address` | text | |
+| `availability_status` | text | `available`, `reserved`, `sold`, `inactive` |
+| `possession_status` | text | e.g. "ongoing", "available" |
+| `possession_date` | date | |
+| `facing` | text | |
+| `furnishing` | text | |
+| `parking` | text | |
+| `tower` | text | |
+| `floor` | text | |
+| `carpet_area_sqft` | numeric | |
+| `builtup_area_sqft` | numeric | |
+| `super_area_sqft` | numeric | |
+| `description` | text | |
+| `amenities` | text[] | Default `{}` |
+| `media_urls` | text[] | Default `{}` |
+| `brochure_url` | text | |
+| `attributes` | jsonb | Default `{}` — industry-specific fields (duration, accreditation, etc.) |
+| `metadata` | jsonb | Default `{}` |
+| `created_at` | timestamptz | Default `now()` |
+| `updated_at` | timestamptz | Auto-updated via trigger |
+
+**Indexes:**
+- `idx_generic_inventory_items_org_id` (org_id)
+- `idx_generic_inventory_items_category` (org_id, category)
+- `idx_generic_inventory_items_search` (org_id, configuration, availability_status, price_min, price_max)
+- `idx_generic_inventory_items_city` (org_id, city, sector)
+
+**Trigger:** `set_generic_inventory_items_updated_at` (BEFORE UPDATE)
 
 ---
 
@@ -450,7 +503,8 @@ Per-organization AI agent configuration. Each org configures its own persona, qu
 | `intent_types` | jsonb | Array of {key, label} |
 | `status_pipeline` | jsonb | Array of {key, label} |
 | `inventory_enabled` | boolean | Default true |
-| `inventory_table` | text | Table to search (e.g. real_estate_units) |
+| `inventory_table` | text | Table to search (e.g. `real_estate_units`, `generic_inventory_items`) |
+| `inventory_schema` | jsonb | Configurable UI schema: `{item_label, item_label_plural, table, search_fields}` — drives the dashboard Inventory and Upload page labels per industry |
 | `search_fields` | jsonb | Array of {field, operator, extract_key} |
 | `reply_template_match` | text | "Yes, we have {{count}} options..." |
 | `reply_template_no_match` | text | "I don't see an exact match..." |
