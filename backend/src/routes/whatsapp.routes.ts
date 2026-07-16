@@ -87,19 +87,14 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   app.get('/api/whatsapp/chats', async (req) => {
     const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
-    // FIX: Eagerly init adapter so chats load from disk even before WhatsApp reconnects.
-    // getAdapter() checks managed + local singleton; if both null, fall through to getLocalAdapter()
-    // which constructs the adapter (loading chat-store.json from disk in the constructor).
     let adapter = await getAdapter(orgId);
     if (!adapter && orgId === config.defaultOrgId) {
-      adapter = getLocalAdapter(); // constructor calls loadFromDisk() — restores all chats
+      adapter = getLocalAdapter();
     }
     if (!adapter) return { chats: [] };
     return { chats: adapter.getChats() };
   });
 
-  // IMPORTANT: bulk-toggle must be registered BEFORE :chatId/toggle,
-  // otherwise Fastify matches "bulk-toggle" as the :chatId param.
   app.post('/api/whatsapp/chats/bulk-toggle', async (req, reply) => {
     const { chatIds, monitored } = req.body as any;
     if (!Array.isArray(chatIds) || typeof monitored !== 'boolean') {
@@ -110,9 +105,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
     const result = adapter.bulkToggleMonitor(chatIds, monitored);
 
-    // SYNC: Also update customer_conversations.ai_enabled in DB so this
-    // toggle is enforced at the message-processing layer and stays in
-    // sync with the Conversations page toggle.
     const { error: dbErr } = await supabaseAdmin()
       .from('customer_conversations')
       .update({ ai_enabled: monitored })
@@ -121,7 +113,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
       .in('external_chat_id', chatIds);
 
     if (dbErr) {
-      logger.warn({ dbErr, count: chatIds.length, monitored }, '[bulk-toggle] DB sync failed — in-memory toggle still applied');
+      logger.warn({ dbErr, count: chatIds.length, monitored }, '[bulk-toggle] DB sync failed');
     } else {
       logger.info({ count: chatIds.length, monitored }, '[bulk-toggle] DB ai_enabled synced');
     }
@@ -137,9 +129,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
     const monitored = adapter.toggleChatMonitor(chatId);
 
-    // SYNC: Also update customer_conversations.ai_enabled in DB so this
-    // toggle is enforced at the message-processing layer and stays in
-    // sync with the Conversations page toggle.
     const { error: dbErr } = await supabaseAdmin()
       .from('customer_conversations')
       .update({ ai_enabled: monitored })
@@ -148,7 +137,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
       .eq('external_chat_id', chatId);
 
     if (dbErr) {
-      logger.warn({ dbErr, chatId, monitored }, '[toggle] DB sync failed — in-memory toggle still applied');
+      logger.warn({ dbErr, chatId, monitored }, '[toggle] DB sync failed');
     } else {
       logger.info({ chatId, monitored }, '[toggle] DB ai_enabled synced');
     }
@@ -181,12 +170,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
    * SIMULATOR: Inject an inbound message into the AI pipeline as if a customer sent it.
    * Creates a lead, runs the AI agent, saves conversation, and optionally delivers
    * the AI reply to a real WhatsApp chatId (your phone) via Baileys.
-   *
-   * Body: { text: string, phone?: string, deliverToChatId?: string }
-   *
-   * - phone: fake customer phone (default: 919999999999)
-   * - deliverToChatId: your real WhatsApp JID to receive the reply (e.g. 917895387978@s.whatsapp.net)
-   * - text: the customer message
    */
   app.post('/api/whatsapp/simulate', async (req, reply) => {
     const { text, phone, deliverToChatId } = req.body as any;
@@ -252,5 +235,142 @@ export async function whatsappRoutes(app: FastifyInstance) {
     } catch (e: any) {
       return reply.code(500).send({ error: e?.message });
     }
+  });
+
+  /**
+   * DIAGNOSTIC: Check conversation state by phone number.
+   * Helps debug why a number isn't getting replies.
+   * Usage: GET /api/whatsapp/debug/919028163126
+   */
+  app.get('/api/whatsapp/debug/:phone', async (req, reply) => {
+    const { phone } = req.params as any;
+    const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    const chatId = `${cleanPhone}@s.whatsapp.net`;
+
+    // Lead lookup
+    const { data: lead } = await supabaseAdmin()
+      .from('crm_leads')
+      .select('*')
+      .eq('org_id', orgId)
+      .or(`phone.eq.+${cleanPhone},whatsapp_number.eq.+${cleanPhone}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Conversation lookup
+    const { data: conversation } = await supabaseAdmin()
+      .from('customer_conversations')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('channel', 'whatsapp')
+      .eq('external_chat_id', chatId)
+      .maybeSingle();
+
+    // Recent messages
+    let recentMessages: any[] = [];
+    if (conversation) {
+      const { data: msgs } = await supabaseAdmin()
+        .from('customer_messages')
+        .select('id, direction, body, ai_generated, sent_at, created_at')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      recentMessages = msgs || [];
+    }
+
+    // Jobs for this conversation
+    let stuckJobs: any[] = [];
+    if (conversation) {
+      const { data: jobs } = await supabaseAdmin()
+        .from('job_queue')
+        .select('id, job_type, status, attempts, error, created_at, next_retry_at')
+        .eq('org_id', orgId)
+        .eq('payload->>conversationId', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      stuckJobs = jobs || [];
+    }
+
+    // Diagnosis
+    const diagnosis: string[] = [];
+    if (!conversation) {
+      diagnosis.push('No conversation found. The number may never have messaged, or phone format is wrong.');
+    } else {
+      if (conversation.status === 'blocked') diagnosis.push('Conversation is BLOCKED.');
+      if (!conversation.ai_enabled) diagnosis.push('AI is DISABLED (ai_enabled=false). Enable it to resume replies.');
+      if (conversation.human_handoff) diagnosis.push('human_handoff=true (should be auto-cleared on next message).');
+      if (conversation.status === 'pending_human') diagnosis.push('status=pending_human (should be auto-cleared on next message).');
+
+      const lastOutbound = recentMessages.find((m) => m.direction === 'outbound');
+      if (!lastOutbound) diagnosis.push('No outbound messages ever sent. Bot may have never replied.');
+    }
+
+    if (stuckJobs.some((j) => j.status === 'processing')) {
+      diagnosis.push('Jobs stuck in "processing" state. Worker may have crashed. Restart backend or /api/system/queue/recover.');
+    }
+    if (stuckJobs.some((j) => j.status === 'failed')) {
+      diagnosis.push('Some jobs FAILED. Check error field.');
+    }
+
+    if (diagnosis.length === 0) {
+      diagnosis.push('Everything looks normal. Check backend logs for LLM errors.');
+    }
+
+    return {
+      phone: cleanPhone,
+      chatId,
+      lead,
+      conversation: conversation
+        ? {
+            id: conversation.id,
+            status: conversation.status,
+            ai_enabled: conversation.ai_enabled,
+            human_handoff: conversation.human_handoff,
+            last_message_at: conversation.last_message_at,
+            last_inbound_at: conversation.last_inbound_at,
+            last_outbound_at: conversation.last_outbound_at,
+          }
+        : null,
+      recentMessages,
+      stuckJobs,
+      diagnosis,
+    };
+  });
+
+  /**
+   * DIAGNOSTIC: Force-unblock a conversation by phone number.
+   * Clears human_handoff, sets status=open, re-enables AI.
+   * Usage: POST /api/whatsapp/debug/:phone/unblock
+   */
+  app.post('/api/whatsapp/debug/:phone/unblock', async (req, reply) => {
+    const { phone } = req.params as any;
+    const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    const chatId = `${cleanPhone}@s.whatsapp.net`;
+
+    const { data, error } = await supabaseAdmin()
+      .from('customer_conversations')
+      .update({
+        ai_enabled: true,
+        human_handoff: false,
+        status: 'open',
+      })
+      .eq('org_id', orgId)
+      .eq('channel', 'whatsapp')
+      .eq('external_chat_id', chatId)
+      .select('id, status, ai_enabled, human_handoff');
+
+    if (error) return reply.code(500).send({ error: error.message });
+    if (!data || data.length === 0) {
+      return reply.code(404).send({ error: 'No conversation found for this phone number.' });
+    }
+
+    logger.info({ phone: cleanPhone, chatId, updated: data[0] }, '[Debug] Conversation force-unblocked');
+    return {
+      ok: true,
+      conversation: data[0],
+      message: 'Conversation unblocked. Next message from this number will get an AI reply.',
+    };
   });
 }

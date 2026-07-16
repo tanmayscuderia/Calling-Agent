@@ -433,12 +433,17 @@ export async function enqueueIncomingMessage(
   if (!conversation.ai_enabled) {
     return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'ai_disabled' };
   }
-  // Clear stale handoff — AI is resuming
+  // Clear stale handoff — AI is resuming.
+  // Log errors instead of silently swallowing — this was a hidden failure
+  // point that caused the queue worker to see handoff still active.
   if (conversation.human_handoff) {
+    logger.info({ chatId: parsed.chatId, conversationId: conversation.id }, 'Clearing human_handoff — AI resuming');
     await updateConversation(resolvedOrgId, conversation.id, {
       human_handoff: false,
       status: 'open',
-    }).catch(() => {});
+    }).catch((e) => {
+      logger.error({ e, conversationId: conversation.id }, 'Failed to clear human_handoff in enqueue path — jobHandler will clear it as backup');
+    });
   }
 
   // 5) enqueue processing job

@@ -1,6 +1,6 @@
 # Architecture — Calling Agent Platform
 
-> **Last Updated:** 2026-07-13
+> **Last Updated:** 2026-07-16
 > **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · Baileys (WhatsApp) · DeepSeek/OpenAI (LLM)
 
 ---
@@ -190,6 +190,40 @@ Customer sends WhatsApp message
 | **Atomic dequeue RPC** | `SELECT ... FOR UPDATE SKIP LOCKED` prevents duplicate processing by concurrent workers. |
 | **5-step AI pipeline** | Extraction → Search → Reply → Update → Persist. Each step is independently testable. |
 | **Lead dedup by phone** | Unique index on `(org_id, phone)` prevents duplicate leads from repeat messages. |
+| **Individual DMs always processed** | No monitoring toggle required for 1:1 chats — only groups need explicit toggle-on. |
+| **Decryption auto-heal** | Signal protocol session desyncs detected and repaired automatically (soft reconnect → full relink). |
+
+### WhatsApp Bridge Resilience (Auto-Heal System)
+
+The Baileys bridge can encounter **signal protocol session desync** — where the bridge's copy of a contact's encryption session gets corrupted. When this happens, Baileys can't decrypt messages from that contact, sends "retry receipts" in a loop, and the message never reaches the AI pipeline.
+
+**Detection (Precise — No False Positives):**
+
+```
+messages.upsert event fires
+         │
+         ▼
+For each message in the batch:
+
+  if (msg.key exists && msg.message is null && !msg.key.fromMe)
+    → REAL decryption failure → trackDecryptionFailure(jid)
+
+  if (msg.message exists)
+    → Decrypted OK → RESET failure counter for that jid
+```
+
+> We deliberately do NOT use `messages.update` for decryption detection — that event fires for normal receipt changes (delivery/read), causing false positives and unnecessary relinks.
+
+**Graduated Auto-Heal:**
+
+| Failures (per-JID, 60s window) | Action | QR Rescan? |
+|-------------------------------|--------|------------|
+| 1 | Log warning | No |
+| 2 | **Soft reconnect** — close/reopen socket with same session files. Refreshes pre-keys. | No |
+| 3–4 | Escalating warning + emit `decryption-warning` event for frontend toast | No |
+| 5 (threshold) | **Full relink** — delete session files, generate new QR | **Yes** |
+
+Soft reconnects have a 30s cooldown to prevent rapid cycling. If soft reconnect doesn't fix the desync (3+ failures persist), the system escalates to a full relink automatically.
 
 ---
 

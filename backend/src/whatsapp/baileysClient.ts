@@ -54,6 +54,20 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   // Debounced save timer for persistence
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // ═══════════════════════════════════════════════════════
+  // DECRYPTION FAILURE TRACKING
+  // When Baileys can't decrypt a message (signal session desync),
+  // it sends "retry receipts" in a loop. We track per-JID failures
+  // and auto-relink if a contact keeps failing.
+  // ═══════════════════════════════════════════════════════
+  private decryptionFailures: Map<string, number> = new Map(); // jid → count
+  private readonly DECRYPT_FAIL_THRESHOLD = 3; // auto-relink after 3 failures from same contact (was 5)
+  private readonly DECRYPT_FAIL_WINDOW_MS = 60_000; // within a 60s window
+  private decryptionTimestamps: Map<string, number[]> = new Map(); // jid → timestamps
+  private isRelinking = false;
+  private lastSoftReconnect = 0; // timestamp of last soft reconnect attempt
+  private readonly SOFT_RECONNECT_COOLDOWN_MS = 30_000; // min 30s between soft reconnects
+
   constructor(orgId: string, sessionDir?: string) {
     super();
     this.orgId = orgId;
@@ -121,17 +135,17 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         // printQRInTerminal is deprecated in latest Baileys — we emit QR to frontend
         logger: logger.child({ module: 'baileys' }) as any,
         browser: ['CallingAgent', 'Chrome', '1.0.0'],
-        // Force full history + contact sync every connect
-        syncFullHistory: true,
+        // ═══════════════════════════════════════════════════════
+        // FIX: Removed syncFullHistory + shouldSyncHistoryMessage overrides.
+        // These forced a FULL history sync on every reconnect, which:
+        //   1. Overwhelmed the signal protocol session management
+        //   2. Caused pre-key exhaustion
+        //   3. Led to decryption failures for contacts whose sessions desynced
+        //   4. Resulted in the infinite "sent retry receipt" loop
+        // Baileys defaults (incremental sync) are more stable.
+        // Individual DMs still arrive via contacts.upsert + messages.upsert.
+        // ═══════════════════════════════════════════════════════
         markOnlineOnConnect: false,
-        // ═══════════════════════════════════════════════════════
-        // ROOT CAUSE FIX: By default, Baileys SKIPS the FULL history sync
-        // type (shouldSyncHistoryMessage returns false for FULL). That FULL
-        // sync is exactly what delivers individual DM chat history.
-        // Without this override, only groups appear — never individual chats.
-        // We force-process ALL sync types so DMs come through.
-        // ═══════════════════════════════════════════════════════
-        shouldSyncHistoryMessage: () => true,
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -307,8 +321,19 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
 
       // ──────────────────────────────────────────────────────
       // INCOMING MESSAGES
+      // On successful message receipt, reset that contact's decryption
+      // failure counter — their session is working fine.
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
+        // Reset decryption failures for any contact whose messages DO decrypt
+        if (type === 'notify' && messages) {
+          for (const msg of messages) {
+            if (msg?.message && msg?.key?.remoteJid && !msg.key.fromMe) {
+              this.decryptionFailures.delete(msg.key.remoteJid);
+              this.decryptionTimestamps.delete(msg.key.remoteJid);
+            }
+          }
+        }
         // FIX: Process BOTH 'notify' (real-time) and 'append' (offline/backfill).
         // Previously only 'notify' was processed, so messages that arrived during
         // a reconnect were silently dropped — a common reason new numbers "didn't trigger".
@@ -318,6 +343,19 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         logger.info({ type, count: messages?.length ?? 0 }, '📨 messages.upsert received');
 
         for (const msg of messages) {
+          // ── DECRYPTION FAILURE DETECTION ──
+          // When Baileys receives a message but can't decrypt it, msg.key exists
+          // but msg.message is null/undefined. This is the REAL signal — not
+          // messages.update (which fires for normal receipt changes too).
+          // We track it and auto-fix before the retry loop becomes infinite.
+          if (!msg.message && msg.key && msg.key.remoteJid && !msg.key.fromMe) {
+            const jid = msg.key.remoteJid;
+            logger.warn({ jid, messageId: msg.key.id }, '🔐 Message could not be decrypted — tracking failure');
+            this.trackDecryptionFailure(jid).catch((err) => {
+              logger.error({ err, jid }, 'Failed to handle decryption failure');
+            });
+            continue;
+          }
           if (!msg.message) continue;
           // DEBUG: Allow self-messages when WHATSAPP_SELF_TEST=true.
           // The bot's own reply is outbound and won't re-trigger this path.
@@ -431,6 +469,103 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       this.starting = false;
       logger.error({ err }, 'Failed to start Baileys socket');
       throw err;
+    }
+  }
+
+  /**
+   * Track decryption failures per-contact.
+   * If a contact fails DECRYPT_FAIL_THRESHOLD times within DECRYPT_FAIL_WINDOW_MS,
+   * we auto-relink the session to fix the signal protocol desync.
+   *
+   * This directly addresses the "sent retry receipt" infinite loop where
+   * Baileys can't decrypt messages from a specific contact and keeps
+   * asking WhatsApp to re-send them forever.
+   */
+  private async trackDecryptionFailure(jid: string): Promise<void> {
+    // Skip groups and broadcast — only individual sessions desync
+    if (jid.endsWith('@g.us') || jid === 'status@broadcast') return;
+    // Don't trigger if already relinking/reconnecting
+    if (this.isRelinking) return;
+
+    const now = Date.now();
+    const timestamps = this.decryptionTimestamps.get(jid) ?? [];
+
+    // Prune timestamps outside the window
+    const recent = timestamps.filter((t) => now - t < this.DECRYPT_FAIL_WINDOW_MS);
+    recent.push(now);
+    this.decryptionTimestamps.set(jid, recent);
+
+    const count = recent.length;
+    this.decryptionFailures.set(jid, count);
+
+    // STEP 1: At 2 failures, try a SOFT reconnect (just close/reopen socket).
+    // This refreshes pre-keys and signal sessions WITHOUT requiring a new QR scan.
+    if (count === 2) {
+      // Cooldown — don't soft-reconnect more than once per 30s
+      if (now - this.lastSoftReconnect < this.SOFT_RECONNECT_COOLDOWN_MS) {
+        logger.warn({ jid, count }, '⚠️ Decryption failure — soft-reconnect on cooldown, will escalate if it continues');
+        this.emit('decryption-warning', { jid, count, threshold: this.DECRYPT_FAIL_THRESHOLD });
+        return;
+      }
+
+      logger.warn(
+        { jid, count },
+        '⚠️ Decryption failure detected — attempting SOFT reconnect (no QR needed)'
+      );
+      this.emit('decryption-warning', { jid, count, threshold: this.DECRYPT_FAIL_THRESHOLD });
+      this.lastSoftReconnect = now;
+
+      // Close socket and reconnect with SAME session files
+      try {
+        this.sock?.end(undefined);
+        this.sock = null;
+        this.status = 'disconnected';
+        // Reconnect after 2s — start() reuses existing session files
+        setTimeout(() => {
+          this.start().catch((err) => {
+            logger.error({ err }, 'Soft reconnect failed');
+          });
+        }, 2000);
+        logger.info('Soft reconnect initiated — socket will reconnect with existing session');
+      } catch (err) {
+        logger.error({ err }, 'Soft reconnect failed to initiate');
+      }
+      return;
+    }
+
+    // STEP 2: Emit escalating warning
+    if (count >= 3 && count < this.DECRYPT_FAIL_THRESHOLD) {
+      logger.warn(
+        { jid, count, threshold: this.DECRYPT_FAIL_THRESHOLD },
+        '⚠️ Decryption still failing after soft reconnect — will escalate to full relink'
+      );
+      this.emit('decryption-warning', { jid, count, threshold: this.DECRYPT_FAIL_THRESHOLD });
+      return;
+    }
+
+    // STEP 3: At threshold, do a FULL relink (delete session files, new QR)
+    if (count >= this.DECRYPT_FAIL_THRESHOLD) {
+      logger.error(
+        { jid, count },
+        '🔴 Decryption failure threshold reached — FULL relink required (session corrupted beyond soft repair)'
+      );
+      this.emit('relink-warning', {
+        jid,
+        count,
+        reason: 'Decryption failures persisted after soft reconnect — session files must be regenerated',
+      });
+
+      this.isRelinking = true;
+      this.decryptionFailures.clear();
+      this.decryptionTimestamps.clear();
+
+      try {
+        await this.relink();
+      } catch (err) {
+        logger.error({ err }, 'Auto-relink failed after decryption threshold');
+      } finally {
+        this.isRelinking = false;
+      }
     }
   }
 

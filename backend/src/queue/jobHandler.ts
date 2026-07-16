@@ -87,9 +87,35 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
     return;
   }
 
-  if (!conversation.ai_enabled || conversation.human_handoff || conversation.status === 'blocked') {
-    logger.info({ conversationId }, '[Queue] AI disabled/handoff/blocked — skipping processing');
+  // ── BUG FIX ──
+  // Previously this checked `human_handoff` and would SILENTLY DROP messages
+  // for any conversation that had handoff active. But the enqueue path
+  // (whatsappService.enqueueIncomingMessage) is supposed to CLEAR handoff
+  // when a new customer message arrives — meaning the AI should resume.
+  // The race condition: if the DB update hadn't committed yet (or failed
+  // silently due to .catch(() => {})), the worker re-loaded the conversation
+  // with human_handoff still true → message dropped → customer never got a reply.
+  //
+  // Now: Only `ai_enabled=false` (manual dashboard toggle) and `status='blocked'`
+  // permanently stop the bot. human_handoff is just a flag for the dashboard.
+  // We also defensively clear handoff here to be 100% sure.
+  if (!conversation.ai_enabled || conversation.status === 'blocked') {
+    logger.info(
+      { conversationId, aiEnabled: conversation.ai_enabled, status: conversation.status },
+      '[Queue] AI disabled or conversation blocked — skipping processing'
+    );
     return;
+  }
+
+  // Defensively clear any stale human_handoff right before processing.
+  // This guarantees the bot replies even if the enqueue-path update raced.
+  if (conversation.human_handoff) {
+    logger.info({ conversationId }, '[Queue] Clearing stale human_handoff before AI processing');
+    await supabaseAdmin()
+      .from('customer_conversations')
+      .update({ human_handoff: false, status: 'open' })
+      .eq('id', conversationId)
+      .eq('org_id', orgId);
   }
 
   // 3. Load recent message history for context

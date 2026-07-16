@@ -38,13 +38,20 @@ Complete list of every capability the app has, organized by module.
 | **Session Persistence** | Session stored locally in `.sessions/whatsapp/` — no re-scan on restart |
 | **Connection Status** | Real-time status: `connected`, `disconnected`, `qr_pending`, `error` |
 | **Auto-Reconnect** | Automatically reconnects if connection drops |
-| **Incoming Message Listener** | Listens to `messages.upsert` events and processes them |
+| **Incoming Message Listener** | Listens to `messages.upsert` events (both `notify` and `append` types) |
 | **Outbound Sending** | Send text replies back through WhatsApp |
 | **Group Filtering** | Ignores group messages by default (`AI_IGNORE_GROUPS=true`) |
 | **Allowlist** | Only respond to numbers in `AI_ALLOWED_NUMBERS` env var |
 | **Own Message Filter** | Ignores messages sent by the bot itself (`key.fromMe`) |
 | **Multi-format Parsing** | Handles text, image, audio, video, document, location messages |
 | **MessagingAdapter Interface** | Clean interface so Baileys can be swapped for Meta Cloud API later |
+| **Individual DMs Always On** | 1:1 chats are always monitored — no manual toggle needed (groups still need toggle) |
+| **Decryption Auto-Heal** | Detects signal session desyncs and repairs them automatically (soft reconnect → full relink) |
+| **Non-Text Message Handling** | Voice notes, images, documents get synthesized placeholder text so they're not dropped |
+| **Media Download + Storage** | Inbound media downloaded and stored in Supabase Storage automatically |
+| **Contact Name Enrichment** | Chat list enriched with saved contact names from WhatsApp sync events |
+| **Chat Persistence** | Chat list + monitoring toggles persisted to disk — survives server restarts |
+| **Bulk Toggle** | "Select All / Deselect All" for group monitoring from the dashboard |
 
 ---
 

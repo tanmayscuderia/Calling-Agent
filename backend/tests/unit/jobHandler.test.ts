@@ -231,18 +231,28 @@ describe('processMessageJob — Guards', () => {
     expect(respondToMessage).not.toHaveBeenCalled();
   });
 
-  // ── Human Handoff Active ───────────────────────────────
+  // ── Human Handoff Auto-Clear on New Inbound ───────────
+  // A conversation stuck in human_handoff=true / pending_human should
+  // NOT silently drop messages. A new inbound means the customer is
+  // re-engaging, so handoff is cleared and AI resumes.
 
-  it('skips processing when human_handoff is true', async () => {
+  it('clears human_handoff and processes when customer re-engages', async () => {
     mockSupabase._setTableResult('customer_conversations', {
-      data: { id: 'conv-1', status: 'pending_human', ai_enabled: true, human_handoff: true },
+      data: {
+        id: 'conv-1',
+        org_id: ORG_ID,
+        lead_id: 'lead-1',
+        status: 'pending_human',
+        ai_enabled: true,
+        human_handoff: true,
+      },
       error: null,
     });
 
     await processMessageJob(ORG_ID, makePayload());
 
     const { respondToMessage } = await import('../../src/ai/baseAgent');
-    expect(respondToMessage).not.toHaveBeenCalled();
+    expect(respondToMessage).toHaveBeenCalledTimes(1);
   });
 
   // ── Blocked Conversation ───────────────────────────────
