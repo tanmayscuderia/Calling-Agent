@@ -14,7 +14,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 8. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection
 9. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 10. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-11. **241 tests** — 150 unit tests + 91 LLM eval tests, all green
+11. **269 tests** — 178 unit tests + 91 LLM eval tests, all green
 12. Clean migration path to Meta Cloud API later
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
@@ -33,7 +33,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (241 tests: 150 unit + 91 LLM evals) |
+| **Testing** | Vitest (269 tests: 178 unit + 91 LLM evals) |
 
 ---
 
@@ -156,7 +156,7 @@ Calling Agent/
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
 │   │   ├── routes/       # 11 route files (auth, whatsapp, leads, calls, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 150 unit tests + 91 LLM evals
+│   └── tests/            # 178 unit tests + 91 LLM evals
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups

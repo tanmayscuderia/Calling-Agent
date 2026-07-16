@@ -127,6 +127,18 @@ Complete list of every capability the app has, organized by module.
 | **Lead Update** | Call outcome updates lead temperature and follow-up schedule |
 | **Live Transcript UI** | Real-time transcript display during call |
 
+---
+
+## 5.5. Dashboard & UX Polish ✅ COMPLETE
+
+| Feature | Description |
+|---------|-------------|
+| **Dashboard Stats API** | Dedicated `/api/dashboard/stats` endpoint — returns lead/conversation/AI/call/property counts in one call |
+| **Stat Card Redesign** | Dashboard cards now use the stats API with shimmer loading states |
+| **Conversation Polling** | Conversations page auto-refreshes every 5s — new messages appear without manual reload |
+| **Sample CSV Download** | Upload page includes a "Download Sample CSV" button with the exact expected format |
+| **Guided Onboarding** | Empty states on inventory, leads, and conversations pages with step-by-step guidance for first-time users |
+
 ### Call Outcomes
 - `interested` — wants to proceed
 - `not_interested` — declined
@@ -285,11 +297,11 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 | **Template-Driven Evals** | Tests config-driven extraction + reply across industries |
 | **Cross-Industry Evals** | Education industry e2e — validates multi-industry support |
 | **Golden Cases** | Curated test cases with expected outcomes |
-| **150 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter |
+| **178 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter, job handler |
 | **Rate-Limit Safe** | Evals run sequential (`fileParallelism: false`), 1 concurrent LLM call, 2s min-delay |
 
 ### Test Files
-- `backend/tests/unit/` — 150 tests (9 files)
+- `backend/tests/unit/` — 178 tests (12 files)
 - `backend/tests/evals/` — 91 eval tests (8 files)
 
 ---
