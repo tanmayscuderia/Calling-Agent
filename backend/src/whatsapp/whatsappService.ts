@@ -123,6 +123,8 @@ export interface HandleMessageOptions {
   skipDelivery?: boolean;
   /** Optional media send function for brochures/images */
   sendMediaFn?: (chatId: string, opts: { url?: string; buffer?: Buffer; fileName?: string; caption?: string; mimeType?: string }) => Promise<void>;
+  /** Optional location send function for sending map pins */
+  sendLocationFn?: (chatId: string, opts: { latitude: number; longitude: number; name?: string; address?: string }) => Promise<void>;
 }
 
 export async function handleIncomingMessage(
@@ -269,6 +271,31 @@ export async function handleIncomingMessage(
           logger.info({ chatId: targetChatId, fileName: result.mediaToSend.fileName }, '📎 Brochure sent via WhatsApp');
         } catch (err) {
           logger.error({ err, chatId: targetChatId }, 'Failed to send brochure media');
+        }
+      }
+
+      // ── LOCATION PIN ──
+      // Send a map pin for the top matched property if it has coordinates.
+      // Only send if the customer asked about location or the match is strong.
+      if (options?.sendLocationFn && result.matchedProperties.length > 0) {
+        const topMatch = result.matchedProperties[0];
+        const lat = topMatch.details?.latitude;
+        const lng = topMatch.details?.longitude;
+        if (lat != null && lng != null && typeof lat === 'number' && typeof lng === 'number') {
+          try {
+            await options.sendLocationFn(targetChatId, {
+              latitude: lat,
+              longitude: lng,
+              name: topMatch.label ?? undefined,
+              address: topMatch.sublabel ?? undefined,
+            });
+            logger.info(
+              { chatId: targetChatId, lat, lng, label: topMatch.label },
+              '📍 Location pin sent for matched property'
+            );
+          } catch (err) {
+            logger.warn({ err, chatId: targetChatId }, 'Failed to send location pin (non-critical)');
+          }
         }
       }
     } catch (err) {

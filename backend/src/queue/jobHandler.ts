@@ -36,6 +36,16 @@ export interface SendReplyJobPayload {
   text: string;
 }
 
+export interface SendLocationJobPayload {
+  orgId: string;
+  accountId: string;
+  chatId: string;
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+}
+
 export interface SummaryJobPayload {
   orgId: string;
   callSessionId: string;
@@ -149,6 +159,32 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
     scheduled_at: new Date().toISOString(),
   });
 
+  // 7b. Enqueue a location pin if the top matched property has coordinates
+  if (result.matchedProperties.length > 0) {
+    const topMatch = result.matchedProperties[0];
+    const lat = topMatch.details?.latitude;
+    const lng = topMatch.details?.longitude;
+    if (lat != null && lng != null && typeof lat === 'number' && typeof lng === 'number') {
+      await supabaseAdmin().from('job_queue').insert({
+        org_id: orgId,
+        job_type: 'send_location',
+        payload: {
+          orgId,
+          accountId,
+          chatId,
+          latitude: lat,
+          longitude: lng,
+          name: topMatch.label ?? undefined,
+          address: topMatch.sublabel ?? undefined,
+        } satisfies SendLocationJobPayload,
+        status: 'pending',
+        priority: 7,
+        scheduled_at: new Date().toISOString(),
+      });
+      logger.info({ chatId, lat, lng }, '[Queue] Location pin job enqueued');
+    }
+  }
+
   // 8. Update lead
   const newStatus = computeStatus(lead, result.extractedData);
   const leadPatch: Record<string, any> = { ...result.leadUpdates };
@@ -227,6 +263,31 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
   } catch (err: any) {
     logger.error({ err, accountId, chatId }, '[Queue] Failed to send WhatsApp reply');
     throw err; // let the queue retry
+  }
+}
+
+/**
+ * Send a location pin via WhatsApp.
+ */
+export async function processSendLocationJob(orgId: string, payload: SendLocationJobPayload): Promise<void> {
+  const { accountId, chatId, latitude, longitude, name, address } = payload;
+
+  const adapter = waManager.getAdapter(accountId);
+  if (!adapter) {
+    throw new Error(`WhatsApp account ${accountId} is not connected (adapter not found)`);
+  }
+
+  if (typeof adapter.sendLocation !== 'function') {
+    logger.warn({ accountId, chatId }, '[Queue] Adapter does not support sendLocation — skipping');
+    return;
+  }
+
+  try {
+    await adapter.sendLocation(chatId, { latitude, longitude, name, address });
+    logger.info({ accountId, chatId, lat: latitude, lng: longitude }, '[Queue] Location pin sent via WhatsApp');
+  } catch (err: any) {
+    logger.error({ err, accountId, chatId }, '[Queue] Failed to send location pin');
+    throw err;
   }
 }
 

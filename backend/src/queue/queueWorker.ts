@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
-import { processMessageJob, processSendReplyJob, processSummaryJob } from './jobHandler';
+import { processMessageJob, processSendReplyJob, processSendLocationJob, processSummaryJob } from './jobHandler';
 
 // ============================================================
 // Production Queue Worker
@@ -179,6 +179,9 @@ async function processJob(job: QueueJob): Promise<void> {
         break;
       case 'send_reply':
         await processSendReplyJob(job.org_id, job.payload);
+        break;
+      case 'send_location':
+        await processSendLocationJob(job.org_id, job.payload);
         break;
       case 'generate_summary':
         await processSummaryJob(job.org_id, job.payload);

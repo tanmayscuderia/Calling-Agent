@@ -23,5 +23,7 @@ export interface MessagingAdapter {
   sendMessage(chatId: string, text: string): Promise<void>;
   /** Send a media file (image/document) with optional caption */
   sendMedia?(chatId: string, opts: { url?: string; buffer?: Buffer; fileName?: string; caption?: string; mimeType?: string }): Promise<void>;
+  /** Send a location pin (latitude, longitude, optional place name) */
+  sendLocation?(chatId: string, opts: { latitude: number; longitude: number; name?: string; address?: string }): Promise<void>;
   getStatus(): Promise<any>;
 }

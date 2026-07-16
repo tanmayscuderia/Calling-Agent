@@ -24,6 +24,8 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
     description: '',
     amenities: '',
     brochure_url: '',
+    latitude: '',
+    longitude: '',
     // Unit fields
     configuration: '3BHK',
     unit_type: 'apartment',
@@ -54,6 +56,8 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
         description: project.description ?? '',
         amenities: Array.isArray(project.amenities) ? project.amenities.join(', ') : '',
         brochure_url: project.brochure_url ?? '',
+        latitude: project.latitude != null ? String(project.latitude) : '',
+        longitude: project.longitude != null ? String(project.longitude) : '',
       }));
     }
   }, [project]);
@@ -84,7 +88,8 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
         rera_number: form.rera_number || null,
         description: form.description || null,
         amenities: amenitiesArray.length ? amenitiesArray : [],
-        brochure_url: form.brochure_url || null,
+        latitude: form.latitude ? Number(form.latitude) : null,
+        longitude: form.longitude ? Number(form.longitude) : null,
       };
 
       if (isEdit) {
@@ -98,8 +103,8 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
           body: projectData,
         });
 
-        // Auto-create a unit if configuration + price are provided
-        if (form.configuration && form.price_min) {
+        // Always auto-create a unit so the property is searchable by AI
+        if (form.configuration) {
           await api('/api/inventory/units', {
             method: 'POST',
             body: {
@@ -153,6 +158,8 @@ export default function PropertyFormModal({ project, onClose, onSaved }: Props) 
           <input className="input" style={inputStyle} placeholder="RERA Number" value={form.rera_number} onChange={(e) => upd('rera_number', e.target.value)} />
           <input className="input" style={inputStyle} type="date" placeholder="Possession Date" value={form.possession_date?.split('T')[0] ?? ''} onChange={(e) => upd('possession_date', e.target.value)} />
           <input className="input" style={inputStyle} placeholder="Brochure URL" value={form.brochure_url} onChange={(e) => upd('brochure_url', e.target.value)} />
+          <input className="input tnum" style={inputStyle} type="number" step="any" placeholder="Latitude" value={form.latitude} onChange={(e) => upd('latitude', e.target.value)} />
+          <input className="input tnum" style={inputStyle} type="number" step="any" placeholder="Longitude" value={form.longitude} onChange={(e) => upd('longitude', e.target.value)} />
           <select className="input" style={inputStyle} value={form.status} onChange={(e) => upd('status', e.target.value)}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>

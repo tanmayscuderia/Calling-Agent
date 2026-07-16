@@ -77,9 +77,19 @@ async function searchRealEstate(
     sublabel: [m.sector, m.city].filter(Boolean).join(', ') || undefined,
     priceRange: formatRange(m.priceMin, m.priceMax),
     details: {
+      projectId: m.projectId,
       configuration: m.configuration,
       possessionStatus: m.possessionStatus,
       brochureUrl: m.brochureUrl,
+      developerName: m.developerName,
+      superAreaSqft: m.superAreaSqft,
+      city: m.city,
+      sector: m.sector,
+      location: m.location,
+      address: m.address,
+      latitude: m.latitude,
+      longitude: m.longitude,
+      mapsUrl: m.mapsUrl,
     },
   }));
 }

@@ -168,6 +168,8 @@ function buildReplyUserPrompt(
             const locStr = [m.details?.sector, m.details?.city].filter(Boolean).join(', ');
             parts.push(locStr);
           }
+          if (m.details?.address) parts.push(`address: ${m.details.address}`);
+          if (m.details?.mapsUrl) parts.push(`map: ${m.details.mapsUrl}`);
           if (m.details?.brochureUrl) parts.push('brochure available');
           return `${i + 1}. ${parts.join(' — ')}`;
         })

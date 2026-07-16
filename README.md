@@ -14,7 +14,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 8. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection
 9. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 10. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-11. **269 tests** — 178 unit tests + 91 LLM eval tests, all green
+11. **290 tests** — 199 unit tests + 91 LLM eval tests, all green
 12. Clean migration path to Meta Cloud API later
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
@@ -33,7 +33,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (269 tests: 178 unit + 91 LLM evals) |
+| **Testing** | Vitest (290 tests: 199 unit + 91 LLM evals) |
 
 ---
 
@@ -157,7 +157,7 @@ Calling Agent/
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
 │   │   ├── routes/       # 11 route files (auth, whatsapp, leads, calls, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 178 unit tests + 91 LLM evals
+│   └── tests/            # 199 unit tests + 91 LLM evals
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
@@ -166,6 +166,41 @@ Calling Agent/
 ├── supabase/migrations/  # 10 SQL migration files
 └── docs/                 # 8 documentation files
 ```
+
+---
+
+## Inventory Search Architecture
+
+The property/inventory search (`searchProperties` in `backend/src/crm/propertyService.ts`) uses a **project-primary, bidirectional matching** design. Three critical bugs were discovered and fixed during development:
+
+### Bug 1: Location alias resolution broke matches
+- **Problem:** When a user typed "Delhi", the alias resolver mapped it to "New Delhi". But if the DB stored `city = 'Delhi'`, the match failed because only the resolved form was compared.
+- **Fix:** **Bidirectional matching** — both the raw input and the resolved alias are checked against DB values, so alias resolution never breaks a match.
+
+### Bug 2: No DB-level city filtering
+- **Problem:** All projects were fetched and scored in memory with weak penalties. Non-matching cities still appeared in results.
+- **Fix:** **Strong city mismatch penalty** (-0.4 score) effectively excludes irrelevant cities. City is the most important filter — if it doesn't match, the property is almost certainly irrelevant.
+
+### Bug 3: Projects without units were invisible
+- **Problem:** The old query used `real_estate_units` as the primary table with an INNER JOIN to projects. Projects with no unit rows (or all units sold) were invisible to search.
+- **Fix:** **Projects as primary source** with a LEFT JOIN to units. Every active project is always findable. If no suitable unit exists, the project appears without unit-level details.
+
+### Scoring System
+
+| Signal | Points |
+|--------|--------|
+| Base (active project) | +0.35 |
+| Configuration match (unit) | +0.20 |
+| Budget overlap | +0.25 |
+| Budget fully within range | +0.05 (bonus) |
+| City match (bidirectional) | +0.10 |
+| City mismatch | -0.40 (strong penalty) |
+| Sector match (bidirectional) | +0.15 |
+| Sector mismatch | -0.20 |
+| Location match | +0.05 |
+| Possession status match | +0.10 |
+
+Results with score ≤ 0.1 are filtered out. Top N (default 3) returned, sorted by score descending. Results are cached for 60 seconds.
 
 ---
 

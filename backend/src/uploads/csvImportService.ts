@@ -106,6 +106,8 @@ export async function importPropertiesCsv(
               possession_date: row.possession_date?.trim() || null,
               description: row.description?.trim() || null,
               amenities,
+              latitude: num(row.latitude),
+              longitude: num(row.longitude),
             })
             .select()
             .single();

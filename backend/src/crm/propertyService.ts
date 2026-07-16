@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
+import { resolveLocations } from '../utils/locationAliases';
 
 // ── In-memory cache for property search (60s TTL) ──
 // Avoids hitting DB on every AI reply for the same search params.
@@ -26,6 +27,7 @@ export interface PropertyMatch {
   city?: string | null;
   sector?: string | null;
   location?: string | null;
+  address?: string | null;
   unitId: string;
   unitTitle?: string | null;
   configuration?: string | null;
@@ -34,6 +36,9 @@ export interface PropertyMatch {
   priceMax?: number | null;
   superAreaSqft?: number | null;
   brochureUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  mapsUrl?: string | null;
   score: number;
   reason: string;
 }
@@ -96,9 +101,15 @@ function norm(s?: string | null): string {
 }
 
 /**
- * Structured property search with progressive relaxation.
- * Returns top `limit` (default 3) results ordered by score.
- * Results are cached for 60s to avoid repeated DB hits on rapid messages.
+ * Unified property search — queries projects as the PRIMARY source and
+ * LEFT JOINs units. This means every project is always findable even if
+ * it has no unit row. Eliminates the "invisible property" problem.
+ *
+ * Scoring uses bidirectional location matching: checks both the resolved
+ * alias (e.g. "New Delhi") and the raw user input (e.g. "Delhi") against
+ * what's stored in the DB, so alias resolution never breaks a match.
+ *
+ * Results are cached for 60s.
  */
 export async function searchProperties(params: PropertySearchParams): Promise<PropertyMatch[]> {
   const {
@@ -113,62 +124,93 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     limit = 3,
   } = params;
 
-  // Check cache first
-  const cacheKey = JSON.stringify({ orgId, configuration, city, sector, location, budgetMin, budgetMax, possessionStatus, limit });
+  // ── LOCATION ALIAS RESOLUTION ──
+  const resolved = await resolveLocations({ city, sector, location }, orgId);
+
+  // Keep BOTH raw and resolved for bidirectional matching
+  const cityRaw = city?.trim() || null;
+  const cityResolved = resolved.city;
+  const sectorRaw = sector?.trim() || null;
+  const sectorResolved = resolved.sector;
+  const locRaw = location?.trim() || null;
+  const locResolved = resolved.location;
+
+  const cacheKey = JSON.stringify({ orgId, configuration, cityRaw, cityResolved, sectorRaw, sectorResolved, locRaw, locResolved, budgetMin, budgetMax, possessionStatus, limit });
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
     return cached.results;
   }
 
-  const sb = supabaseAdmin();
-  let query = sb
-    .from('real_estate_units')
+  // ── QUERY: projects LEFT JOIN units ──
+  // Primary source = real_estate_projects (always present).
+  // Units are nested — we'll flatten the best-matching unit per project.
+  const { data: projects, error } = await supabaseAdmin()
+    .from('real_estate_projects')
     .select(
-      `id, title, configuration, possession_status, price_min, price_max, super_area_sqft,
-       brochure_url, availability_status,
-       project:real_estate_projects (id, name, developer_name, city, sector, location)`
+      `id, name, developer_name, city, sector, location, address, status, latitude, longitude, maps_url,
+       units:real_estate_units ( id, title, configuration, possession_status, price_min, price_max, super_area_sqft, brochure_url, availability_status )`
     )
     .eq('org_id', orgId)
-    .eq('availability_status', 'available');
+    .in('status', ['active'])
+    .limit(50);
 
-  if (configuration) {
-    query = query.ilike('configuration', `%${configuration}%`);
-  }
-  if (possessionStatus && possessionStatus !== 'any') {
-    const pref = possessionStatus.toLowerCase();
-    if (pref === 'ready_to_move') {
-      query = query.in('possession_status', ['ready_to_move', 'ready', 'ready to move']);
-    } else if (pref === 'under_construction') {
-      query = query.in('possession_status', ['under_construction', 'under construction']);
-    }
-  }
-
-  const { data: units, error } = await query.limit(50);
   if (error) {
     logger.error({ error }, 'property search query failed');
     throw error;
   }
 
-  type Proj = { id: string; name: string; developer_name?: string | null; city?: string | null; sector?: string | null; location?: string | null } | null;
-  type Row = (NonNullable<typeof units>[number]) & { project?: Proj };
+  type UnitRow = {
+    id: string; title: string | null; configuration: string | null;
+    possession_status: string | null; price_min: number | null; price_max: number | null;
+    super_area_sqft: number | null; brochure_url: string | null; availability_status: string;
+  };
+  type ProjRow = {
+    id: string; name: string; developer_name: string | null;
+    city: string | null; sector: string | null; location: string | null; address: string | null;
+    status: string; latitude: number | null; longitude: number | null; maps_url: string | null;
+    units: UnitRow[];
+  };
 
   const scored: PropertyMatch[] = [];
 
-  for (const u of (units ?? []) as Row[]) {
-    let score = 0.4;
+  for (const p of (projects ?? []) as ProjRow[]) {
+    // ── Pick the best-matching unit for this project ──
+    // If configuration specified, prefer the unit that matches it.
+    // Otherwise pick the first available unit (or null if no units).
+    const availableUnits = (p.units ?? []).filter((u) => u.availability_status === 'available');
+
+    let bestUnit: UnitRow | null = null;
+    if (configuration && availableUnits.length > 0) {
+      bestUnit = availableUnits.find((u) => u.configuration && norm(u.configuration).includes(norm(configuration))) ?? availableUnits[0]!;
+    } else if (availableUnits.length > 0) {
+      bestUnit = availableUnits[0]!;
+    }
+
+    // ── Score this project ──
+    let score = 0.35; // base score for being an active project
     const reasons: string[] = [];
 
-    const uMin = u.price_min != null ? Number(u.price_min) : null;
-    const uMax = u.price_max != null ? Number(u.price_max) : null;
+    // Configuration scoring (from unit if available)
+    if (configuration && bestUnit?.configuration) {
+      if (norm(bestUnit.configuration).includes(norm(configuration))) {
+        score += 0.2;
+        reasons.push(bestUnit.configuration);
+      } else {
+        score -= 0.1;
+      }
+    }
 
-    if (budgetMax != null || budgetMin != null) {
+    // Budget scoring (from unit if available)
+    const uMin = bestUnit?.price_min != null ? Number(bestUnit.price_min) : null;
+    const uMax = bestUnit?.price_max != null ? Number(bestUnit.price_max) : null;
+    if ((budgetMin != null || budgetMax != null) && uMin != null && uMax != null) {
       const bMin = budgetMin ?? 0;
       const bMax = budgetMax ?? Number.MAX_SAFE_INTEGER;
-      const overlaps = uMin != null && uMax != null ? uMin <= bMax && uMax >= bMin : true;
+      const overlaps = uMin <= bMax && uMax >= bMin;
       if (overlaps) {
         score += 0.25;
         reasons.push('within budget');
-        if (uMin != null && uMax != null && budgetMax != null && uMax <= budgetMax && uMin >= (budgetMin ?? 0)) {
+        if (budgetMax != null && uMax <= budgetMax && uMin >= (budgetMin ?? 0)) {
           score += 0.05;
         }
       } else {
@@ -176,65 +218,92 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
       }
     }
 
-    if (configuration && u.configuration) {
-      if (norm(u.configuration).includes(norm(configuration))) {
-        score += 0.2;
-        reasons.push(`${u.configuration}`);
+    // ── BIDIRECTIONAL LOCATION MATCHING ──
+    // Check both raw and resolved forms against DB values.
+    // Fixes: "Delhi" resolved to "New Delhi" but stored as "Delhi" → was missed.
+    const cityVals = [cityRaw, cityResolved].filter(Boolean).map(norm);
+    const sectorVals = [sectorRaw, sectorResolved].filter(Boolean).map(norm);
+    const locVals = [locRaw, locResolved].filter(Boolean).map(norm);
+
+    const pCity = norm(p.city);
+    const pSector = norm(p.sector);
+    const pLoc = norm(p.location);
+
+    // City match (bidirectional)
+    // Strong penalty: if user specifies a city and it doesn't match,
+    // the property is almost certainly irrelevant.
+    if (cityVals.length > 0) {
+      const matched = cityVals.some((cv) => pCity.includes(cv) || cv.includes(pCity));
+      if (matched && pCity) {
+        score += 0.1;
+        reasons.push(p.city!);
       } else {
-        score -= 0.1;
+        score -= 0.4; // strong penalty — effectively excludes non-matching cities
       }
     }
 
-    const p = u.project;
-    if (p) {
-      const wantSector = norm(sector);
-      const wantCity = norm(city);
-      const wantLoc = norm(location);
-
-      if (wantSector && norm(p.sector).includes(wantSector)) {
+    // Sector match (bidirectional)
+    if (sectorVals.length > 0) {
+      const matched = sectorVals.some((sv) => pSector.includes(sv) || sv.includes(pSector));
+      if (matched && pSector) {
         score += 0.15;
         reasons.push(`in ${p.sector}`);
-      } else if (wantSector) {
-        score -= 0.08;
+      } else {
+        score -= 0.2;
       }
-      if (wantCity && norm(p.city).includes(wantCity)) {
-        score += 0.05;
-        reasons.push(`${p.city}`);
-      }
-      if (wantLoc && (norm(p.location).includes(wantLoc) || norm(p.sector).includes(wantLoc))) {
+    }
+
+    // Location match (bidirectional, checks both location and sector fields)
+    if (locVals.length > 0) {
+      const matched = locVals.some((lv) => pLoc.includes(lv) || lv.includes(pLoc) || pSector.includes(lv) || lv.includes(pSector));
+      if (matched) {
         score += 0.05;
         reasons.push(p.location ?? p.sector ?? '');
       }
     }
 
-    if (score <= 0) continue;
+    // Possession status scoring
+    if (possessionStatus && possessionStatus !== 'any' && bestUnit?.possession_status) {
+      const pref = possessionStatus.toLowerCase().replace(/[\s-]/g, '_');
+      const unitPs = norm(bestUnit.possession_status).replace(/[\s-]/g, '_');
+      if (pref === unitPs || (pref === 'ready_to_move' && unitPs.includes('ready')) || (pref === 'under_construction' && unitPs.includes('under'))) {
+        score += 0.1;
+        reasons.push(bestUnit.possession_status.replace(/_/g, ' '));
+      }
+    }
 
-    // Build a human-readable reason string
+    // Skip if score dropped to zero or below
+    if (score <= 0.1) continue;
+
+    // ── Build human-readable reason ──
     const reasonParts: string[] = [];
-    if (u.configuration) reasonParts.push(u.configuration);
-    const locStr = [p?.sector, p?.city].filter(Boolean).join(', ');
+    if (bestUnit?.configuration) reasonParts.push(bestUnit.configuration);
+    const locStr = [p.sector, p.city].filter(Boolean).join(', ');
     if (locStr) reasonParts.push(`in ${locStr}`);
     if (budgetMax != null && uMin != null && uMax != null) {
-      const overlaps = uMin <= budgetMax && uMax >= (budgetMin ?? 0);
-      if (overlaps) reasonParts.push('within budget');
+      if (uMin <= budgetMax && uMax >= (budgetMin ?? 0)) reasonParts.push('within budget');
     }
-    if (u.possession_status) reasonParts.push(u.possession_status.replace(/_/g, ' '));
+    if (bestUnit?.possession_status) reasonParts.push(bestUnit.possession_status.replace(/_/g, ' '));
 
     scored.push({
-      projectId: p?.id ?? '',
-      projectName: p?.name ?? 'Unknown',
-      developerName: p?.developer_name ?? null,
-      city: p?.city ?? null,
-      sector: p?.sector ?? null,
-      location: p?.location ?? null,
-      unitId: u.id,
-      unitTitle: u.title ?? null,
-      configuration: u.configuration ?? null,
-      possessionStatus: u.possession_status ?? null,
+      projectId: p.id,
+      projectName: p.name,
+      developerName: p.developer_name ?? null,
+      city: p.city ?? null,
+      sector: p.sector ?? null,
+      location: p.location ?? null,
+      address: p.address ?? null,
+      unitId: bestUnit?.id ?? '',
+      unitTitle: bestUnit?.title ?? null,
+      configuration: bestUnit?.configuration ?? configuration ?? null,
+      possessionStatus: bestUnit?.possession_status ?? null,
       priceMin: uMin,
       priceMax: uMax,
-      superAreaSqft: u.super_area_sqft ?? null,
-      brochureUrl: u.brochure_url ?? null,
+      superAreaSqft: bestUnit?.super_area_sqft ?? null,
+      brochureUrl: bestUnit?.brochure_url ?? null,
+      latitude: p.latitude ?? null,
+      longitude: p.longitude ?? null,
+      mapsUrl: p.maps_url ?? null,
       score: Math.max(0, Math.min(1, score)),
       reason: reasonParts.join(', ') || 'available listing',
     });

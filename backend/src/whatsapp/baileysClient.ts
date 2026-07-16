@@ -715,6 +715,28 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   }
 
   /**
+   * Send a location pin via WhatsApp.
+   * Uses Baileys' native location message type.
+   */
+  async sendLocation(chatId: string, opts: { latitude: number; longitude: number; name?: string; address?: string }): Promise<void> {
+    if (!this.sock) throw new Error('WhatsApp socket not connected');
+
+    await this.sock.sendMessage(chatId, {
+      location: {
+        degreesLatitude: opts.latitude,
+        degreesLongitude: opts.longitude,
+        name: opts.name || undefined,
+        address: opts.address || undefined,
+      },
+    });
+
+    logger.info(
+      { chatId, lat: opts.latitude, lng: opts.longitude, name: opts.name },
+      '📍 Location pin sent via WhatsApp'
+    );
+  }
+
+  /**
    * Download media from a raw Baileys message.
    * Returns Buffer + mimeType + fileName.
    */
