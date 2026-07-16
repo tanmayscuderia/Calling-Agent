@@ -4,7 +4,24 @@ import { api } from '@/lib/api';
 import Link from 'next/link';
 
 const csvTemplate = `project_name,developer_name,city,sector,location,configuration,price_min,price_max,possession_status,possession_date,status,amenities,description,brochure_url
-Demo Heights,Demo Realty,Noida,Sector 150,Noida Sector 150,3BHK,16500000,21000000,under_construction,2027-12-31,active,clubhouse;parking;green area;security,Premium residential near expressway,https://example.com/brochure.pdf`;
+Demo Heights,Demo Realty,Noida,Sector 150,Noida Sector 150,3BHK,16500000,21000000,under_construction,2027-12-31,active,clubhouse;parking;green area;security,Premium residential near expressway,https://example.com/brochure.pdf
+Demo Heights,Demo Realty,Noida,Sector 150,Noida Sector 150,2BHK,9500000,12500000,under_construction,2027-12-31,active,clubhouse;parking;green area;security,Premium residential near expressway,https://example.com/brochure.pdf
+ATS Knightsbridge,ATS,Noida,Sector 124,Noida Sector 124,4BHK,75000000,120000000,ready,2024-01-01,active,clubhouse;pool;gym;security;power backup,Luxury ready-to-move apartments,https://example.com/ats.pdf
+Godrej Tropical Isle,Godrej,Noida,Sector 146,Noida Sector 146,3BHK,22000000,32000000,under_construction,2028-06-30,active,clubhouse;pool;gym;tropical gardens,Tropical-themed premium living,https://example.com/godrej.pdf
+Central Noida Residency,CNR,Noida,Sector 76,Noida Sector 76,2BHK,9500000,12500000,ready,2023-06-01,active,parking;gym;security,Affordable ready-to-move in central Noida,https://example.com/cnr.pdf
+Luxury Greens Villa,Luxury Greens,Greater Noida West,Gaur City,Greater Noida West,Villa,28000000,40000000,under_construction,2027-03-31,active,private garden;parking;clubhouse;gated community,Spacious luxury villas with private gardens,https://example.com/lgv.pdf`;
+
+const downloadSampleCsv = () => {
+  const blob = new Blob([csvTemplate], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sample-properties.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -129,13 +146,22 @@ export default function UploadPage() {
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>Expected CSV Format</h3>
-          <button
-            className="btn btn-ghost"
-            style={{ minHeight: 32, padding: '4px 12px', fontSize: 13 }}
-            onClick={() => navigator.clipboard.writeText(csvTemplate)}
-          >
-            Copy Template
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-ghost"
+              style={{ minHeight: 32, padding: '4px 12px', fontSize: 13 }}
+              onClick={downloadSampleCsv}
+            >
+              ⬇ Download Sample CSV
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ minHeight: 32, padding: '4px 12px', fontSize: 13 }}
+              onClick={() => navigator.clipboard.writeText(csvTemplate)}
+            >
+              Copy Template
+            </button>
+          </div>
         </div>
         <pre style={{ fontSize: 12, background: '#0f172a', color: '#e2e8f0', padding: 16, borderRadius: 12, overflowX: 'auto', margin: 0 }}>
 {csvTemplate}

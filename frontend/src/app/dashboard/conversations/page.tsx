@@ -10,26 +10,58 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevMsgCount = useRef(0);
 
-  useEffect(() => {
+  const fetchConversations = () =>
     api('/api/conversations')
       .then((r) => {
-        setConversations(r.conversations ?? []);
-        if (r.conversations?.length && !selected) setSelected(r.conversations[0].id);
+        const list = r.conversations ?? [];
+        setConversations(list);
+        setSelected((prev) => {
+          if (!prev && list.length > 0) return list[0].id;
+          return prev;
+        });
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
+
+  const fetchMessages = (convId: string) =>
+    api(`/api/conversations/${convId}`)
+      .then((r) => {
+        const msgs = r.conversation?.messages ?? r.messages ?? [];
+        setMessages(msgs);
+      })
+      .catch(() => setMessages([]));
+
+  // Initial load
+  useEffect(() => {
+    fetchConversations().finally(() => setLoading(false));
   }, []);
 
+  // Fetch messages when selected changes
   useEffect(() => {
-    if (!selected) return;
-    api(`/api/conversations/${selected}`)
-      .then((r) => setMessages(r.conversation?.messages ?? r.messages ?? []))
-      .catch(() => setMessages([]));
+    if (!selected) {
+      setMessages([]);
+      return;
+    }
+    prevMsgCount.current = 0;
+    fetchMessages(selected);
   }, [selected]);
 
+  // Poll for updates every 5 seconds (list + active conversation)
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
+    const interval = setInterval(() => {
+      fetchConversations();
+      if (selected) fetchMessages(selected);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selected]);
+
+  // Auto-scroll only when new messages arrive
+  useEffect(() => {
+    if (messages.length > prevMsgCount.current) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+    prevMsgCount.current = messages.length;
   }, [messages]);
 
   const send = async () => {

@@ -112,9 +112,19 @@ export default function InventoryPage() {
           Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 180, borderRadius: 16 }} />)
         ) : filtered.length === 0 ? (
           <div className="card" style={{ padding: 48, textAlign: 'center', gridColumn: 'span 2' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🏠</div>
-            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>No properties found.</div>
-            <button className="btn-primary" onClick={() => setShowForm(true)}>Add Your First Property</button>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🏠</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>No properties in inventory yet</h3>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', maxWidth: 400, marginLeft: 'auto', marginRight: 'auto' }}>
+              Upload a CSV file to import properties in bulk, or add a property manually. The AI agent needs inventory to recommend to leads.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <Link href="/dashboard/upload" className="btn-primary" style={{ textDecoration: 'none' }}>
+                📤 Upload CSV
+              </Link>
+              <button className="btn-secondary" onClick={() => setShowForm(true)}>
+                + Add Manually
+              </button>
+            </div>
           </div>
         ) : (
           filtered.map((proj) => (

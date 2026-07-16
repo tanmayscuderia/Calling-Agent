@@ -12,23 +12,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     Promise.all([
-      api('/api/leads'),
-      api('/api/conversations'),
-      api('/api/inventory/projects'),
+      api('/api/dashboard/stats').catch(() => null),
       api('/api/followups?status=pending').catch(() => ({ followups: [] })),
       api('/api/system/llm-usage').catch(() => null),
     ])
-      .then(([leadsRes, convRes, projRes, followupsRes, usageRes]) => {
-        const leads = leadsRes.leads ?? [];
-        const conversations = convRes.conversations ?? [];
-        const projects = projRes.projects ?? [];
-        const followups = followupsRes.followups ?? [];
+      .then(([statsRes, followupsRes, usageRes]) => {
         setStats({
-          totalLeads: leads.length,
-          hotLeads: leads.filter((l: any) => l.temperature === 'hot').length,
-          openConversations: conversations.filter((c: any) => c.status === 'open').length,
-          properties: projects.length,
-          pendingFollowups: followups.length,
+          totalLeads: statsRes?.totalLeads ?? 0,
+          hotLeads: statsRes?.hotLeads ?? 0,
+          openConversations: statsRes?.openConversations ?? 0,
+          aiRepliesToday: statsRes?.aiRepliesToday ?? 0,
+          callsCompleted: statsRes?.callsCompleted ?? 0,
+          properties: statsRes?.propertiesAvailable ?? 0,
+          pendingFollowups: followupsRes.followups?.length ?? 0,
         });
         if (usageRes) setLlmUsage(usageRes);
       })
@@ -40,6 +36,8 @@ export default function DashboardPage() {
     { label: 'Total Leads', value: stats?.totalLeads ?? 0, color: '#2563eb', bg: '#dbeafe', icon: '👥' },
     { label: 'Hot Leads', value: stats?.hotLeads ?? 0, color: '#dc2626', bg: '#fee2e2', icon: '🔥' },
     { label: 'Open Conversations', value: stats?.openConversations ?? 0, color: '#16a34a', bg: '#dcfce7', icon: '💬' },
+    { label: 'AI Replies Today', value: stats?.aiRepliesToday ?? 0, color: '#0891b2', bg: '#cffafe', icon: '🤖' },
+    { label: 'Calls Completed', value: stats?.callsCompleted ?? 0, color: '#9333ea', bg: '#f3e8ff', icon: '📞' },
     { label: 'Properties', value: stats?.properties ?? 0, color: '#7c3aed', bg: '#ede9fe', icon: '🏠' },
     { label: 'Pending Follow-ups', value: stats?.pendingFollowups ?? 0, color: '#d97706', bg: '#fef3c7', icon: '📋' },
   ];
@@ -108,7 +106,7 @@ export default function DashboardPage() {
        </m.div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 32 }}>
         {statCards.map((stat) => (
           <m.div key={stat.label} variants={staggerItem}>
             <m.div

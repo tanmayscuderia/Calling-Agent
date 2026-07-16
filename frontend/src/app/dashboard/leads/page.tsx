@@ -114,8 +114,22 @@ export default function LeadsPage() {
                 ))
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px 16px', color: '#94a3b8' }}>
-                    No leads yet. Send a WhatsApp message or create one manually.
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <div style={{ padding: 48, textAlign: 'center' }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>No leads yet</h3>
+                      <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', maxWidth: 400, marginLeft: 'auto', marginRight: 'auto' }}>
+                        Leads are created automatically when customers message on WhatsApp. Connect your WhatsApp bridge and upload inventory first.
+                      </p>
+                      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                        <Link href="/dashboard/whatsapp" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+                          📱 Connect WhatsApp
+                        </Link>
+                        <Link href="/dashboard/playground" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+                          🧪 Try AI Playground
+                        </Link>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
