@@ -325,6 +325,24 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // failure counter — their session is working fine.
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
+        // ═══════════════════════════════════════════════════════
+        // ULTRA-EARLY LOGGING — before ANY filter or check.
+        // Fires for EVERY message event, even ones we later drop.
+        // Essential for debugging "the bot didn't respond" issues.
+        // ═══════════════════════════════════════════════════════
+        if (messages && messages.length > 0) {
+          for (const msg of messages) {
+            const jid = msg?.key?.remoteJid ?? 'unknown';
+            const msgId = msg?.key?.id ?? 'unknown';
+            const fromMe = msg?.key?.fromMe ?? false;
+            const msgKeys = msg?.message ? Object.keys(msg.message) : [];
+            logger.info(
+              { type, jid, msgId, fromMe, msgKeys, hasMessage: !!msg?.message },
+              '🔬 [RAW] messages.upsert — before any filter'
+            );
+          }
+        }
+
         // Reset decryption failures for any contact whose messages DO decrypt
         if (type === 'notify' && messages) {
           for (const msg of messages) {
@@ -410,12 +428,29 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             } else if (parsed.messageType === 'location') {
               // Location messages already have synthesized text from the parser
             } else {
-              // Stickers, reactions, contacts, protocol messages, etc.
+              // Unknown message type — check the raw message keys to synthesize something useful
+              const rawKeys = (parsed.raw as any)?.message ? Object.keys((parsed.raw as any).message) : [];
               logger.info(
-                { chatId: parsed.chatId, messageType: parsed.messageType },
-                '⏭️ Skipping non-text message with no synthesized content'
+                { chatId: parsed.chatId, messageType: parsed.messageType, rawKeys },
+                '📝 Unrecognized message type — synthesizing placeholder'
               );
-              continue;
+
+              // Protocol messages (revoke, etc.) — genuinely skip, no customer content
+              if (rawKeys.includes('protocolMessage')) {
+                logger.info({ chatId: parsed.chatId }, '⏭️ Skipping protocol message (no customer content)');
+                continue;
+              }
+
+              // For everything else, synthesize a placeholder so the pipeline runs.
+              if (rawKeys.includes('stickerMessage')) {
+                parsed.text = '[sticker — please send your query as text]';
+              } else if (rawKeys.includes('reactionMessage')) {
+                // Reactions don't need a reply — skip
+                continue;
+              } else {
+                // Contacts, polls, view-once, ephemeral, or truly unknown
+                parsed.text = `[message type: ${rawKeys.join(', ') || 'unknown'} — please send your query as text]`;
+              }
             }
             logger.info(
               { chatId: parsed.chatId, messageType: parsed.messageType, synthesizedText: parsed.text },
@@ -618,6 +653,64 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     if (msg.imageMessage?.caption) return msg.imageMessage.caption;
     if (msg.videoMessage?.caption) return msg.videoMessage.caption;
     return undefined;
+  }
+
+  /**
+   * Force-resync contacts and chats from WhatsApp.
+   * This triggers a fresh history sync request and re-processes all
+   * contacts.upsert events. Useful when the chat list is empty or
+   * incomplete after a reconnect.
+   *
+   * Returns the current chat count after resync.
+   */
+  async resyncContacts(): Promise<{ ok: boolean; chatsCount: number; monitoredCount: number }> {
+    if (!this.sock) {
+      return { ok: false, chatsCount: this.chats.size, monitoredCount: this.monitoredChatIds.size };
+    }
+
+    logger.info('Starting manual contact resync...');
+
+    try {
+      // 1. Re-fetch all participating groups
+      await this.syncGroups();
+
+      // 2. Request a fresh history sync from WhatsApp (if supported by this Baileys version)
+      // The sock.resyncAppState method forces a re-download of chat history
+      try {
+        // Baileys exposes this via the internal signal layer — wrapped in try/catch
+        // since API surface varies by version.
+        const sockAny = this.sock as any;
+        if (typeof sockAny.resyncAppState === 'function') {
+          await sockAny.resyncAppState(['critical_unblockable', 'non_critical_unblockable']);
+          logger.info('Requested fresh history sync from WhatsApp');
+        } else if (typeof sockAny.fetchMessageHistory === 'function') {
+          // Alternative API name in some Baileys versions
+          await sockAny.fetchMessageHistory(50);
+          logger.info('Requested message history fetch (50 messages)');
+        } else {
+          logger.info('History sync API not available in this Baileys version — relying on event-based sync');
+        }
+      } catch (err) {
+        logger.warn({ err }, 'History sync request failed — contacts will sync via events');
+      }
+
+      // 3. Wait briefly for events to arrive
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      logger.info(
+        { chatsCount: this.chats.size, monitoredCount: this.monitoredChatIds.size },
+        'Manual contact resync complete'
+      );
+
+      return {
+        ok: true,
+        chatsCount: this.chats.size,
+        monitoredCount: this.monitoredChatIds.size,
+      };
+    } catch (err) {
+      logger.error({ err }, 'resyncContacts failed');
+      return { ok: false, chatsCount: this.chats.size, monitoredCount: this.monitoredChatIds.size };
+    }
   }
 
   /**

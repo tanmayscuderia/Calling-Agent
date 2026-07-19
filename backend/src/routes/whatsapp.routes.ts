@@ -154,6 +154,23 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /**
+   * Force-resync contacts and chats from WhatsApp.
+   * Re-fetches groups and requests a fresh history sync.
+   * Use this when the chat list looks empty or incomplete.
+   */
+  app.post('/api/whatsapp/resync-contacts', async (req, reply) => {
+    try {
+      const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
+      const adapter = await getAdapter(orgId);
+      if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
+      const result = await adapter.resyncContacts();
+      return result;
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message });
+    }
+  });
+
   app.post('/api/whatsapp/relink', async (req, reply) => {
     try {
       const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;

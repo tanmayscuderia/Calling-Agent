@@ -50,6 +50,52 @@ export function parseWhatsAppMessage(msg: any): ParsedWhatsAppMessage | null {
     const lon = m.locationMessage.degreesLongitude;
     text = lat && lon ? `Location: ${lat}, ${lon}` : '';
     messageType = 'location';
+  } else if (m.stickerMessage) {
+    messageType = 'unknown';
+    text = ''; // Will be synthesized by baileysClient as [sticker]
+  } else if (m.reactionMessage) {
+    messageType = 'unknown';
+    text = ''; // Will be synthesized by baileysClient as [reaction]
+  } else if (m.contactMessage) {
+    messageType = 'unknown';
+    text = m.contactMessage.displayName ? `[contact: ${m.contactMessage.displayName}]` : '';
+  } else if (m.contactsArrayMessage) {
+    const names = (m.contactsArrayMessage.contacts || []).map((c: any) => c.displayName).filter(Boolean);
+    messageType = 'unknown';
+    text = names.length ? `[contacts: ${names.join(', ')}]` : '';
+  } else if (m.pollCreationMessage || m.pollCreationMessageV3) {
+    const poll = m.pollCreationMessage || m.pollCreationMessageV3;
+    messageType = 'unknown';
+    text = poll?.name ? `[poll: ${poll.name}]` : '[poll]';
+  } else if (m.viewOnceMessage || m.viewOnceMessageV2) {
+    // View-once images/videos — treat as media
+    const inner = m.viewOnceMessage?.message || m.viewOnceMessageV2?.message || {};
+    if (inner.imageMessage) {
+      text = inner.imageMessage.caption ?? '';
+      messageType = 'image';
+      mediaMimeType = inner.imageMessage.mimetype ?? 'image/jpeg';
+    } else if (inner.videoMessage) {
+      text = inner.videoMessage.caption ?? '';
+      messageType = 'video';
+      mediaMimeType = inner.videoMessage.mimetype ?? 'video/mp4';
+    } else {
+      messageType = 'unknown';
+      text = '[view-once message]';
+    }
+  } else if (m.ephemeralMessage) {
+    messageType = 'unknown';
+    text = '[ephemeral message]';
+  } else if (m.protocolMessage) {
+    messageType = 'unknown';
+    text = ''; // Protocol messages (revoke, etc.) — skip silently
+  } else {
+    // Unknown message type — log it so we can add support
+    const allKeys = Object.keys(m);
+    // Don't return null — let the caller decide. Set as unknown with a marker.
+    messageType = 'unknown';
+    text = '';
+    // Attach the raw keys so the caller can log what we missed
+    (msg as any).__unhandledKeys = allKeys;
   }
 
   return {
