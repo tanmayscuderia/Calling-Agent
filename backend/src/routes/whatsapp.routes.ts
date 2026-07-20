@@ -171,6 +171,29 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
   });
 
+  /**
+   * Force reconnect: tear down the socket and rebuild it with the SAME session.
+   * Unlike /start (which is a no-op if socket exists), this always works.
+   * Use when the connection is stuck/stale but session is still valid.
+   */
+  app.post('/api/whatsapp/force-reconnect', async (req, reply) => {
+    try {
+      const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
+      const adapter = await getAdapter(orgId);
+      if (!adapter) return reply.code(400).send({ error: 'WhatsApp adapter not found' });
+
+      logger.info({ orgId }, '[force-reconnect] Stopping existing socket...');
+      await adapter.stop();
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      logger.info({ orgId }, '[force-reconnect] Starting fresh socket with same session...');
+      adapter.start().catch((e) => logger.error({ e }, '[force-reconnect] start failed'));
+
+      return { ok: true, message: 'Force reconnecting — socket rebuilt with existing session.' };
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message });
+    }
+  });
+
   app.post('/api/whatsapp/relink', async (req, reply) => {
     try {
       const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;

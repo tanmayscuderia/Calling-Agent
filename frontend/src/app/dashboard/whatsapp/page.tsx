@@ -25,6 +25,8 @@ export default function WhatsAppPage() {
   const [filter, setFilter] = useState<'all' | 'groups' | 'individuals'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [reconnectLoading, setReconnectLoading] = useState(false);
+  const [resyncLoading, setResyncLoading] = useState(false);
 
   // Simulator state
   const [simText, setSimText] = useState('');
@@ -84,9 +86,34 @@ export default function WhatsAppPage() {
   const relink = () => {
     setLoading(true);
     api('/api/whatsapp/relink', { method: 'POST' })
-      .then((r) => { setStatus(r); setOffline(false); setChats([]); })
-      .catch((e) => { if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true); })
+      .then((r) => { setStatus(r); setOffline(false); setChats([]); toast.success('Re-linking: old session cleared, generating new QR code.'); })
+      .catch((e) => {
+        if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true);
+        else toast.error(`Re-link failed: ${e?.message || e}`);
+      })
       .finally(() => setLoading(false));
+  };
+
+  const forceReconnect = () => {
+    setReconnectLoading(true);
+    api('/api/whatsapp/force-reconnect', { method: 'POST' })
+      .then(() => { toast.success('Force reconnecting — socket rebuilt.'); setTimeout(fetchStatus, 2000); })
+      .catch((e) => {
+        if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true);
+        else toast.error(`Force reconnect failed: ${e?.message || e}`);
+      })
+      .finally(() => setReconnectLoading(false));
+  };
+
+  const resyncContacts = () => {
+    setResyncLoading(true);
+    api('/api/whatsapp/resync-contacts', { method: 'POST' })
+      .then((r) => { toast.success(`Resynced: ${r?.chatsCount ?? 0} chats, ${r?.monitoredCount ?? 0} monitored.`); fetchChats(); })
+      .catch((e) => {
+        if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true);
+        else toast.error(`Resync failed: ${e?.message || e}`);
+      })
+      .finally(() => setResyncLoading(false));
   };
 
   const toggleChat = (chatId: string) => {
@@ -302,49 +329,8 @@ export default function WhatsAppPage() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {adapterStatus === 'disabled' ? (
-              <button
-                onClick={relink}
-                disabled={loading}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: 10,
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  background: 'rgba(255,255,255,0.25)',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.5 : 1,
-                  backdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {loading ? '⏳ Clearing...' : '🔗 Re-link WhatsApp'}
-              </button>
-            ) : (
-              <button
-                onClick={start}
-                disabled={loading || adapterStatus === 'connected'}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: 10,
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  background: 'rgba(255,255,255,0.15)',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: loading || adapterStatus === 'connected' ? 'not-allowed' : 'pointer',
-                  opacity: loading || adapterStatus === 'connected' ? 0.5 : 1,
-                  backdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {loading ? '⏳ Starting...' : adapterStatus === 'disconnected' ? '🔗 Start Bridge' : '🔄 Restart'}
-              </button>
-            )}
-            {adapterStatus === 'connected' && (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {adapterStatus === 'connected' ? (
               <button
                 onClick={stop}
                 style={{
@@ -360,9 +346,108 @@ export default function WhatsAppPage() {
               >
                 ⏹ Stop
               </button>
+            ) : (
+              <button
+                onClick={start}
+                disabled={loading}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  background: 'rgba(255,255,255,0.15)',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.5 : 1,
+                  backdropFilter: 'blur(4px)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {loading ? '⏳ Starting...' : '🔗 Start Bridge'}
+              </button>
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Maintenance / Connection Tools ── */}
+      <div style={{
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        marginBottom: 16,
+        padding: '12px 16px',
+        borderRadius: 12,
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', alignSelf: 'center', marginRight: 4 }}>
+          🔧 Connection Tools
+        </span>
+
+        {/* Force Reconnect */}
+        <button
+          onClick={forceReconnect}
+          disabled={reconnectLoading}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 10,
+            border: '1px solid #fbbf24',
+            background: 'white',
+            color: '#92400e',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: reconnectLoading ? 'not-allowed' : 'pointer',
+            opacity: reconnectLoading ? 0.6 : 1,
+            transition: 'all 0.15s',
+          }}
+          title="Stuck or stale connection? This tears down the socket and rebuilds it with the same session (no new QR needed)."
+        >
+          {reconnectLoading ? '⏳ Reconnecting...' : '🔄 Force Reconnect'}
+        </button>
+
+        {/* Re-link (fresh QR) */}
+        <button
+          onClick={relink}
+          disabled={loading}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 10,
+            border: '1px solid #ef4444',
+            background: 'white',
+            color: '#b91c1c',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+            transition: 'all 0.15s',
+          }}
+          title="Session corrupted or device unlinked? This clears the session and generates a fresh QR code."
+        >
+          {loading ? '⏳ Clearing...' : '🔗 Re-link (New QR)'}
+        </button>
+
+        {/* Resync Contacts */}
+        <button
+          onClick={resyncContacts}
+          disabled={resyncLoading}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 10,
+            border: '1px solid #6366f1',
+            background: 'white',
+            color: '#4338ca',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: resyncLoading ? 'not-allowed' : 'pointer',
+            opacity: resyncLoading ? 0.6 : 1,
+            transition: 'all 0.15s',
+          }}
+          title="Chat list empty or incomplete after reconnect? This re-fetches contacts and groups from WhatsApp."
+        >
+          {resyncLoading ? '⏳ Syncing...' : '📱 Resync Contacts'}
+        </button>
       </div>
 
       {/* Device Unlinked Warning */}
