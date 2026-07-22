@@ -48,18 +48,21 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
   );
   const ex = normalizeExtracted(extracted, cfg);
 
-  // 3. Search inventory
+  // 3. Search inventory — fetch more when customer asks for "all/more options"
+  const wantsAllOptions = detectListAllIntent(inboundText);
+  const searchLimit = wantsAllOptions ? 8 : 3;
   let matches: InventoryMatch[] = [];
   if (shouldSearch(ex, cfg)) {
     try {
-      matches = await searchInventory(orgId, cfg, ex, lead, 3);
+      matches = await searchInventory(orgId, cfg, ex, lead, searchLimit);
     } catch {
       // Non-fatal — continue without inventory
     }
   }
 
   // 4. Generate reply
-  const replyUserPrompt = buildReplyUserPrompt(input, cfg, ex, matches);
+  const availableLocations = await getAvailableLocations(orgId, cfg);
+  const replyUserPrompt = buildReplyUserPrompt(input, cfg, ex, matches, wantsAllOptions, availableLocations);
   const templateCtx = buildTemplateContext(cfg, {
     customerName: lead.full_name ?? lead.customer_name,
     customerPhone: lead.phone ?? lead.customer_phone,
@@ -70,10 +73,11 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
   const { text: reply, model: replyModel } = await llm.generateText(
     replyUserPrompt,
     systemPrompt,
-    { temperature: 0.7, maxTokens: 400 }
+    { temperature: 0.7, maxTokens: wantsAllOptions ? 800 : 550 }
   );
 
-  const finalReply = reply?.trim() || fallbackReply(ex, matches, cfg);
+  const rawReply = reply?.trim() || fallbackReply(ex, matches, cfg);
+  const finalReply = ensureCompleteReply(rawReply);
 
   // 5. Lead updates
   const leadUpdates = computeLeadUpdates(ex, matches, cfg);
@@ -151,7 +155,9 @@ function buildReplyUserPrompt(
   input: BaseAgentInput,
   cfg: AgentConfig,
   ex: ExtractedData,
-  matches: InventoryMatch[]
+  matches: InventoryMatch[],
+  wantsAllOptions: boolean,
+  availableLocations: string[]
 ): string {
   const inv = matches.length
     ? matches
@@ -169,7 +175,13 @@ function buildReplyUserPrompt(
             parts.push(locStr);
           }
           if (m.details?.address) parts.push(`address: ${m.details.address}`);
-          if (m.details?.mapsUrl) parts.push(`map: ${m.details.mapsUrl}`);
+          // Compute Google Maps link from lat/lng if mapsUrl not already set
+          const mapsLink = m.details?.mapsUrl
+            ? m.details.mapsUrl
+            : m.details?.latitude != null && m.details?.longitude != null
+              ? `https://www.google.com/maps?q=${m.details.latitude},${m.details.longitude}`
+              : null;
+          if (mapsLink) parts.push(`map: ${mapsLink}`);
           if (m.details?.brochureUrl) parts.push('brochure available');
           return `${i + 1}. ${parts.join(' — ')}`;
         })
@@ -189,8 +201,21 @@ function buildReplyUserPrompt(
     .map((m) => `${m.direction === 'inbound' ? 'Customer' : 'Assistant'}: ${m.body}`)
     .join('\n');
 
-  return `IMPORTANT — USE THIS CONTEXT. Do not repeat questions or forget what was already shared above.
+  // ── Anti-hallucination: list available locations so AI never invents cities ──
+  const locationsConstraint = availableLocations.length > 0
+    ? `\nAVAILABLE LOCATIONS — only mention cities/areas from this list. Never invent locations:\n${availableLocations.join(', ')}\nIf the customer asks about a location NOT in this list, say: "We currently have options in ${availableLocations.slice(0, 5).join(', ')}. Which of these works for you?"\n`
+    : '';
 
+  // ── List-all instruction: when customer wants all options, format as a list ──
+  const listAllInstruction = wantsAllOptions && matches.length > 0
+    ? `\nThe customer wants to see ALL available options. List EVERY property from the inventory above as a numbered list. For each, include: project name, location, configuration, price range, and a Google Maps link if available. Keep each item to 1-2 lines. Don't omit any.\n`
+    : '';
+
+  // ── Complete sentence guardrail ──
+  const completenessRule = `\nCRITICAL: Always write COMPLETE sentences. Never end mid-word or mid-sentence. Every reply must end with proper punctuation (. ! ? or an emoji).\n`;
+
+  return `IMPORTANT — USE THIS CONTEXT. Do not repeat questions or forget what was already shared above.
+${locationsConstraint}
 Inventory available for this reply (use ONLY these, do not invent):
 ${inv}
 
@@ -198,10 +223,10 @@ Customer preferences extracted:
 ${JSON.stringify(ex, null, 2)}
 
 Missing key info: ${missing.join(', ') || 'none'}.
-
+${listAllInstruction}
 Conversation so far (use this — don't re-ask anything already answered):
 ${history || '(start of conversation)'}
-
+${completenessRule}
 Customer's latest message:
 """${input.inboundText}"""`;
 }
@@ -321,4 +346,132 @@ function generateQuickReplies(ex: ExtractedData, matches: InventoryMatch[], lead
   }
 
   return chips.slice(0, 5);
+}
+
+// ── List-All Intent Detection ──
+// Detects when customer asks to see all/more options (not just the top 3)
+function detectListAllIntent(text: string): boolean {
+  const t = text.toLowerCase();
+  const patterns = [
+    /show (?:me )?(?:all|every|more)\b/,
+    /\ball (?:the )?(?:options|properties|projects|listings|flats|apartments|homes)\b/,
+    /\bwhat (?:else|other) (?:do you|have|are)\b/,
+    /\blist (?:all|every|out)\b/,
+    /\bmore options\b/,
+    /\baur (?:options|variants|choices)\b/,  // Hinglish
+    /\bsaare?\b/,  // Hinglish "all"
+    /\bkaun kaun (?:se|sa)\b/,  // Hinglish "which ones"
+    /\bentire (?:list|inventory|catalog)\b/,
+    /\beverything (?:you|available|that)\b/,
+  ];
+  return patterns.some((p) => p.test(t));
+}
+
+// ── Available Locations Fetcher ──
+// Fetches distinct cities from inventory to prevent city hallucination.
+// Cached for 5 minutes to avoid hitting DB on every message.
+const locationsCache = new Map<string, { cities: string[]; ts: number }>();
+const LOCATIONS_CACHE_TTL = 300_000; // 5 minutes
+
+async function getAvailableLocations(orgId: string, cfg: AgentConfig): Promise<string[]> {
+  if (!cfg.inventory_enabled || !cfg.inventory_table) return [];
+
+  // Check cache
+  const cached = locationsCache.get(orgId);
+  if (cached && Date.now() - cached.ts < LOCATIONS_CACHE_TTL) {
+    return cached.cities;
+  }
+
+  try {
+    const { supabaseAdmin } = await import('../db/supabase');
+    // For real estate, query projects table for distinct cities + sectors
+    if (cfg.inventory_table === 'real_estate_units') {
+      const { data, error } = await supabaseAdmin()
+        .from('real_estate_projects')
+        .select('city, sector')
+        .eq('org_id', orgId)
+        .eq('status', 'active');
+
+      if (error || !data) return [];
+
+      const locs = new Set<string>();
+      for (const row of data) {
+        if (row.city) locs.add(row.city);
+        if (row.sector) locs.add(row.sector);
+      }
+      const cities = [...locs].filter(Boolean);
+      locationsCache.set(orgId, { cities, ts: Date.now() });
+      return cities;
+    }
+
+    // Generic: try common location columns
+    const { data, error } = await supabaseAdmin()
+      .from(cfg.inventory_table)
+      .select('city, location')
+      .eq('org_id', orgId)
+      .limit(100);
+
+    if (error || !data) return [];
+
+    const locs = new Set<string>();
+    for (const row of data) {
+      if (row.city) locs.add(row.city);
+      if (row.location) locs.add(row.location);
+    }
+    const cities = [...locs].filter(Boolean);
+    locationsCache.set(orgId, { cities, ts: Date.now() });
+    return cities;
+  } catch {
+    return [];
+  }
+}
+
+/** Invalidate locations cache when inventory changes (upload/edit/delete) */
+export function clearLocationsCache(): void {
+  locationsCache.clear();
+}
+
+// ── Complete Reply Guard ──
+// Detects and fixes truncated replies (ending mid-word or without punctuation)
+function ensureCompleteReply(reply: string): string {
+  if (!reply) return reply;
+  const trimmed = reply.trim();
+
+  // If reply ends with proper punctuation or emoji, it's fine
+  const lastChar = trimmed.slice(-1);
+  const endsOk = /[.!?…)\]]/.test(lastChar) ||
+    /\p{Emoji}/u.test(lastChar) ||
+    lastChar === '\n';
+  if (endsOk) return trimmed;
+
+  // If reply is very short and ends abruptly (likely truncated by maxTokens)
+  // Try to find the last complete sentence
+  const sentenceEnd = Math.max(
+    trimmed.lastIndexOf('. '),
+    trimmed.lastIndexOf('! '),
+    trimmed.lastIndexOf('? '),
+    trimmed.lastIndexOf('.\n'),
+    trimmed.lastIndexOf('!\n'),
+    trimmed.lastIndexOf('?\n'),
+  );
+
+  if (sentenceEnd > 20) {
+    // Trim to last complete sentence + its punctuation
+    return trimmed.slice(0, sentenceEnd + 1).trim();
+  }
+
+  // Last resort: add ellipsis to indicate continuation wasn't intentional
+  // But only if it looks like it was cut mid-word (no space before end)
+  const lastWord = trimmed.split(/\s+/).pop() ?? '';
+  const looksTruncated = lastWord.length > 0 && !/^[A-Z0-9]+$/.test(lastWord);
+
+  if (looksTruncated && trimmed.length > 30) {
+    // Re-trim to last space before the incomplete word
+    const lastSpace = trimmed.lastIndexOf(' ');
+    if (lastSpace > 20) {
+      return trimmed.slice(0, lastSpace).trim() + '...';
+    }
+  }
+
+  return trimmed;
 }

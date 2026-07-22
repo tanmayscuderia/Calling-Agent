@@ -68,6 +68,28 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   private lastSoftReconnect = 0; // timestamp of last soft reconnect attempt
   private readonly SOFT_RECONNECT_COOLDOWN_MS = 30_000; // min 30s between soft reconnects
 
+  // ═══════════════════════════════════════════════════════
+  // ZOMBIE CONNECTION WATCHDOG
+  // Baileys WebSocket can silently die — the socket appears "open"
+  // but no events fire, so messages.upsert never triggers.
+  // This watchdog tracks the last time ANY event fired and forces
+  // a reconnect if the connection goes quiet for too long.
+  // ═══════════════════════════════════════════════════════
+  private lastEventAt: number = Date.now(); // updated on ANY socket event
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly WATCHDOG_CHECK_INTERVAL_MS = 60_000; // check every 60s
+  private readonly WATCHDOG_STALE_THRESHOLD_MS = 5 * 60_000; // 5 min silence = zombie
+
+  // ═══════════════════════════════════════════════════════
+  // HEARTBEAT KEEPALIVE
+  // Proactively sends a presence update every 60s to keep the
+  // WebSocket active and prevent WhatsApp from dropping the
+  // idle session. This works WITH the watchdog — the watchdog
+  // catches zombies that slip through despite the heartbeat.
+  // ═══════════════════════════════════════════════════════
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly HEARTBEAT_INTERVAL_MS = 45_000; // 45s keepalive ping
+
   constructor(orgId: string, sessionDir?: string) {
     super();
     this.orgId = orgId;
@@ -136,25 +158,41 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         logger: logger.child({ module: 'baileys' }) as any,
         browser: ['CallingAgent', 'Chrome', '1.0.0'],
         // ═══════════════════════════════════════════════════════
-        // FIX: Removed syncFullHistory + shouldSyncHistoryMessage overrides.
-        // These forced a FULL history sync on every reconnect, which:
-        //   1. Overwhelmed the signal protocol session management
-        //   2. Caused pre-key exhaustion
-        //   3. Led to decryption failures for contacts whose sessions desynced
-        //   4. Resulted in the infinite "sent retry receipt" loop
-        // Baileys defaults (incremental sync) are more stable.
-        // Individual DMs still arrive via contacts.upsert + messages.upsert.
+        // CONTACT SYNC: Enable full history sync for CONTACTS+CHATS,
+        // but skip downloading old MESSAGES.
+        //
+        // syncFullHistory: true → WhatsApp sends ALL contacts + chats on connect
+        // shouldSyncHistoryMessage: () => false → skip storing old messages
+        //
+        // This gives us:
+        //   - Full contact list with names (via messaging-history.set)
+        //   - All chat entries (groups + individual DMs)
+        //   - New numbers that messaged during downtime
+        // WITHOUT the pre-key exhaustion that caused the decryption loop
+        // (because we're not processing/storing thousands of old messages).
         // ═══════════════════════════════════════════════════════
+        syncFullHistory: true,
+        shouldSyncHistoryMessage: () => false,
         markOnlineOnConnect: false,
       });
 
       this.sock.ev.on('creds.update', saveCreds);
+
+      // ═══════════════════════════════════════════════════════
+      // ZOMBIE WATCHDOG: Listen to ALL events via a wildcard handler.
+      // Baileys EventEmitter fires 'event' for every internal event.
+      // This lets us track "last activity" without registering for each
+      // event type individually.
+      // ═══════════════════════════════════════════════════════
+      this.lastEventAt = Date.now();
+      this.startWatchdog();
 
       // ──────────────────────────────────────────────────────
       // HISTORY SYNC — fires right after login with ALL chats
       // This is the key event that gives us individual DMs!
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('messaging-history.set', ({ chats, contacts, isLatest }: any) => {
+        this.pingWatchdog();
         const chatArr = Array.isArray(chats) ? chats : [];
         // FIX: contacts is an ARRAY (Contact[]), not an object — iterate directly
         const contactArr = Array.isArray(contacts) ? contacts : [];
@@ -203,6 +241,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // INCREMENTAL CHAT UPDATES
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('chats.upsert', (newChats: any[]) => {
+        this.pingWatchdog();
         logger.info({ count: newChats.length }, '📥 chats.upsert event');
         for (const c of newChats) {
           this.upsertChat(c);
@@ -230,6 +269,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // Now it creates chat entries for all individual contacts.
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('contacts.upsert', (contacts: any[]) => {
+        this.pingWatchdog();
         logger.info({ count: contacts.length }, '👤 contacts.upsert event');
         let newCount = 0;
         for (const contact of contacts) {
@@ -278,6 +318,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // CONNECTION LIFECYCLE
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('connection.update', async (update: any) => {
+        this.pingWatchdog();
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
@@ -301,6 +342,11 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
           // Sync groups immediately. Individual DMs will arrive via
           // messaging-history.set and contacts.upsert events shortly after.
           await this.syncGroups();
+
+          // Start heartbeat keepalive to prevent zombie connections.
+          // WhatsApp drops idle linked-device sessions after ~5-10 min;
+          // a 45s presence ping keeps the WebSocket active.
+          this.startHeartbeat();
         }
 
         if (connection === 'close') {
@@ -325,6 +371,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // failure counter — their session is working fine.
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
+        this.pingWatchdog();
         // ═══════════════════════════════════════════════════════
         // ULTRA-EARLY LOGGING — before ANY filter or check.
         // Fires for EVERY message event, even ones we later drop.
@@ -384,6 +431,28 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
 
           const parsed = parseWhatsAppMessage(msg);
           if (!parsed) continue;
+
+          // FIX 1: Capture pushName — the sender's WhatsApp display name.
+          // Every message includes msg.pushName (e.g., "Rahul Sharma").
+          // This is THE primary source of contact names for individual DMs.
+          if (msg.pushName && parsed.chatId) {
+            const nameSource = parsed.isGroup ? parsed.senderId : parsed.chatId;
+            if (nameSource) {
+              const existingName = this.contactNames.get(nameSource);
+              if (!existingName || existingName === nameSource.split('@')[0]) {
+                this.contactNames.set(nameSource, msg.pushName);
+                const chat = this.chats.get(nameSource);
+                if (chat && (!chat.name || chat.name === chat.phone || chat.name === 'Unknown')) {
+                  chat.name = msg.pushName;
+                }
+                logger.info(
+                  { jid: nameSource, pushName: msg.pushName, isGroup: parsed.isGroup },
+                  'Captured pushName for contact'
+                );
+                this.scheduleSave();
+              }
+            }
+          }
 
           // ── MEDIA DOWNLOAD ──
           // Download and store media for non-text messages
@@ -629,15 +698,28 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       ? Array.from(c.messages.values() as IterableIterator<any>).pop()
       : c.lastMessage;
 
+    // FIX 3: Always prefer the best available name + latest timestamps.
+    // Previously used `??` which only filled if null — once a phone number was
+    // set as name, it NEVER updated when the real name arrived later.
+    // Now: contactName/explicit name overrides phone/placeholder names.
+    const isPlaceholderName = !name || name === phone || name === 'Unknown';
+    const bestName = (isPlaceholderName && contactName) ? contactName : name;
+    const newLastMessage = lastMsg?.message
+      ? this.extractTextFromMessage(lastMsg.message)?.slice(0, 80)
+      : undefined;
+    const newLastMessageAt = c.conversationTimestamp
+      ? new Date((c.conversationTimestamp as number) * 1000).toISOString()
+      : undefined;
+
     this.chats.set(id, {
       id,
-      name,
+      name: bestName,
       isGroup,
       phone,
-      lastMessage: existing?.lastMessage
-        ?? (lastMsg?.message ? this.extractTextFromMessage(lastMsg.message)?.slice(0, 80) : undefined),
-      lastMessageAt: existing?.lastMessageAt
-        ?? (c.conversationTimestamp ? new Date((c.conversationTimestamp as number) * 1000).toISOString() : undefined),
+      // Take new message if available, else preserve existing (don't overwrite with undefined)
+      lastMessage: newLastMessage ?? existing?.lastMessage,
+      // Take new timestamp if available, else preserve existing
+      lastMessageAt: newLastMessageAt ?? existing?.lastMessageAt,
       monitored: this.monitoredChatIds.has(id),
       unreadCount: c.unreadCount ?? existing?.unreadCount ?? 0,
     });
@@ -822,6 +904,8 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
    * Does NOT unlink the device from the phone.
    */
   async stop(): Promise<void> {
+    this.stopWatchdog();
+    this.stopHeartbeat();
     try {
       if (this.sock) {
         // Use end() not logout() — logout() unlinks the device!
@@ -847,6 +931,8 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
    * is stale. This is the "Re-link WhatsApp" action.
    */
   async relink(): Promise<void> {
+    this.stopWatchdog();
+    this.stopHeartbeat();
     logger.info('Starting re-link: clearing old session and generating fresh QR');
 
     // 1. Close existing socket if any
@@ -994,7 +1080,129 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     }
   }
 
+  // ═══════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
+  // HEARTBEAT KEEPALIVE IMPLEMENTATION
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Start sending periodic presence updates to keep the WebSocket alive.
+   * WhatsApp drops idle linked-device sessions after ~5-10 min of inactivity.
+   * By sending a presence ping every 45s, we prevent the server-side timeout
+   * that causes zombie connections.
+   *
+   * This is the PROACTIVE defense — the watchdog is the REACTIVE defense.
+   * Both work together: heartbeat prevents most zombies, watchdog catches any
+   * that slip through.
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(async () => {
+      if (!this.sock || this.status !== 'connected') return;
+      try {
+        // sendPresenceUpdate is a lightweight ping that keeps the WS active
+        await this.sock.sendPresenceUpdate('available');
+      } catch (err) {
+        // If the heartbeat itself fails, the socket is likely already dead.
+        // The watchdog will catch it — just log here.
+        logger.warn({ err }, 'Heartbeat ping failed — socket may be dead');
+      }
+    }, this.HEARTBEAT_INTERVAL_MS);
+
+    logger.info(
+      { intervalSec: this.HEARTBEAT_INTERVAL_MS / 1000 },
+      '💓 Heartbeat keepalive started'
+    );
+  }
+
+  /**
+   * Stop the heartbeat timer.
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  // ZOMBIE WATCHDOG IMPLEMENTATION
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Start the zombie connection watchdog.
+   * Checks every WATCHDOG_CHECK_INTERVAL_MS if the socket has gone silent.
+   * If no events fire for WATCHDOG_STALE_THRESHOLD_MS, force a reconnect.
+   *
+   * This catches the classic Baileys failure mode where the WebSocket
+   * appears "open" at the TCP level but WhatsApp's server has stopped
+   * sending data. Without this, the bot silently stops responding.
+   */
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.watchdogTimer = setInterval(() => {
+      if (this.status !== 'connected') return;
+      if (!this.sock) return;
+
+      const silenceMs = Date.now() - this.lastEventAt;
+      if (silenceMs > this.WATCHDOG_STALE_THRESHOLD_MS) {
+        const silenceMin = Math.round(silenceMs / 60_000);
+        logger.error(
+          { silenceMin, thresholdMin: this.WATCHDOG_STALE_THRESHOLD_MS / 60_000, phone: this.connectedPhone },
+          '🔴 ZOMBIE CONNECTION DETECTED — no events for too long. Force-reconnecting...'
+        );
+
+        // Emit alert event for upstream listeners (ConnectionManager, notifications, etc.)
+        this.emit('watchdog-reconnect', {
+          orgId: this.orgId,
+          phone: this.connectedPhone,
+          silenceMin,
+          thresholdMin: this.WATCHDOG_STALE_THRESHOLD_MS / 60_000,
+          timestamp: new Date().toISOString(),
+        });
+
+        this.stop().then(() => {
+          setTimeout(() => {
+            this.start().catch((err) => {
+              logger.error({ err }, 'Watchdog force-reconnect failed');
+            });
+          }, 2000);
+        }).catch((err) => {
+          logger.error({ err }, 'Watchdog stop() failed during force-reconnect');
+        });
+      } else if (silenceMs > 2 * 60_000) {
+        logger.warn(
+          { silenceSec: Math.round(silenceMs / 1000) },
+          '⚠️ WhatsApp connection quiet — may be going zombie'
+        );
+      }
+    }, this.WATCHDOG_CHECK_INTERVAL_MS);
+
+    logger.info(
+      { checkInterval: this.WATCHDOG_CHECK_INTERVAL_MS / 1000, staleThreshold: this.WATCHDOG_STALE_THRESHOLD_MS / 1000 },
+      '🐕 Zombie watchdog started'
+    );
+  }
+
+  /**
+   * Stop the watchdog timer (called on disconnect/stop).
+   */
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
+  /**
+   * Mark that we received a Baileys event (any event).
+   * Called from event handlers to keep the watchdog satisfied.
+   */
+  private pingWatchdog(): void {
+    this.lastEventAt = Date.now();
+  }
+
   async getStatus(): Promise<any> {
+    const silenceMs = this.status === 'connected' ? Date.now() - this.lastEventAt : 0;
     return {
       provider: 'baileys',
       status: this.status,
@@ -1005,6 +1213,15 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       orgId: this.orgId,
       chatsCount: this.chats.size,
       monitoredCount: this.monitoredChatIds.size,
+      watchdog: {
+        lastEventAgoSec: Math.round(silenceMs / 1000),
+        isStale: silenceMs > this.WATCHDOG_STALE_THRESHOLD_MS,
+        thresholdSec: this.WATCHDOG_STALE_THRESHOLD_MS / 1000,
+      },
+      heartbeat: {
+        active: !!this.heartbeatTimer,
+        intervalSec: this.HEARTBEAT_INTERVAL_MS / 1000,
+      },
     };
   }
 

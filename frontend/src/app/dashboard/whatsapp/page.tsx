@@ -322,9 +322,30 @@ export default function WhatsAppPage() {
               </div>
             )}
             {adapterStatus === 'connected' && (
-              <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
-                {monitoredCount} of {chats.length} chats monitored · AI auto-reply {cfg?.autoReply ? 'ON' : 'OFF'}
-              </div>
+              <>
+                <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
+                  {monitoredCount} of {chats.length} chats monitored · AI auto-reply {cfg?.autoReply ? 'ON' : 'OFF'}
+                </div>
+                {status?.adapter?.watchdog && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      background: status.adapter.watchdog.isStale ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                    }}>
+                      {status.adapter.watchdog.isStale ? '🔴 Zombie' : '🟢 Live'} · {status.adapter.watchdog.lastEventAgoSec}s ago
+                    </span>
+                    {status?.adapter?.heartbeat?.active && (
+                      <span style={{
+                        padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                        background: 'rgba(255,255,255,0.15)', color: 'white',
+                      }}>
+                        💓 Heartbeat
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -449,6 +470,45 @@ export default function WhatsAppPage() {
           {resyncLoading ? '⏳ Syncing...' : '📱 Resync Contacts'}
         </button>
       </div>
+
+      {/* Connection Health Card */}
+      {adapterStatus === 'connected' && status?.adapter?.watchdog && (
+        <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 16 }}>🩺</span>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Connection Health</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Watchdog</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: status.adapter.watchdog.isStale ? '#dc2626' : '#16a34a', marginTop: 4 }}>
+                {status.adapter.watchdog.isStale ? 'STALE' : 'HEALTHY'}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                Last event: {status.adapter.watchdog.lastEventAgoSec}s ago
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stale Threshold</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#475569', marginTop: 4 }}>
+                {status.adapter.watchdog.thresholdSec / 60} min
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                Auto-reconnect after silence
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Heartbeat</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: status?.adapter?.heartbeat?.active ? '#16a34a' : '#94a3b8', marginTop: 4 }}>
+                {status?.adapter?.heartbeat?.active ? 'ACTIVE' : 'OFF'}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                Keepalive every {status?.adapter?.heartbeat?.intervalSec ?? 45}s
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Device Unlinked Warning */}
       {adapterStatus === 'disabled' && (

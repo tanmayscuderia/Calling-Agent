@@ -321,7 +321,14 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
 /** Invalidate cache when inventory changes (upload/edit/delete) */
 export function clearSearchCache(): void {
   searchCache.clear();
-  logger.info('Property search cache cleared');
+  // Also clear the AI locations cache so new cities/sectors appear immediately
+  try {
+    const { clearLocationsCache } = require('../ai/baseAgent');
+    clearLocationsCache();
+  } catch {
+    // baseAgent may not be loaded yet in some contexts — safe to ignore
+  }
+  logger.info('Property search cache + locations cache cleared');
 }
 
 // ── CRUD: Update / Delete for Phase 1 ──────────────────────
