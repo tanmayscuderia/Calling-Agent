@@ -199,9 +199,19 @@ export async function whatsappRoutes(app: FastifyInstance) {
       const orgId = (req as any).getOrgId?.() ?? config.defaultOrgId;
       const adapter = await getAdapter(orgId);
       if (!adapter) return reply.code(400).send({ error: 'WhatsApp not started' });
-      adapter.relink().catch((e) => logger.error({ e }, 'relink failed'));
-      return { ok: true, message: 'Re-linking: old session cleared, generating new QR code.' };
+
+      // Await relink so the response reflects the actual state — the new socket
+      // is created and the QR event has fired before we reply.
+      await adapter.relink();
+      const status = await adapter.getStatus();
+
+      return {
+        ok: true,
+        status,
+        message: 'Session cleared. New QR code generated — scan it to re-link.',
+      };
     } catch (e: any) {
+      logger.error({ e }, 'relink route failed');
       return reply.code(500).send({ error: e?.message });
     }
   });

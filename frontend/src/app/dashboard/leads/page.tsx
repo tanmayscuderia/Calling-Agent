@@ -95,6 +95,7 @@ export default function LeadsPage() {
                 <th>Budget</th>
                 <th>Temperature</th>
                 <th>Status</th>
+                <th>Assigned To</th>
                 <th>Last Contact</th>
                 <th></th>
               </tr>
@@ -107,14 +108,16 @@ export default function LeadsPage() {
                     <td><div className="skeleton" style={{ height: 20, width: 100 }} /></td>
                     <td><div className="skeleton" style={{ height: 20, width: 60 }} /></td>
                     <td><div className="skeleton" style={{ height: 24, width: 60, borderRadius: 999 }} /></td>
-                    <td><div className="skeleton" style={{ height: 24, width: 70, borderRadius: 999 }} /></td>
-                    <td><div className="skeleton" style={{ height: 20, width: 70 }} /></td>
-                    <td></td>
+                     <td><div className="skeleton" style={{ height: 24, width: 70, borderRadius: 999 }} /></td>
+                     <td><div className="skeleton" style={{ height: 24, width: 70, borderRadius: 999 }} /></td>
+                     <td><div className="skeleton" style={{ height: 20, width: 80 }} /></td>
+                     <td><div className="skeleton" style={{ height: 20, width: 70 }} /></td>
+                     <td></td>
                   </tr>
                 ))
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  <td colSpan={8} style={{ padding: 0 }}>
                     <div style={{ padding: 48, textAlign: 'center' }}>
                       <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
                       <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>No leads yet</h3>
@@ -161,6 +164,18 @@ export default function LeadsPage() {
                     </td>
                     <td><span className={tempBadge(lead.temperature)} style={{ textTransform: 'capitalize' }}>{lead.temperature || 'unknown'}</span></td>
                     <td><span className={statusBadge(lead.status)} style={{ textTransform: 'capitalize' }}>{(lead.status || 'new').replace(/_/g, ' ')}</span></td>
+                    <td style={{ fontSize: 13 }}>
+                      {lead.assigned_member ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className="avatar" style={{ width: 24, height: 24, fontSize: 10, background: '#64748b' }}>
+                            {(lead.assigned_member.full_name || '?')[0]}
+                          </div>
+                          <span>{lead.assigned_member.full_name}</span>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>Unassigned</span>
+                      )}
+                    </td>
                     <td style={{ fontSize: 13, color: '#64748b' }}>{timeAgo(lead.last_contacted_at)}</td>
                     <td>
                       <Link href={`/dashboard/leads/${lead.id}`} className="btn btn-ghost" style={{ padding: '4px 12px', minHeight: 32, fontSize: 13 }}>

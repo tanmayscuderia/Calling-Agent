@@ -43,6 +43,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   private lastQr: string | null = null;
   private connectedPhone: string | null = null;
   private starting: boolean = false;
+  private socketGen: number = 0; // incremented on every start() — stale socket events check this
 
   // Our own chat tracking — fed by Baileys events
   private chats: Map<string, WhatsAppChat> = new Map();
@@ -143,6 +144,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   async start(): Promise<void> {
     if (this.starting || this.sock) return;
     this.starting = true;
+    const myGen = ++this.socketGen; // capture generation — stale events from old sockets check this
 
     try {
       this.accountId = await resolveAccountId(this.orgId);
@@ -318,6 +320,13 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       // CONNECTION LIFECYCLE
       // ──────────────────────────────────────────────────────
       this.sock.ev.on('connection.update', async (update: any) => {
+        // ── GENERATION GUARD ──
+        // If this socket was replaced (relink/stop/force-reconnect), ignore ALL
+        // events from it. This prevents the old socket's async `close` event from
+        // destroying the new socket reference (`this.sock = null`) and orphaning
+        // the QR that the new socket is generating.
+        if (myGen !== this.socketGen) return;
+
         this.pingWatchdog();
         const { connection, lastDisconnect, qr } = update;
 
@@ -350,6 +359,11 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         }
 
         if (connection === 'close') {
+          // Extra guard: only process close if we're still the active socket
+          if (myGen !== this.socketGen) {
+            logger.info({ myGen, currentGen: this.socketGen }, 'Ignoring stale socket close event');
+            return;
+          }
           this.starting = false;
           const code = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = code !== DisconnectReason.loggedOut;
@@ -621,7 +635,8 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
 
       // Close socket and reconnect with SAME session files
       try {
-        this.sock?.end(undefined);
+        try { (this.sock?.ev as any).removeAllListeners(); } catch {}
+        this.sock?.end(new Error('Soft reconnect'));
         this.sock = null;
         this.status = 'disconnected';
         // Reconnect after 2s — start() reuses existing session files
@@ -906,10 +921,14 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   async stop(): Promise<void> {
     this.stopWatchdog();
     this.stopHeartbeat();
+    this.socketGen++; // invalidate any in-flight event handlers from the old socket
     try {
       if (this.sock) {
+        // Remove all event listeners BEFORE closing — prevents the old socket's
+        // async `close` event from firing and clobbering state.
+        try { (this.sock.ev as any).removeAllListeners(); } catch {}
         // Use end() not logout() — logout() unlinks the device!
-        this.sock.end(undefined);
+        this.sock.end(new Error('Manual stop'));
         this.sock = null;
       }
     } catch {
@@ -933,11 +952,16 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   async relink(): Promise<void> {
     this.stopWatchdog();
     this.stopHeartbeat();
+    this.socketGen++; // invalidate stale socket events before we start the new one
     logger.info('Starting re-link: clearing old session and generating fresh QR');
 
-    // 1. Close existing socket if any
+    // 1. Close existing socket if any — remove listeners FIRST to prevent
+    // the old socket's async close event from destroying the new socket.
     try {
-      this.sock?.end(undefined);
+      if (this.sock) {
+        try { (this.sock.ev as any).removeAllListeners(); } catch {}
+        this.sock.end(new Error('Manual relink'));
+      }
     } catch {}
     this.sock = null;
 

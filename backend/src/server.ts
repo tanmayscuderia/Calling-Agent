@@ -19,6 +19,7 @@ import { whatsappRoutes } from './routes/whatsapp.routes';
 import { callsRoutes } from './routes/calls.routes';
 import { aiRoutes } from './routes/ai.routes';
 import { agentRoutes } from './routes/agent.routes';
+import { membersRoutes } from './routes/members.routes';
 import systemRoutes from './routes/system.routes';
 
 async function start() {
@@ -51,6 +52,7 @@ async function start() {
   await app.register(callsRoutes);
   await app.register(aiRoutes);
   await app.register(agentRoutes);
+  await app.register(membersRoutes);
   await app.register(systemRoutes);
 
   // Dashboard stats endpoint
@@ -91,6 +93,7 @@ async function start() {
       '/api/calls/*',
       '/api/ai/*',
       '/api/agent/*',
+      '/api/members',
       '/api/dashboard/stats',
     ],
   }));

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { listLeads, getLead, updateLead, createLead, getLeadMessages, getLeadCalls, getLeadMatches, createFollowup, listFollowups } from '../crm/leadService';
+import { listLeads, getLead, updateLead, createLead, getLeadMessages, getLeadCalls, getLeadMatches, createFollowup, listFollowups, getLeadFollowups } from '../crm/leadService';
 import { config } from '../config';
 
 function orgId(req: any): string {
@@ -47,6 +47,12 @@ export async function leadsRoutes(app: FastifyInstance) {
     const { id } = req.params as any;
     const matches = await getLeadMatches(orgId(req), id);
     return { matches };
+  });
+
+  app.get('/api/leads/:id/followups', async (req) => {
+    const { id } = req.params as any;
+    const followups = await getLeadFollowups(orgId(req), id);
+    return { followups };
   });
 
   app.post('/api/leads/:id/followups', async (req) => {

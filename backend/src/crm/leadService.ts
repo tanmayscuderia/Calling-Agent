@@ -120,7 +120,7 @@ export async function getLead(orgId: string, id: string) {
 export async function listLeads(orgId: string, opts: { status?: string; temperature?: string; limit?: number } = {}) {
   let q = supabaseAdmin()
     .from('crm_leads')
-    .select('*')
+    .select('*, assigned_member:organization_members!assigned_to(id, full_name, role, title)')
     .eq('org_id', orgId)
     .order('updated_at', { ascending: false });
   if (opts.status) q = q.eq('status', opts.status);
@@ -216,7 +216,7 @@ export async function createFollowup(orgId: string, leadId: string, input: Recor
 export async function listFollowups(orgId: string, opts: { status?: string; limit?: number } = {}) {
   let q = supabaseAdmin()
     .from('lead_followups')
-    .select('*, lead:crm_leads(id, full_name, phone, temperature, status)')
+    .select('*, lead:crm_leads(id, full_name, phone, temperature, status), assignee:organization_members!assigned_to(id, full_name, role, title)')
     .eq('org_id', orgId)
     .order('scheduled_at', { ascending: true, nullsFirst: false });
   if (opts.status) q = q.eq('status', opts.status);
@@ -224,6 +224,20 @@ export async function listFollowups(orgId: string, opts: { status?: string; limi
   const { data, error } = await q;
   if (error) throw error;
   return data;
+}
+
+/**
+ * Get followups for a specific lead, with assignee info.
+ */
+export async function getLeadFollowups(orgId: string, leadId: string) {
+  const { data, error } = await supabaseAdmin()
+    .from('lead_followups')
+    .select('*, assignee:organization_members!assigned_to(id, full_name, role, title)')
+    .eq('org_id', orgId)
+    .eq('lead_id', leadId)
+    .order('scheduled_at', { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
 /**
