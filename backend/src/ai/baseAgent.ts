@@ -208,7 +208,12 @@ function buildReplyUserPrompt(
 
   // ── List-all instruction: when customer wants all options, format as a list ──
   const listAllInstruction = wantsAllOptions && matches.length > 0
-    ? `\nThe customer wants to see ALL available options. List EVERY property from the inventory above as a numbered list. For each, include: project name, location, configuration, price range, and a Google Maps link if available. Keep each item to 1-2 lines. Don't omit any.\n`
+    ? `\nThe customer wants to see ALL available options. List EVERY property from the inventory above using this exact format:\n\n1️⃣ *<Project Name>* — <Sector>, <City>\n   <Config> | ₹<price range> | <possession>\n   📍 <map link>\n2️⃣ *<Project Name>* — <Sector>, <City>\n   <Config> | ₹<price range> | <possession>\n\nUse actual data from the inventory for every field. Add a blank line after the list, then ONE short question.\n`
+    : '';
+
+  // ── Multi-property format hint (2+ matches but customer didn't ask for all) ──
+  const multiPropertyHint = !wantsAllOptions && matches.length >= 2
+    ? `\nYou have multiple matching properties. Use emoji-numbered format (1️⃣ 2️⃣ 3️⃣) for ALL of them — don't just mention one. Format each as shown in the formatting rules.\n`
     : '';
 
   // ── Complete sentence guardrail ──
@@ -224,6 +229,7 @@ ${JSON.stringify(ex, null, 2)}
 
 Missing key info: ${missing.join(', ') || 'none'}.
 ${listAllInstruction}
+${multiPropertyHint}
 Conversation so far (use this — don't re-ask anything already answered):
 ${history || '(start of conversation)'}
 ${completenessRule}
