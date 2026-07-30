@@ -57,11 +57,15 @@ export default function WhatsAppPage() {
       })
       .catch(() => {}), []);
 
+  // FIX: Adaptive polling — poll every 1s when QR is pending (so the QR
+  // appears on screen ASAP), otherwise every 3s for normal status updates.
+  const currentStatus = status?.adapter?.status ?? 'unknown';
   useEffect(() => {
     fetchStatus();
-    const t1 = setInterval(fetchStatus, 3000);
+    const interval = currentStatus === 'qr_pending' ? 1000 : 3000;
+    const t1 = setInterval(fetchStatus, interval);
     return () => clearInterval(t1);
-  }, []);
+  }, [currentStatus]);
 
   useEffect(() => {
     // FIX: Fetch chats whenever an adapter exists (even if disconnected).
@@ -76,8 +80,10 @@ export default function WhatsAppPage() {
 
   const start = () => {
     setLoading(true);
+    // FIX: The /start route returns { ok, message } — not the full status shape.
+    // Call fetchStatus() immediately to get the real adapter/account/config.
     api('/api/whatsapp/start', { method: 'POST' })
-      .then((r) => { setStatus(r); setOffline(false); })
+      .then(() => { setOffline(false); fetchStatus(); })
       .catch((e) => { if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true); })
       .finally(() => setLoading(false));
   };
@@ -86,7 +92,19 @@ export default function WhatsAppPage() {
   const relink = () => {
     setLoading(true);
     api('/api/whatsapp/relink', { method: 'POST' })
-      .then((r) => { setStatus(r); setOffline(false); setChats([]); toast.success('Re-linking: old session cleared, generating new QR code.'); })
+      .then((r) => {
+        setOffline(false);
+        setChats([]);
+        toast.success('Re-linking: old session cleared, generating new QR code.');
+        // FIX: The relink response has shape { ok, status, message },
+        // but the component expects { adapter, account, config }.
+        // Set adapter from the response's `status` field, then immediately
+        // fetch the full status for account/config data.
+        if (r?.status) {
+          setStatus({ adapter: r.status });
+        }
+        fetchStatus();
+      })
       .catch((e) => {
         if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true);
         else toast.error(`Re-link failed: ${e?.message || e}`);
