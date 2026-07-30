@@ -149,6 +149,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     try {
       this.accountId = await resolveAccountId(this.orgId);
       await setAccountStatus(this.orgId, this.accountId, 'qr_pending');
+      this.status = 'qr_pending'; // ← Set immediately so getStatus() reflects reality before async QR arrives
 
       const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
       const { version } = await fetchLatestBaileysVersion();

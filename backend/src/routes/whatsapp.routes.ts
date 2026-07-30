@@ -203,12 +203,24 @@ export async function whatsappRoutes(app: FastifyInstance) {
       // Await relink so the response reflects the actual state — the new socket
       // is created and the QR event has fired before we reply.
       await adapter.relink();
-      const status = await adapter.getStatus();
+
+      // Poll for QR arrival — Baileys generates the QR asynchronously via
+      // connection.update, which fires 1-5 seconds after start() returns.
+      // We wait up to 15s so the frontend gets the QR immediately on click.
+      let status = await adapter.getStatus();
+      for (let i = 0; i < 10 && !status.qr && status.status === 'qr_pending'; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        status = await adapter.getStatus();
+      }
+
+      logger.info({ hasQr: !!status.qr, status: status.status }, '[relink] QR poll complete');
 
       return {
         ok: true,
         status,
-        message: 'Session cleared. New QR code generated — scan it to re-link.',
+        message: status.qr
+          ? 'Session cleared. New QR code ready — scan it to re-link.'
+          : 'Session cleared. QR is generating — it will appear on the dashboard shortly.',
       };
     } catch (e: any) {
       logger.error({ e }, 'relink route failed');
