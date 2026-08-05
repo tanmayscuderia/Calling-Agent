@@ -1,0 +1,142 @@
+# Brand Guidelines
+
+Source: https://docs.fish.audio/developer-guide/resources/brand
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#logo)
+
+Logo
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#wordmark)
+
+Wordmark
+
+Our preferred logo format combines the [Fish Audio Icon](https://docs.fish.audio/developer-guide/resources/brand#icon) with the wordmark side by side. This is the primary version of our logo and should be used whenever possible for maximum brand recognition and clarity.
+
+![Fish Audio Clearspace Wordmark](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/light/wordmark-clearspace.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=1560a1dcb417e7ee732d4f9e4ef6caaf)![Fish Audio Clearspace Wordmark](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/dark/wordmark-clearspace.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=7308fe89f570668c41d080b37a46aaeb)
+
+The minimum clearspace around the wordmark must be equal to the height of the letter 'F' in Fish Audio.
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#icon)
+
+Icon
+
+Our icon features a whale composed of audio bars and sound waves, symbolizing the fusion of marine life with audio technology. This design represents our brand’s commitment to natural, flowing, and powerful voice generation. The Fish Audio icon should only be used when space constraints or context make it impractical to display the full wordmark. Always prefer the wordmark with icon combination when possible.
+
+![Fish Audio Clearspace Logo](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/light/fish-clearspace.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=b0db4cf3f4547ab6e24ee2a537ccca92)![Fish Audio Clearspace Logo](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/dark/fish-clearspace.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=2860082005e3d04b18f9dcaf48ad609a)
+
+The minimum clearspace around the icon must be equal to the bar-to-bar distance (labeled as x).
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#avoid)
+
+Avoid
+
+To maintain the integrity of our brand identity, please do not alter our logo in any of the following ways:
+
+![Incorrect logo usage - distorted](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/light/avoid/distort.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=02000ffc5f4f76b4397f6009351ff18f)![Incorrect logo usage - distorted](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/dark/avoid/distort.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=79235e6c73331227de08fcd2bf6ba690)
+
+Don't stretch, squish, or distort the logo proportions.
+
+![Incorrect logo usage - rotated](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/light/avoid/rotate.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=4f5263705c4ae63e7ad70614d3c19170)![Incorrect logo usage - rotated](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/dark/avoid/rotate.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=4a9615f94831cfaadc8ad52e74fb0fa6)
+
+Don't rotate or tilt the logo.
+
+![Incorrect logo usage - wrong colors](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/light/avoid/color.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=65e17131977363926563bcd3d0187c16)![Incorrect logo usage - wrong colors](https://mintcdn.com/hanabiaiinc/-WxHANLOAmlTUwdM/branding/dark/avoid/color.svg?fit=max&auto=format&n=-WxHANLOAmlTUwdM&q=85&s=19af7eda8cbb1d7d4a57d4ad55eb7197)
+
+Don't use non-brand colors or apply color overlays.
+
+![Incorrect logo usage - effects](https://mintcdn.com/hanabiaiinc/b5HZYQAi_bKxijc7/branding/light/avoid/effects.png?fit=max&auto=format&n=b5HZYQAi_bKxijc7&q=85&s=4ac7516101be85f820644288d1e944fc)![Incorrect logo usage - effects](https://mintcdn.com/hanabiaiinc/b5HZYQAi_bKxijc7/branding/dark/avoid/effects.png?fit=max&auto=format&n=b5HZYQAi_bKxijc7&q=85&s=0f832456fc579abd027e76cf4cf5b7cf)
+
+Don't add effects like shadows, outlines, or gradients.
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#colors)
+
+Colors
+
+Our official brand colors consist of black and white for primary logo applications, complemented by secondary grays for subtle variations and an accent purple for visual highlights in marketing materials.
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#typography)
+
+Typography
+
+Our brand uses **Onest Semibold** in the logo wordmark. This documentation is also set in Onest, so you’re experiencing our brand typography right now. [Download Onest on Google Fonts](https://fonts.google.com/specimen/Onest)
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#usage-guidelines)
+
+Usage Guidelines
+
+The Fish Audio name and logos are trademarks of Hanabi AI Inc. You may freely use and redistribute our brand assets when referencing Fish Audio. By using our brand assets, you agree that we own them and that any goodwill generated by your use benefits Fish Audio.
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#do)
+
+Do
+
+-   Use our brand assets freely in your projects, applications, and content
+-   Share our brand assets in blog posts, tutorials, documentation, and educational materials
+-   Follow the visual guidelines shown above (spacing, colors, sizing)
+-   Link to fish.audio when using our brand online
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#don%E2%80%99t)
+
+Don’t
+
+-   Use our logo as part of your own product name or branding
+-   Imply partnership, sponsorship, or endorsement without permission
+-   Feature our logo more prominently than your own brand
+
+### 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#questions)
+
+Questions?
+
+If you’re unsure whether your use case is appropriate or need special permission, please contact us at [support@fish.audio](mailto:support@fish.audio).
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/resources/brand#download-assets)
+
+Download Assets
+
+Was this page helpful?
+
+[Suggest edits](https://github.com/fishaudio/docs/edit/main/developer-guide/resources/brand.mdx)[Raise issue](https://github.com/fishaudio/docs/issues/new?title=Issue%20on%20docs&body=Path:%20/developer-guide/resources/brand)

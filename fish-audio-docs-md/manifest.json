@@ -1,0 +1,328 @@
+{
+  "source": "https://docs.fish.audio",
+  "sitemap": "https://docs.fish.audio/sitemap.xml",
+  "generatedAt": "2026-08-05T06:19:05.992Z",
+  "pages": [
+    {
+      "title": "Create Model",
+      "url": "https://docs.fish.audio/api-reference/endpoint/model/create-model",
+      "relativePath": "api-reference/endpoint/model/create-model.md"
+    },
+    {
+      "title": "Delete Model",
+      "url": "https://docs.fish.audio/api-reference/endpoint/model/delete-model",
+      "relativePath": "api-reference/endpoint/model/delete-model.md"
+    },
+    {
+      "title": "Get Model",
+      "url": "https://docs.fish.audio/api-reference/endpoint/model/get-model",
+      "relativePath": "api-reference/endpoint/model/get-model.md"
+    },
+    {
+      "title": "List Models",
+      "url": "https://docs.fish.audio/api-reference/endpoint/model/list-models",
+      "relativePath": "api-reference/endpoint/model/list-models.md"
+    },
+    {
+      "title": "Update Model",
+      "url": "https://docs.fish.audio/api-reference/endpoint/model/update-model",
+      "relativePath": "api-reference/endpoint/model/update-model.md"
+    },
+    {
+      "title": "Speech to Text",
+      "url": "https://docs.fish.audio/api-reference/endpoint/openapi-v1/speech-to-text",
+      "relativePath": "api-reference/endpoint/openapi-v1/speech-to-text.md"
+    },
+    {
+      "title": "Text to Speech Stream with Timestamps",
+      "url": "https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech-stream-with-timestamps",
+      "relativePath": "api-reference/endpoint/openapi-v1/text-to-speech-stream-with-timestamps.md"
+    },
+    {
+      "title": "Text to Speech",
+      "url": "https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech",
+      "relativePath": "api-reference/endpoint/openapi-v1/text-to-speech.md"
+    },
+    {
+      "title": "Voice Design",
+      "url": "https://docs.fish.audio/api-reference/endpoint/openapi-v1/voice-design",
+      "relativePath": "api-reference/endpoint/openapi-v1/voice-design.md"
+    },
+    {
+      "title": "Get API Credit",
+      "url": "https://docs.fish.audio/api-reference/endpoint/wallet/get-api-credit",
+      "relativePath": "api-reference/endpoint/wallet/get-api-credit.md"
+    },
+    {
+      "title": "Get User Package",
+      "url": "https://docs.fish.audio/api-reference/endpoint/wallet/get-user-package",
+      "relativePath": "api-reference/endpoint/wallet/get-user-package.md"
+    },
+    {
+      "title": "WebSocket TTS Streaming",
+      "url": "https://docs.fish.audio/api-reference/endpoint/websocket/tts-live",
+      "relativePath": "api-reference/endpoint/websocket/tts-live.md"
+    },
+    {
+      "title": "Errors",
+      "url": "https://docs.fish.audio/api-reference/errors",
+      "relativePath": "api-reference/errors.md"
+    },
+    {
+      "title": "Introduction",
+      "url": "https://docs.fish.audio/api-reference/introduction",
+      "relativePath": "api-reference/introduction.md"
+    },
+    {
+      "title": "Tracing & Performance Analysis",
+      "url": "https://docs.fish.audio/api-reference/observability",
+      "relativePath": "api-reference/observability.md"
+    },
+    {
+      "title": "JavaScript SDK Reference",
+      "url": "https://docs.fish.audio/api-reference/sdk/javascript/api-reference",
+      "relativePath": "api-reference/sdk/javascript/api-reference.md"
+    },
+    {
+      "title": "Client",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/client",
+      "relativePath": "api-reference/sdk/python/client.md"
+    },
+    {
+      "title": "Core",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/core",
+      "relativePath": "api-reference/sdk/python/core.md"
+    },
+    {
+      "title": "Exceptions",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/exceptions",
+      "relativePath": "api-reference/sdk/python/exceptions.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/overview",
+      "relativePath": "api-reference/sdk/python/overview.md"
+    },
+    {
+      "title": "Resources",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/resources",
+      "relativePath": "api-reference/sdk/python/resources.md"
+    },
+    {
+      "title": "Types",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/types",
+      "relativePath": "api-reference/sdk/python/types.md"
+    },
+    {
+      "title": "Utils",
+      "url": "https://docs.fish.audio/api-reference/sdk/python/utils",
+      "relativePath": "api-reference/sdk/python/utils.md"
+    },
+    {
+      "title": "Emotion & Expression Control",
+      "url": "https://docs.fish.audio/developer-guide/best-practices/emotion-control",
+      "relativePath": "developer-guide/best-practices/emotion-control.md"
+    },
+    {
+      "title": "Real-time Voice Streaming",
+      "url": "https://docs.fish.audio/developer-guide/best-practices/real-time-streaming",
+      "relativePath": "developer-guide/best-practices/real-time-streaming.md"
+    },
+    {
+      "title": "Voice Cloning Best Practices",
+      "url": "https://docs.fish.audio/developer-guide/best-practices/voice-cloning",
+      "relativePath": "developer-guide/best-practices/voice-cloning.md"
+    },
+    {
+      "title": "Emotion Control",
+      "url": "https://docs.fish.audio/developer-guide/core-features/emotions",
+      "relativePath": "developer-guide/core-features/emotions.md"
+    },
+    {
+      "title": "Fine-grained Control",
+      "url": "https://docs.fish.audio/developer-guide/core-features/fine-grained-control",
+      "relativePath": "developer-guide/core-features/fine-grained-control.md"
+    },
+    {
+      "title": "Chinese Phoneme Control",
+      "url": "https://docs.fish.audio/developer-guide/core-features/fine-grained-control/chinese",
+      "relativePath": "developer-guide/core-features/fine-grained-control/chinese.md"
+    },
+    {
+      "title": "English Phoneme Control",
+      "url": "https://docs.fish.audio/developer-guide/core-features/fine-grained-control/english",
+      "relativePath": "developer-guide/core-features/fine-grained-control/english.md"
+    },
+    {
+      "title": "Japanese Phoneme Control",
+      "url": "https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese",
+      "relativePath": "developer-guide/core-features/fine-grained-control/japanese.md"
+    },
+    {
+      "title": "Get Your API Key",
+      "url": "https://docs.fish.audio/developer-guide/getting-started/api-key",
+      "relativePath": "developer-guide/getting-started/api-key.md"
+    },
+    {
+      "title": "Changelog",
+      "url": "https://docs.fish.audio/developer-guide/getting-started/changelog",
+      "relativePath": "developer-guide/getting-started/changelog.md"
+    },
+    {
+      "title": "Quick Start",
+      "url": "https://docs.fish.audio/developer-guide/getting-started/quickstart",
+      "relativePath": "developer-guide/getting-started/quickstart.md"
+    },
+    {
+      "title": "LiveKit",
+      "url": "https://docs.fish.audio/developer-guide/integrations/livekit",
+      "relativePath": "developer-guide/integrations/livekit.md"
+    },
+    {
+      "title": "n8n",
+      "url": "https://docs.fish.audio/developer-guide/integrations/n8n",
+      "relativePath": "developer-guide/integrations/n8n.md"
+    },
+    {
+      "title": "Pipecat",
+      "url": "https://docs.fish.audio/developer-guide/integrations/pipecat",
+      "relativePath": "developer-guide/integrations/pipecat.md"
+    },
+    {
+      "title": "Telnyx",
+      "url": "https://docs.fish.audio/developer-guide/integrations/telnyx",
+      "relativePath": "developer-guide/integrations/telnyx.md"
+    },
+    {
+      "title": "Choosing a Model",
+      "url": "https://docs.fish.audio/developer-guide/models-pricing/choosing-a-model",
+      "relativePath": "developer-guide/models-pricing/choosing-a-model.md"
+    },
+    {
+      "title": "Model Deprecations",
+      "url": "https://docs.fish.audio/developer-guide/models-pricing/deprecations",
+      "relativePath": "developer-guide/models-pricing/deprecations.md"
+    },
+    {
+      "title": "Models Overview",
+      "url": "https://docs.fish.audio/developer-guide/models-pricing/models-overview",
+      "relativePath": "developer-guide/models-pricing/models-overview.md"
+    },
+    {
+      "title": "Pricing & Rate Limits",
+      "url": "https://docs.fish.audio/developer-guide/models-pricing/pricing-and-rate-limits",
+      "relativePath": "developer-guide/models-pricing/pricing-and-rate-limits.md"
+    },
+    {
+      "title": "Agent Quickstart",
+      "url": "https://docs.fish.audio/developer-guide/resources/agent-quickstart",
+      "relativePath": "developer-guide/resources/agent-quickstart.md"
+    },
+    {
+      "title": "Brand Guidelines",
+      "url": "https://docs.fish.audio/developer-guide/resources/brand",
+      "relativePath": "developer-guide/resources/brand.md"
+    },
+    {
+      "title": "AI Coding Agents",
+      "url": "https://docs.fish.audio/developer-guide/resources/coding-agents",
+      "relativePath": "developer-guide/resources/coding-agents.md"
+    },
+    {
+      "title": "Batch-transcribe files with a language hint",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/batch-transcribe-with-language-hint",
+      "relativePath": "developer-guide/sdk-guide/cookbook/batch-transcribe-with-language-hint.md"
+    },
+    {
+      "title": "Clone a voice and wait until it is ready",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/clone-and-wait-until-ready",
+      "relativePath": "developer-guide/sdk-guide/cookbook/clone-and-wait-until-ready.md"
+    },
+    {
+      "title": "Discover and reuse a Voice Library voice",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/discover-library-voice",
+      "relativePath": "developer-guide/sdk-guide/cookbook/discover-library-voice.md"
+    },
+    {
+      "title": "Instant voice cloning",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/instant-voice-cloning",
+      "relativePath": "developer-guide/sdk-guide/cookbook/instant-voice-cloning.md"
+    },
+    {
+      "title": "One-shot vs persistent cloning: pick the right approach",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/oneshot-vs-persistent-cloning",
+      "relativePath": "developer-guide/sdk-guide/cookbook/oneshot-vs-persistent-cloning.md"
+    },
+    {
+      "title": "Realtime: LLM tokens → speech",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/realtime-llm-to-speech",
+      "relativePath": "developer-guide/sdk-guide/cookbook/realtime-llm-to-speech.md"
+    },
+    {
+      "title": "Stream TTS to a file",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/streaming-to-file",
+      "relativePath": "developer-guide/sdk-guide/cookbook/streaming-to-file.md"
+    },
+    {
+      "title": "Telephony-grade audio (8 kHz) for IVR and phone",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/telephony-8khz-audio",
+      "relativePath": "developer-guide/sdk-guide/cookbook/telephony-8khz-audio.md"
+    },
+    {
+      "title": "Transcribe audio to SRT/VTT captions",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/transcribe-to-captions",
+      "relativePath": "developer-guide/sdk-guide/cookbook/transcribe-to-captions.md"
+    },
+    {
+      "title": "Build a voice agent loop: speech in, reply, speech out",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/cookbook/voice-agent-loop",
+      "relativePath": "developer-guide/sdk-guide/cookbook/voice-agent-loop.md"
+    },
+    {
+      "title": "Authentication",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/python/authentication",
+      "relativePath": "developer-guide/sdk-guide/python/authentication.md"
+    },
+    {
+      "title": "Errors & Retries",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/python/errors",
+      "relativePath": "developer-guide/sdk-guide/python/errors.md"
+    },
+    {
+      "title": "SDK Quickstart",
+      "url": "https://docs.fish.audio/developer-guide/sdk-guide/quickstart",
+      "relativePath": "developer-guide/sdk-guide/quickstart.md"
+    },
+    {
+      "title": "Docker Deployment",
+      "url": "https://docs.fish.audio/developer-guide/self-hosting/docker-deployment",
+      "relativePath": "developer-guide/self-hosting/docker-deployment.md"
+    },
+    {
+      "title": "Local Model Setup",
+      "url": "https://docs.fish.audio/developer-guide/self-hosting/local-setup",
+      "relativePath": "developer-guide/self-hosting/local-setup.md"
+    },
+    {
+      "title": "Running Inference",
+      "url": "https://docs.fish.audio/developer-guide/self-hosting/running-inference",
+      "relativePath": "developer-guide/self-hosting/running-inference.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.fish.audio/overview/capabilities",
+      "relativePath": "overview/capabilities.md"
+    },
+    {
+      "title": "MCP Server",
+      "url": "https://docs.fish.audio/overview/mcp",
+      "relativePath": "overview/mcp.md"
+    },
+    {
+      "title": "Platform (Web App)",
+      "url": "https://docs.fish.audio/overview/platform",
+      "relativePath": "overview/platform.md"
+    }
+  ],
+  "failures": []
+}

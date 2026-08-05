@@ -1,0 +1,164 @@
+# Japanese Phoneme Control
+
+Source: https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese#overview)
+
+Overview
+
+Japanese phoneme control uses OpenJTalk-style romaji phonemes plus pitch accent information. This is useful for Japanese homographs that have the same plain phoneme sequence but different pitch accents, such as `端が`, `箸が`, and `橋が`.
+
+```
+Standard: 橋が見えます。
+With phoneme control: <|phoneme_start|>ha0shi1ga0<|phoneme_end|>見えます。
+```
+
+Unlike Chinese, Japanese phoneme control is usually applied to a short word or phrase, not one tag per character.
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese#format)
+
+Format
+
+Put the pitch level digit immediately after each vowel-bearing mora:
+
+-   `0` means the current mora is low.
+-   `1` means the current mora is high.
+-   `N` can also carry a pitch digit.
+-   Consonants are written without spaces before the vowel they belong to, for example `ha`, `shi`, and `ga`.
+-   Use OpenJTalk phoneme symbols such as `a`, `i`, `u`, `e`, `o`, `N`, `cl`, `ky`, `sh`, `ch`, and `ts`.
+
+The following examples all share the plain phoneme sequence `h a sh i g a`, but the pitch markers disambiguate the word:
+
+-   `端が` (end + subject marker): `<|phoneme_start|>ha0shi1ga1<|phoneme_end|>`
+-   `箸が` (chopsticks + subject marker): `<|phoneme_start|>ha1shi0ga0<|phoneme_end|>`
+-   `橋が` (bridge + subject marker): `<|phoneme_start|>ha0shi1ga0<|phoneme_end|>`
+
+Japanese pitch accent depends on the dictionary, reading, and dialect. Generate the phoneme string from the same text you send to TTS, then listen and adjust the digits when you need a specific accent.
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese#relation-to-ttslearn-prosody-symbols)
+
+Relation to ttslearn Prosody Symbols
+
+The [ttslearn Japanese Tacotron recipe](https://r9y9.github.io/ttslearn/latest/notebooks/ch10_Recipe-Tacotron.html#%E3%83%95%E3%83%AB%E3%82%B3%E3%83%B3%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%83%A9%E3%83%99%E3%83%AB%E3%81%8B%E3%82%89%E3%81%AE%E9%9F%B3%E7%B4%A0%E5%88%97%E3%81%8A%E3%82%88%E3%81%B3%E9%9F%BB%E5%BE%8B%E8%A8%98%E5%8F%B7%E3%81%AE%E6%8A%BD%E5%87%BA) shows how to extract phonemes and prosody symbols from OpenJTalk full-context labels. That recipe prints symbols such as `[` for a pitch rise and `]` for a pitch fall. Fish Audio phoneme tags should not contain literal `[` or `]`. Convert that prosody into digit notation, such as `ha0shi1ga0`.
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese#generate-japanese-phonemes)
+
+Generate Japanese Phonemes
+
+You can generate Japanese phoneme strings with `pyopenjtalk`. The converter below follows the same full-context label logic used in training:
+
+```
+pip install pyopenjtalk
+```
+
+```
+import re
+
+import pyopenjtalk
+
+
+JAPANESE_VOWELS = "aiueoAIUEON"
+
+
+def japanese_to_romaji_with_accent(sentence: str) -> str:
+    text = ""
+    labels = pyopenjtalk.extract_fullcontext(sentence)
+    level = -1
+
+    for index, label in enumerate(labels):
+        phoneme = re.search(r"\-([^\+]*)\+", label).group(1)
+        if phoneme in ["sil", "pau"]:
+            continue
+
+        text += phoneme
+
+        a1 = int(re.search(r"/A:(\-?[0-9]+)\+", label).group(1))
+        a2 = int(re.search(r"\+(\d+)\+", label).group(1))
+        a3 = int(re.search(r"\+(\d+)/", label).group(1))
+
+        next_phoneme = re.search(r"\-([^\+]*)\+", labels[index + 1]).group(1)
+        if next_phoneme in ["sil", "pau"]:
+            a2_next = -1
+        else:
+            a2_next = int(re.search(r"\+(\d+)\+", labels[index + 1]).group(1))
+
+        # Accent phrase boundary
+        if a3 == 1 and a2_next == 1:
+            if level >= 0:
+                text += str(level)
+            level = -1
+        # Falling
+        elif a1 == 0 and a2_next == a2 + 1:
+            level = 0
+            text += "1"
+        # Rising
+        elif a2 == 1 and a2_next == 2:
+            level = 1
+            text += "0"
+        elif phoneme in JAPANESE_VOWELS:
+            if level < 0:
+                level = 0
+            text += str(level)
+
+    return text
+
+
+print(japanese_to_romaji_with_accent("橋が"))
+# ha0shi1ga0
+```
+
+Then place the result inside the phoneme tags:
+
+```
+<|phoneme_start|>ha0shi1ga0<|phoneme_end|>
+```
+
+Minimal request body:
+
+```
+{
+  "text": "<|phoneme_start|>ha0shi1ga0<|phoneme_end|>見えます。"
+}
+```
+
+## 
+
+[​
+
+](https://docs.fish.audio/developer-guide/core-features/fine-grained-control/japanese#processing-longer-text)
+
+Processing Longer Text
+
+For long Japanese text, split on punctuation and tag short Japanese runs instead of wrapping an entire paragraph. The training augmentation used short segments and skipped empty or very long spans. Good:
+
+```
+<|phoneme_start|>ha0shi1ga0<|phoneme_end|>、見えます。
+```
+
+Avoid:
+
+```
+<|phoneme_start|>very long paragraph with multiple clauses...<|phoneme_end|>
+```
+
+If your text contains symbols that OpenJTalk should read as words, normalize them before conversion. For example, the training preprocessor converted `％` to `パーセント` before extracting phonemes.
+
+Was this page helpful?
+
+[Suggest edits](https://github.com/fishaudio/docs/edit/main/developer-guide/core-features/fine-grained-control/japanese.mdx)[Raise issue](https://github.com/fishaudio/docs/issues/new?title=Issue%20on%20docs&body=Path:%20/developer-guide/core-features/fine-grained-control/japanese)
