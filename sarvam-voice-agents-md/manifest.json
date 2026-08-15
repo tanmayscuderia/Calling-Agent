@@ -1,0 +1,513 @@
+{
+  "source": "https://docs.sarvam.ai/",
+  "sitemap": "https://docs.sarvam.ai/sitemap.xml",
+  "generatedAt": "2026-08-15T19:40:51.883Z",
+  "pages": [
+    {
+      "title": "Get attempts",
+      "url": "https://docs.sarvam.ai/conversations/api/analytics/attempts",
+      "relativePath": "conversations/api/analytics/attempts.md"
+    },
+    {
+      "title": "Get interactions",
+      "url": "https://docs.sarvam.ai/conversations/api/analytics/interactions",
+      "relativePath": "conversations/api/analytics/interactions.md"
+    },
+    {
+      "title": "Get recordings",
+      "url": "https://docs.sarvam.ai/conversations/api/analytics/recordings",
+      "relativePath": "conversations/api/analytics/recordings.md"
+    },
+    {
+      "title": "Get transcripts",
+      "url": "https://docs.sarvam.ai/conversations/api/analytics/transcripts",
+      "relativePath": "conversations/api/analytics/transcripts.md"
+    },
+    {
+      "title": "Obtain access token",
+      "url": "https://docs.sarvam.ai/conversations/api/byok/auth",
+      "relativePath": "conversations/api/byok/auth.md"
+    },
+    {
+      "title": "Decrypt key",
+      "url": "https://docs.sarvam.ai/conversations/api/byok/decrypt-key",
+      "relativePath": "conversations/api/byok/decrypt-key.md"
+    },
+    {
+      "title": "BYOK overview",
+      "url": "https://docs.sarvam.ai/conversations/api/byok/overview",
+      "relativePath": "conversations/api/byok/overview.md"
+    },
+    {
+      "title": "Rotate key",
+      "url": "https://docs.sarvam.ai/conversations/api/byok/rotate-key",
+      "relativePath": "conversations/api/byok/rotate-key.md"
+    },
+    {
+      "title": "Create cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/cohorts/create",
+      "relativePath": "conversations/api/campaigns/cohorts/create.md"
+    },
+    {
+      "title": "Download cohort file",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/cohorts/download",
+      "relativePath": "conversations/api/campaigns/cohorts/download.md"
+    },
+    {
+      "title": "Get cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/cohorts/get",
+      "relativePath": "conversations/api/campaigns/cohorts/get.md"
+    },
+    {
+      "title": "List cohorts",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/cohorts/list",
+      "relativePath": "conversations/api/campaigns/cohorts/list.md"
+    },
+    {
+      "title": "Upload cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/cohorts/upload",
+      "relativePath": "conversations/api/campaigns/cohorts/upload.md"
+    },
+    {
+      "title": "Create campaign",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/create",
+      "relativePath": "conversations/api/campaigns/create.md"
+    },
+    {
+      "title": "Get campaign",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/get",
+      "relativePath": "conversations/api/campaigns/get.md"
+    },
+    {
+      "title": "List campaigns",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/list",
+      "relativePath": "conversations/api/campaigns/list.md"
+    },
+    {
+      "title": "Update status",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/update-status",
+      "relativePath": "conversations/api/campaigns/update-status.md"
+    },
+    {
+      "title": "Update campaign",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/update",
+      "relativePath": "conversations/api/campaigns/update.md"
+    },
+    {
+      "title": "Campaigns webhook payload",
+      "url": "https://docs.sarvam.ai/conversations/api/campaigns/webhook-payload",
+      "relativePath": "conversations/api/campaigns/webhook-payload.md"
+    },
+    {
+      "title": "Create cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/cohorts/create",
+      "relativePath": "conversations/api/deployments/cohorts/create.md"
+    },
+    {
+      "title": "Download cohort file",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/cohorts/download",
+      "relativePath": "conversations/api/deployments/cohorts/download.md"
+    },
+    {
+      "title": "Get cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/cohorts/get",
+      "relativePath": "conversations/api/deployments/cohorts/get.md"
+    },
+    {
+      "title": "List cohorts",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/cohorts/list",
+      "relativePath": "conversations/api/deployments/cohorts/list.md"
+    },
+    {
+      "title": "Upload cohort",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/cohorts/upload",
+      "relativePath": "conversations/api/deployments/cohorts/upload.md"
+    },
+    {
+      "title": "Create deployment",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/create",
+      "relativePath": "conversations/api/deployments/create.md"
+    },
+    {
+      "title": "Delete deployment",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/delete",
+      "relativePath": "conversations/api/deployments/delete.md"
+    },
+    {
+      "title": "Get deployment",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/get",
+      "relativePath": "conversations/api/deployments/get.md"
+    },
+    {
+      "title": "List deployments",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/list",
+      "relativePath": "conversations/api/deployments/list.md"
+    },
+    {
+      "title": "Update status",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/update-status",
+      "relativePath": "conversations/api/deployments/update-status.md"
+    },
+    {
+      "title": "Update deployment",
+      "url": "https://docs.sarvam.ai/conversations/api/deployments/update",
+      "relativePath": "conversations/api/deployments/update.md"
+    },
+    {
+      "title": "Create outbound call",
+      "url": "https://docs.sarvam.ai/conversations/api/instant-outbound/create",
+      "relativePath": "conversations/api/instant-outbound/create.md"
+    },
+    {
+      "title": "Instant Outbound webhook payload",
+      "url": "https://docs.sarvam.ai/conversations/api/instant-outbound/webhook-payload",
+      "relativePath": "conversations/api/instant-outbound/webhook-payload.md"
+    },
+    {
+      "title": "Introduction",
+      "url": "https://docs.sarvam.ai/conversations/api/introduction",
+      "relativePath": "conversations/api/introduction.md"
+    },
+    {
+      "title": "Agent",
+      "url": "https://docs.sarvam.ai/conversations/build/agent/overview",
+      "relativePath": "conversations/build/agent/overview.md"
+    },
+    {
+      "title": "Agent versioning",
+      "url": "https://docs.sarvam.ai/conversations/build/agent/versioning",
+      "relativePath": "conversations/build/agent/versioning.md"
+    },
+    {
+      "title": "Harness",
+      "url": "https://docs.sarvam.ai/conversations/build/concepts/harness",
+      "relativePath": "conversations/build/concepts/harness.md"
+    },
+    {
+      "title": "Introduction to conversational agents",
+      "url": "https://docs.sarvam.ai/conversations/build/concepts/introduction",
+      "relativePath": "conversations/build/concepts/introduction.md"
+    },
+    {
+      "title": "Conversation Settings",
+      "url": "https://docs.sarvam.ai/conversations/build/conversation-settings",
+      "relativePath": "conversations/build/conversation-settings.md"
+    },
+    {
+      "title": "Genie",
+      "url": "https://docs.sarvam.ai/conversations/build/genie",
+      "relativePath": "conversations/build/genie.md"
+    },
+    {
+      "title": "Knowledge Base",
+      "url": "https://docs.sarvam.ai/conversations/build/knowledge-base",
+      "relativePath": "conversations/build/knowledge-base.md"
+    },
+    {
+      "title": "Models",
+      "url": "https://docs.sarvam.ai/conversations/build/models",
+      "relativePath": "conversations/build/models.md"
+    },
+    {
+      "title": "Navigating the build interface",
+      "url": "https://docs.sarvam.ai/conversations/build/navigating-workspace",
+      "relativePath": "conversations/build/navigating-workspace.md"
+    },
+    {
+      "title": "On-Start & On-End Hooks",
+      "url": "https://docs.sarvam.ai/conversations/build/on-start-on-end-hooks",
+      "relativePath": "conversations/build/on-start-on-end-hooks.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.sarvam.ai/conversations/build/overview",
+      "relativePath": "conversations/build/overview.md"
+    },
+    {
+      "title": "Building & improving agents",
+      "url": "https://docs.sarvam.ai/conversations/build/process",
+      "relativePath": "conversations/build/process.md"
+    },
+    {
+      "title": "Run-time",
+      "url": "https://docs.sarvam.ai/conversations/build/run-time",
+      "relativePath": "conversations/build/run-time.md"
+    },
+    {
+      "title": "Prompt Practices",
+      "url": "https://docs.sarvam.ai/conversations/build/single-state-agents",
+      "relativePath": "conversations/build/single-state-agents.md"
+    },
+    {
+      "title": "Multi-state agents",
+      "url": "https://docs.sarvam.ai/conversations/build/states-conversation-flow",
+      "relativePath": "conversations/build/states-conversation-flow.md"
+    },
+    {
+      "title": "Instruction",
+      "url": "https://docs.sarvam.ai/conversations/build/system-prompt",
+      "relativePath": "conversations/build/system-prompt.md"
+    },
+    {
+      "title": "Tools",
+      "url": "https://docs.sarvam.ai/conversations/build/tools",
+      "relativePath": "conversations/build/tools.md"
+    },
+    {
+      "title": "Code Tools",
+      "url": "https://docs.sarvam.ai/conversations/build/tools/code-tools",
+      "relativePath": "conversations/build/tools/code-tools.md"
+    },
+    {
+      "title": "Core tools",
+      "url": "https://docs.sarvam.ai/conversations/build/tools/core-tools",
+      "relativePath": "conversations/build/tools/core-tools.md"
+    },
+    {
+      "title": "Data validation & verification",
+      "url": "https://docs.sarvam.ai/conversations/build/tools/data-validation",
+      "relativePath": "conversations/build/tools/data-validation.md"
+    },
+    {
+      "title": "API tool",
+      "url": "https://docs.sarvam.ai/conversations/build/tools/https-tool",
+      "relativePath": "conversations/build/tools/https-tool.md"
+    },
+    {
+      "title": "Mocking a tool",
+      "url": "https://docs.sarvam.ai/conversations/build/tools/mocking-a-tool",
+      "relativePath": "conversations/build/tools/mocking-a-tool.md"
+    },
+    {
+      "title": "Variables & Personalization",
+      "url": "https://docs.sarvam.ai/conversations/build/variables-personalization",
+      "relativePath": "conversations/build/variables-personalization.md"
+    },
+    {
+      "title": "Speakers & voice",
+      "url": "https://docs.sarvam.ai/conversations/build/voice-language",
+      "relativePath": "conversations/build/voice-language.md"
+    },
+    {
+      "title": "Campaigns",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns",
+      "relativePath": "conversations/deploy/campaigns.md"
+    },
+    {
+      "title": "Best practices",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/best-practices",
+      "relativePath": "conversations/deploy/campaigns/best-practices.md"
+    },
+    {
+      "title": "Campaign details",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/campaign-details",
+      "relativePath": "conversations/deploy/campaigns/campaign-details.md"
+    },
+    {
+      "title": "Campaign lifecycle",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/campaign-lifecycle",
+      "relativePath": "conversations/deploy/campaigns/campaign-lifecycle.md"
+    },
+    {
+      "title": "Cohorts",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/cohorts",
+      "relativePath": "conversations/deploy/campaigns/cohorts.md"
+    },
+    {
+      "title": "Create a campaign",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/create-campaign",
+      "relativePath": "conversations/deploy/campaigns/create-campaign.md"
+    },
+    {
+      "title": "Dialing rate & concurrency",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/dialing-rate",
+      "relativePath": "conversations/deploy/campaigns/dialing-rate.md"
+    },
+    {
+      "title": "Do Not Disturb (DND)",
+      "url": "https://docs.sarvam.ai/conversations/deploy/campaigns/dnd",
+      "relativePath": "conversations/deploy/campaigns/dnd.md"
+    },
+    {
+      "title": "Deploy with Code (API & SDK)",
+      "url": "https://docs.sarvam.ai/conversations/deploy/deploy-with-code",
+      "relativePath": "conversations/deploy/deploy-with-code.md"
+    },
+    {
+      "title": "Inbounds",
+      "url": "https://docs.sarvam.ai/conversations/deploy/inbounds",
+      "relativePath": "conversations/deploy/inbounds.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.sarvam.ai/conversations/deploy/overview",
+      "relativePath": "conversations/deploy/overview.md"
+    },
+    {
+      "title": "Phone Numbers",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony",
+      "relativePath": "conversations/deploy/telephony.md"
+    },
+    {
+      "title": "Bring Your Own Telephony",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/bring-your-own",
+      "relativePath": "conversations/deploy/telephony/bring-your-own.md"
+    },
+    {
+      "title": "Exotel",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/exotel",
+      "relativePath": "conversations/deploy/telephony/exotel.md"
+    },
+    {
+      "title": "Groups",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/groups",
+      "relativePath": "conversations/deploy/telephony/groups.md"
+    },
+    {
+      "title": "Intalk",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/intalk",
+      "relativePath": "conversations/deploy/telephony/intalk.md"
+    },
+    {
+      "title": "Manage Phone Numbers",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/manage-numbers",
+      "relativePath": "conversations/deploy/telephony/manage-numbers.md"
+    },
+    {
+      "title": "Pulse",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/pulse",
+      "relativePath": "conversations/deploy/telephony/pulse.md"
+    },
+    {
+      "title": "Rent from Sarvam",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/rent-from-sarvam",
+      "relativePath": "conversations/deploy/telephony/rent-from-sarvam.md"
+    },
+    {
+      "title": "Smartflo",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/smartflo",
+      "relativePath": "conversations/deploy/telephony/smartflo.md"
+    },
+    {
+      "title": "Twilio",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/twilio",
+      "relativePath": "conversations/deploy/telephony/twilio.md"
+    },
+    {
+      "title": "Vobiz",
+      "url": "https://docs.sarvam.ai/conversations/deploy/telephony/vobiz",
+      "relativePath": "conversations/deploy/telephony/vobiz.md"
+    },
+    {
+      "title": "Agent Analytics",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics",
+      "relativePath": "conversations/monitor/agent-analytics.md"
+    },
+    {
+      "title": "Call Logs",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/call-logs",
+      "relativePath": "conversations/monitor/agent-analytics/call-logs.md"
+    },
+    {
+      "title": "Connectivity",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/connectivity",
+      "relativePath": "conversations/monitor/agent-analytics/connectivity.md"
+    },
+    {
+      "title": "Engagement",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/engagement",
+      "relativePath": "conversations/monitor/agent-analytics/engagement.md"
+    },
+    {
+      "title": "Goals",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/goals",
+      "relativePath": "conversations/monitor/agent-analytics/goals.md"
+    },
+    {
+      "title": "Group by",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/group-by",
+      "relativePath": "conversations/monitor/agent-analytics/group-by.md"
+    },
+    {
+      "title": "Log Analyser",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/log-analyser",
+      "relativePath": "conversations/monitor/agent-analytics/log-analyser.md"
+    },
+    {
+      "title": "Overview tab",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/overview",
+      "relativePath": "conversations/monitor/agent-analytics/overview.md"
+    },
+    {
+      "title": "Tools",
+      "url": "https://docs.sarvam.ai/conversations/monitor/agent-analytics/tools",
+      "relativePath": "conversations/monitor/agent-analytics/tools.md"
+    },
+    {
+      "title": "Boards",
+      "url": "https://docs.sarvam.ai/conversations/monitor/boards",
+      "relativePath": "conversations/monitor/boards.md"
+    },
+    {
+      "title": "Create a board",
+      "url": "https://docs.sarvam.ai/conversations/monitor/boards/create-board",
+      "relativePath": "conversations/monitor/boards/create-board.md"
+    },
+    {
+      "title": "Create a widget",
+      "url": "https://docs.sarvam.ai/conversations/monitor/boards/create-widget",
+      "relativePath": "conversations/monitor/boards/create-widget.md"
+    },
+    {
+      "title": "Filters",
+      "url": "https://docs.sarvam.ai/conversations/monitor/boards/filters",
+      "relativePath": "conversations/monitor/boards/filters.md"
+    },
+    {
+      "title": "SQL best practices",
+      "url": "https://docs.sarvam.ai/conversations/monitor/clickhouse-sql-best-practices",
+      "relativePath": "conversations/monitor/clickhouse-sql-best-practices.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.sarvam.ai/conversations/monitor/overview",
+      "relativePath": "conversations/monitor/overview.md"
+    },
+    {
+      "title": "Announcing Voice Agents",
+      "url": "https://docs.sarvam.ai/conversations/newly-launched",
+      "relativePath": "conversations/newly-launched.md"
+    },
+    {
+      "title": "Overview",
+      "url": "https://docs.sarvam.ai/conversations/overview",
+      "relativePath": "conversations/overview.md"
+    },
+    {
+      "title": "Quickstart",
+      "url": "https://docs.sarvam.ai/conversations/quickstart",
+      "relativePath": "conversations/quickstart.md"
+    },
+    {
+      "title": "API Key",
+      "url": "https://docs.sarvam.ai/conversations/settings/api-key",
+      "relativePath": "conversations/settings/api-key.md"
+    },
+    {
+      "title": "Extensions",
+      "url": "https://docs.sarvam.ai/conversations/settings/extensions",
+      "relativePath": "conversations/settings/extensions.md"
+    },
+    {
+      "title": "Policy",
+      "url": "https://docs.sarvam.ai/conversations/settings/policy",
+      "relativePath": "conversations/settings/policy.md"
+    },
+    {
+      "title": "Secrets",
+      "url": "https://docs.sarvam.ai/conversations/settings/secrets",
+      "relativePath": "conversations/settings/secrets.md"
+    }
+  ],
+  "failures": []
+}
