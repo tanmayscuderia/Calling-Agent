@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
 import { processMessageJob, processSendReplyJob, processSendLocationJob, processSummaryJob } from './jobHandler';
+import { processCallResultJob } from '../sarvam/callResultService';
 
 // ============================================================
 // Production Queue Worker
@@ -185,6 +186,9 @@ async function processJob(job: QueueJob): Promise<void> {
         break;
       case 'generate_summary':
         await processSummaryJob(job.org_id, job.payload);
+        break;
+      case 'process_call_result':
+        await processCallResultJob(job.org_id, job.payload);
         break;
       default:
         logger.warn({ jobType: job.job_type }, '[Queue] Unknown job type, marking complete');

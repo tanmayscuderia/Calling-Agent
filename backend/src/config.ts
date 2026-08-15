@@ -53,6 +53,28 @@ export const config = {
     },
   },
 
+  sarvam: {
+    // Sarvam Voice Agents — real AI phone calls (docs/SARVAM_CALLING_PLAN.md)
+    // Empty apiKey = feature off; start-real returns 'Sarvam not configured'.
+    apiKey: required('SARVAM_API_KEY'),
+    orgId: required('SARVAM_ORG_ID'),
+    workspaceId: required('SARVAM_WORKSPACE_ID'),
+    appId: required('SARVAM_APP_ID'),
+    appVersion: Number(process.env.SARVAM_APP_VERSION ?? 1),
+    connectionId: required('SARVAM_CONNECTION_ID'),
+    agentPhoneNumber: required('SARVAM_AGENT_PHONE_NUMBER'),
+    // Random 32+ char secret embedded in the webhook URL path — it IS the auth
+    // for /webhooks/sarvam/:secret (Sarvam doesn't sign payloads).
+    webhookSecret: required('SARVAM_WEBHOOK_SECRET', 'dev-sarvam-webhook-secret-change-me-32chars'),
+    // Public HTTPS base URL of this backend (ngrok in dev, domain in prod) —
+    // used to build the webhook URL we register with Sarvam.
+    publicUrl: required('PUBLIC_BASE_URL', 'http://localhost:4000'),
+    baseUrl: process.env.SARVAM_BASE_URL ?? 'https://apps.sarvam.ai',
+    // Calling hours guard (IST). Outside this window start-real rejects.
+    callingHoursStart: Number(process.env.SARVAM_CALLING_HOURS_START ?? 9),
+    callingHoursEnd: Number(process.env.SARVAM_CALLING_HOURS_END ?? 21),
+  },
+
   whatsapp: {
     provider: (process.env.WHATSAPP_PROVIDER ?? 'baileys').toLowerCase(),
     sessionDir: process.env.WHATSAPP_SESSION_DIR ?? '.sessions/whatsapp',

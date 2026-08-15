@@ -35,7 +35,7 @@ export default function CallsPage() {
     <div style={{ maxWidth: 1000 }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>Call Sessions</h1>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>AI calling agent demo — browser-based with speech synthesis</p>
+        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>AI call sessions — browser demo + real outbound calls via Sarvam voice agents</p>
       </div>
 
       <div className="stagger">
@@ -45,7 +45,7 @@ export default function CallsPage() {
           <div className="card" style={{ padding: 48, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📞</div>
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>No call sessions yet</div>
-            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 20 }}>Start an AI call demo from any lead detail page</div>
+            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 20 }}>Start an AI call demo or a real Sarvam call from any lead detail page</div>
             <Link href="/dashboard/leads" className="btn btn-primary">View Leads</Link>
           </div>
         ) : (
@@ -62,7 +62,16 @@ export default function CallsPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-end' }}>
-                  <span className={`badge ${call.status === 'completed' ? 'badge-green' : 'badge-slate'}`} style={{ textTransform: 'capitalize' }}>{call.status}</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {call.provider === 'sarvam' && <span className="badge badge-purple">Sarvam</span>}
+                    {call.provider === 'browser_demo' && <span className="badge badge-blue">Demo</span>}
+                  </div>
+                  <span
+                    className={`badge ${call.status === 'completed' ? 'badge-green' : call.status === 'failed' ? 'badge-red' : 'badge-amber'}`}
+                    style={{ textTransform: 'capitalize' }}
+                  >
+                    {call.status === 'ringing' ? '📞 ' : ''}{call.status.replace(/_/g, ' ')}
+                  </span>
                   {call.outcome && <span className={`badge ${outcomeColors[call.outcome] || 'badge-slate'}`} style={{ textTransform: 'capitalize' }}>{call.outcome.replace(/_/g, ' ')}</span>}
                 </div>
               </div>

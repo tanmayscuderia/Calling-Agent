@@ -1,21 +1,22 @@
 # Multi-Industry WhatsApp AI + Calling Agent Platform
 
-A production-grade platform for AI-powered lead qualification via WhatsApp, with CRM dashboard, multi-industry support, and browser-based AI calling-agent demo.
+A production-grade platform for AI-powered lead qualification via WhatsApp **and real phone calls**, with CRM dashboard, multi-industry support, and a Sarvam AI voice-calling agent.
 
 ## What This Platform Does
 
 1. **Multi-industry AI agents** — 12 industry templates (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
 2. **WhatsApp message monitoring** via WhatsApp Web bridge (Baileys)
 3. **Automatic AI replies** for lead qualification (async queue pipeline)
-4. **Config-driven AI** — each org configures its own persona, fields, intents, reply templates
-5. **Inventory upload** (CSV) and structured search
-6. **CRM dashboard** for leads and conversations
-7. **AI call-agent demo** (browser speechSynthesis + text input)
-8. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection
-9. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
-10. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-11. **290 tests** — 199 unit tests + 91 LLM eval tests, all green
-12. Clean migration path to Meta Cloud API later
+4. **AI phone calls via Sarvam** — real outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks
+5. **Config-driven AI** — each org configures its own persona, fields, intents, reply templates
+6. **Inventory upload** (CSV) and structured search
+7. **CRM dashboard** for leads and conversations
+8. **Browser call-agent demo** (speechSynthesis + text input) — no telephony needed
+9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
+10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
+11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
+12. **296+ tests** — 205 unit tests + 91 LLM eval tests, all green
+13. Clean migration path to Meta Cloud API later
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
 
@@ -30,10 +31,11 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 | **Database** | Supabase Postgres |
 | **Auth** | Supabase Auth + httpOnly cookies (session-based) |
 | **WhatsApp Bridge** | Baileys (WhatsApp Web protocol) |
+| **Voice Calling** | Sarvam AI voice agents (real PSTN calls, webhook-driven results) |
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (290 tests: 199 unit + 91 LLM evals) |
+| **Testing** | Vitest (296 tests: 205 unit + 91 LLM evals) |
 
 ---
 
@@ -41,7 +43,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp, with
 
 ### 1. Database Setup
 
-Create a Supabase project, then run all 10 migrations in order:
+Create a Supabase project, then run all 14 migrations in order:
 
 ```bash
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
@@ -54,7 +56,12 @@ psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_inde
 psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 ```
+
+> **Already have a live DB?** Paste `supabase/run_missing_migrations.sql` into the Supabase SQL editor instead — it replays every missing piece idempotently.
 
 > **Full setup (user creation, org linking, env config, troubleshooting):** [docs/SETUP.md](./docs/SETUP.md)
 
@@ -74,6 +81,16 @@ DEFAULT_ORG_ID=your-org-uuid
 DEEPSEEK_API_KEY=your-key
 COOKIE_SECRET=random-string-at-least-32-chars
 FRONTEND_ORIGIN=http://localhost:3000
+
+# Sarvam AI calling (optional — leave SARVAM_API_KEY empty to disable;
+# /api/calls/start-real returns 400 without it)
+SARVAM_API_KEY=your-sarvam-key
+SARVAM_ORG_ID=...           # from https://apps.sarvam.ai
+SARVAM_WORKSPACE_ID=...
+SARVAM_APP_ID=...
+SARVAM_CONNECTION_ID=...
+SARVAM_AGENT_PHONE_NUMBER=+91XXXXXXXXXX
+SARVAM_WEBHOOK_SECRET=random-string-32-chars
 ```
 
 > **Note:** The DeepSeek model is hardcoded to `deepseek-v4-flash` in `config.ts`. The `DEEPSEEK_MODEL` env var is not read. See [docs/DEEPSEEK_GUIDE.md](./docs/DEEPSEEK_GUIDE.md).
@@ -141,6 +158,7 @@ All details are in `docs/`:
 | **[ROADMAP.md](./docs/ROADMAP.md)** | Completed phases + future plans |
 | **[DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md)** | Client demo walkthrough |
 | **[DEEPSEEK_GUIDE.md](./docs/DEEPSEEK_GUIDE.md)** | LLM integration, cost, error handling |
+| **[SARVAM_CALLING_PLAN.md](./docs/SARVAM_CALLING_PLAN.md)** | Sarvam voice-calling agent — architecture, endpoints, webhook flow, rollout status |
 
 ---
 
@@ -150,21 +168,22 @@ All details are in `docs/`:
 Calling Agent/
 ├── backend/              # Fastify API server (TypeScript)
 │   ├── src/
-│   │   ├── ai/           # LLM client, agents, prompt engine, config service
+│   │   ├── ai/           # LLM client, agents (WhatsApp + call), prompt engine, config service
 │   │   ├── auth/         # Cookie-based auth middleware + rate limiter
 │   │   ├── crm/          # Lead, conversation, property services
 │   │   ├── queue/        # Postgres-backed job worker + stale recovery
+│   │   ├── sarvam/       # Sarvam API client + call-result processing service
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
-│   │   ├── routes/       # 11 route files (auth, whatsapp, leads, calls, agent, ai, etc.)
+│   │   ├── routes/       # 13 route files (auth, whatsapp, leads, calls, sarvam webhook, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 199 unit tests + 91 LLM evals
+│   └── tests/            # 205 unit tests + 91 LLM evals
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
 │       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
 │       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
-├── supabase/migrations/  # 10 SQL migration files
-└── docs/                 # 8 documentation files
+├── supabase/migrations/  # 14 SQL migration files
+└── docs/                 # 10 documentation files
 ```
 
 ---
@@ -206,6 +225,6 @@ Results with score ≤ 0.1 are filtered out. Top N (default 3) returned, sorted 
 
 ## Production Notes
 
-The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Future work includes replacing Baileys with Meta Cloud API, WebSocket real-time updates, and real calling integration.
+The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). Future work includes replacing Baileys with Meta Cloud API and WebSocket real-time updates.
 
 See **[ROADMAP.md](./docs/ROADMAP.md)** for full details.

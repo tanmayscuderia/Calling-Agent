@@ -1,10 +1,10 @@
+
 # Database Schema — Multi-Industry WhatsApp AI + Calling Agent Platform
 
 All tables, columns, relationships, and indexes.
 
 > **Migrations:** `supabase/migrations/`
-> - `20260101_0000_core_schema.sql` — Core tables (organizations, users, members)
-> - `20260101_0001_real_estate_ai_prototype.sql` — All prototype tables
+> - `20260101_0001_real_estate_ai_prototype.sql` — Core tables (organizations, users, members) + all prototype tables
 > - `20260101_0002_demo_seed.sql` — 5 demo properties
 > - `20260102_0001_multi_tenant_production.sql` — Multi-tenant auth, rate limits, usage limits
 > - `20260102_0001a_job_queue_base.sql` — Base `job_queue` table + dequeue/complete/fail/reclaim/stats RPCs
@@ -14,6 +14,11 @@ All tables, columns, relationships, and indexes.
 > - `20260104_0001_more_industry_templates.sql` — 4 more templates (legal, automotive, salon, insurance)
 > - `20260105_0001_fix_dequeue_rpc_ambiguous.sql` — Fix column ambiguity in `dequeue_job()` RPC
 > - `20260106_0001_generic_inventory_items.sql` — Generic inventory table for non-real-estate industries + `inventory_schema` column on `agent_configs`
+> - `20260107_0001_location_features.sql` — Location features + aliases support
+> - `20260108_0001_sarvam_calls.sql` — Sarvam calling: provider CHECK + `interaction_id` + `sarvam_webhook_events` + idempotency index
+> - `20260109_0001_sarvam_fixes.sql` — CHECK value fixes (`job_queue.job_type`, `call_sessions.status/provider`), re-asserts 0008
+>
+> **Already have a live DB?** `supabase/run_missing_migrations.sql` replays every missing piece idempotently.
 
 ---
 
@@ -151,9 +156,9 @@ Tracks CSV/PDF upload jobs.
 
 ## Generic Inventory Table (Multi-Industry)
 
-### `generic_inventory_items`
+### `inventory_items` (generic inventory)
 
-Used by any non-real-estate industry (Education, Healthcare, E-Commerce, etc.). Replaces `real_estate_projects` + `real_estate_units` for industries that don't need the project/unit split.
+Used by any non-real-estate industry (Education, Healthcare, E-Commerce, etc.). Generic table used by non-real-estate industries. Replaces `real_estate_projects` + `real_estate_units` for industries that don't need the project/unit split.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -192,12 +197,13 @@ Used by any non-real-estate industry (Education, Healthcare, E-Commerce, etc.). 
 | `updated_at` | timestamptz | Auto-updated via trigger |
 
 **Indexes:**
-- `idx_generic_inventory_items_org_id` (org_id)
-- `idx_generic_inventory_items_category` (org_id, category)
-- `idx_generic_inventory_items_search` (org_id, configuration, availability_status, price_min, price_max)
-- `idx_generic_inventory_items_city` (org_id, city, sector)
+- `idx_inventory_items_org_id` (org_id)
+- `idx_inventory_items_category` (org_id, category)
+- `idx_inventory_items_status` (org_id, status)
+- `idx_inventory_items_location` (org_id, city, area)
+- `idx_inventory_items_price` (org_id, price_min, price_max)
 
-**Trigger:** `set_generic_inventory_items_updated_at` (BEFORE UPDATE)
+**Trigger:** `set_inventory_items_updated_at` (BEFORE UPDATE)
 
 ---
 
@@ -622,3 +628,11 @@ organizations ──────────────────────
 organizations ──────────────────────────────────────────
     │                                                   │
     └── job_queue (async processing pipeline)           │
+
+## Sarvam Calling Tables
+
+| Table | Purpose |
+|-------|---------|
+| `sarvam_webhook_events` | Raw audit of every Sarvam webhook (received → processed). Replay + idempotency source of truth |
+
+`call_sessions` gains: `interaction_id`, `provider_account_id`, `failure_reason`, `lead_temperature`; provider CHECK now includes `sarvam`; status CHECK now includes `no_answer`, `busy`. `job_queue.job_type` CHECK now includes `process_call_result` and `send_location` (migration `20260109_0001_sarvam_fixes.sql`).

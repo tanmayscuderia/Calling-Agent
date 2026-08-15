@@ -9,10 +9,12 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
-    "db:migrate": "psql \"$DATABASE_URL\" -f supabase/migrations/20260101_0000_core_schema.sql && psql \"$DATABASE_URL\" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql && psql \"$DATABASE_URL\" -f supabase/migrations/20260101_0002_demo_seed.sql",
-    "db:reset": "psql \"$DATABASE_URL\" -f supabase/migrations/20260101_0000_core_schema.sql"
+    "db:migrate": "for f in supabase/migrations/*.sql; do echo \"== $f\"; psql \"$DATABASE_URL\" -f \"$f\" || exit 1; done"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "comments": {
+    "db:migrate": "Runs every migration in supabase/migrations/ in filename order (all are idempotent). Alternatively paste them into Supabase SQL Editor — see docs/SETUP.md."
   }
 }

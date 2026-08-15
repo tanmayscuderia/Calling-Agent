@@ -6,19 +6,20 @@
 
 ## 1. Project Overview
 
-**Multi-Industry WhatsApp AI + Calling Agent Platform** — a production-grade system for AI-powered lead qualification via WhatsApp, with CRM dashboard, configurable multi-industry AI agents, inventory management, and browser-based AI calling-agent demo.
+**Multi-Industry WhatsApp AI + Calling Agent Platform** — a production-grade system for AI-powered lead qualification via WhatsApp **and real AI phone calls**, with CRM dashboard, configurable multi-industry AI agents, inventory management, a Sarvam AI voice-calling agent, and a browser-based call demo.
 
 **Core capabilities:**
 1. WhatsApp message monitoring via WhatsApp Web bridge (Baileys)
 2. Automatic AI replies for lead qualification (async job queue pipeline)
 3. 12 industry templates — each org configures its own AI agent (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
-4. Config-driven AI — persona, fields, intents, reply templates, inventory mappings all stored in DB
-5. CSV inventory upload + structured search with progressive relaxation
-6. CRM dashboard for leads, conversations, follow-ups
-7. AI call-agent demo (browser speechSynthesis + text input)
-8. Production-grade reliability — durable Postgres job queue, retry with backoff, crash recovery, LLM rate-limit protection
-9. Secure login — Supabase Auth with httpOnly cookies (no tokens in JS)
-10. Polished animated UI — Framer Motion route transitions, staggered cards, spring hovers
+4. **Real AI phone calls via Sarvam voice agents** — outbound PSTN calls (Hindi/English) that qualify leads, book site visits, and write transcripts/summaries/outcomes back to the CRM via authenticated webhooks
+5. Config-driven AI — persona, fields, intents, reply templates, inventory mappings all stored in DB
+6. CSV inventory upload + structured search with progressive relaxation
+7. CRM dashboard for leads, conversations, follow-ups
+8. Browser call-agent demo (speechSynthesis + text input) — works with zero telephony setup
+9. Production-grade reliability — durable Postgres job queue, retry with backoff, crash recovery, LLM rate-limit protection, webhook idempotency
+10. Secure login — Supabase Auth with httpOnly cookies (no tokens in JS)
+11. Polished animated UI — Framer Motion route transitions, staggered cards, spring hovers
 
 > **Prototype positioning:** WhatsApp bridge uses Baileys (WhatsApp Web protocol) for demo speed. Production will use Meta Cloud API. The AI, CRM, inventory, and calling workflows are the real product and remain unchanged. The `MessagingAdapter` interface ensures a clean swap path.
 
@@ -33,10 +34,11 @@
 | **Database** | Supabase Postgres |
 | **Auth** | Supabase Auth + httpOnly cookies (session-based, XSS-proof) |
 | **WhatsApp Bridge** | `@whiskeysockets/baileys` (WhatsApp Web protocol) |
+| **Voice Calling** | Sarvam AI voice agents (real PSTN calls + webhooks; see `docs/SARVAM_CALLING_PLAN.md`) |
 | **LLM** | DeepSeek V4 (default, `deepseek-v4-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
-| **Testing** | Vitest — 178 unit tests (12 files) + 91 LLM eval tests (8 files) |
+| **Testing** | Vitest — 205 unit tests + 91 LLM eval tests |
 | **Package Manager** | npm (workspace root with `backend/` and `frontend/`) |
 
 ---
@@ -90,7 +92,7 @@ Save outbound customer_messages + ai_agent_runs
 
 ## 4. Database Schema
 
-### 9 Migration Files (run in order)
+### 14 Migration Files (run in order)
 
 ```
 supabase/migrations/
@@ -101,9 +103,15 @@ supabase/migrations/
 ├── 20260102_0002_queue_hardening.sql             — Queue indexes, stale recovery RPC
 ├── 20260103_0001_agent_configs_templates.sql     — agent_configs table + 12 templates
 ├── 20260103_0002_lead_dedup_unique_indexes.sql   — Unique constraints on phone/whatsapp
-├── 20260104_0001_more_industry_templates.sql     — Additional industry inventory tables
+├── 20260104_0001_more_industry_templates.sql     — 4 more templates (legal, automotive, salon, insurance)
 ├── 20260105_0001_fix_dequeue_rpc_ambiguous.sql   — Fix ambiguous column in dequeue RPC
+├── 20260106_0001_generic_inventory_items.sql     — Generic inventory_items table + inventory_schema
+├── 20260107_0001_location_features.sql           — Location aliases for search matching
+├── 20260108_0001_sarvam_calls.sql                — Sarvam: provider CHECK, correlation columns, webhook audit table
+├── 20260109_0001_sarvam_fixes.sql                — Idempotent schema alignment (job_type + call status CHECKs)
 ```
+
+> **Live DB repair:** `supabase/run_missing_migrations.sql` replays everything missing idempotently — paste into the Supabase SQL editor.
 
 ### Core Tables (14 — from migration 0001)
 
@@ -380,8 +388,10 @@ Temperature scoring:
 | **POST** | `/api/calls/start-demo` | Start AI call demo `{ orgId, leadId }` |
 | **POST** | `/api/calls/:id/turn` | Customer reply → get agent response |
 | **POST** | `/api/calls/:id/end` | End call → generate summary + outcome |
+| **POST** | `/api/calls/start-real` | Start **real Sarvam call** `{ leadId }` — guards: API key, calling hours, DNC, cost caps |
 | **GET** | `/api/calls/:id` | Get call session + transcript |
 | **GET** | `/api/calls?orgId=` | List call sessions |
+| **POST** | `/webhooks/sarvam/:secret` | Sarvam result webhook (secret in path; idempotent; enqueues `process_call_result`) |
 | | | |
 | **POST** | `/api/ai/test-extraction` | Test extraction without WhatsApp |
 | **POST** | `/api/ai/test-reply` | Test full AI reply without WhatsApp |
@@ -447,6 +457,18 @@ LLM_MAX_CONCURRENT=3                               # Max parallel LLM calls
 LLM_MIN_DELAY_MS=0                                 # Inter-call delay (set 1500 for evals)
 LLM_DAILY_LIMIT=500                                # Max LLM calls per day per source
 
+# Sarvam Voice Calling (optional — empty SARVAM_API_KEY disables; start-real returns 400)
+SARVAM_API_KEY=                                    # From https://apps.sarvam.ai
+SARVAM_ORG_ID=
+SARVAM_WORKSPACE_ID=
+SARVAM_APP_ID=
+SARVAM_APP_VERSION=1
+SARVAM_CONNECTION_ID=
+SARVAM_AGENT_PHONE_NUMBER=                         # Caller ID shown to leads
+SARVAM_WEBHOOK_SECRET=random-32-chars              # Webhook URL: /webhooks/sarvam/<secret>
+SARVAM_CALLING_HOURS_START=9                       # IST
+SARVAM_CALLING_HOURS_END=21                        # IST
+
 # WhatsApp
 WHATSAPP_PROVIDER=baileys
 WHATSAPP_SESSION_DIR=.sessions/whatsapp
@@ -473,7 +495,7 @@ PORT=4000
 
 ### Database
 ```bash
-# Run all 9 migrations in order
+# Run all 14 migrations in order
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0002_demo_seed.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260102_0001_multi_tenant_production.sql
@@ -483,6 +505,10 @@ psql "$DATABASE_URL" -f supabase/migrations/20260103_0001_agent_configs_template
 psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_indexes.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 ```
 
 ### Install
@@ -503,7 +529,7 @@ cd frontend && npm run dev
 ```bash
 cd backend
 
-# Unit tests (no API key needed) — 178 tests
+# Unit tests (no API key needed) — 205 tests
 npx vitest run tests/unit/
 
 # LLM evals (requires DEEPSEEK_API_KEY) — 91 tests
@@ -563,12 +589,13 @@ Calling Agent/
 │   │   ├── crm/                 # Lead, conversation, property services
 │   │   ├── db/                  # Supabase client (service-role)
 │   │   ├── queue/               # Postgres job queue + worker + stale recovery
-│   │   ├── routes/              # 12 Fastify route files
+│   │   ├── sarvam/              # Sarvam API client + call-result service
+│   │   ├── routes/              # 13 Fastify route files
 │   │   ├── uploads/             # CSV import + Supabase Storage
-│   │   ├── utils/               # phone, money, logger, email
+│   │   ├── utils/               # phone, money, logger, email, locationAliases
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
-│       ├── unit/                # 178 unit tests (12 files)
+│       ├── unit/                # 205 unit tests (14 files)
 │       └── evals/               # 91 LLM eval tests (8 files)
 ├── frontend/
 │   └── src/
@@ -579,8 +606,8 @@ Calling Agent/
 │       │   └── globals.css      # Tailwind + custom classes
 │       ├── components/          # CallDemoModal, motion/
 │       └── lib/                 # api.ts, auth.tsx, animations.ts
-├── supabase/migrations/         # 9 SQL migration files
-└── docs/                        # 9 documentation files (this one + 8 others)
+├── supabase/migrations/         # 14 SQL migration files
+└── docs/                        # 10 documentation files (this one + 9 others)
 ```
 
 ---
@@ -616,7 +643,8 @@ Calling Agent/
 | Prototype | Production |
 |-----------|------------|
 | Baileys WhatsApp Web bridge | Meta Cloud API or BSP (Gupshup/Wati/Twilio) |
-| Browser speechSynthesis call demo | Exotel/Twilio voice integration |
+| Sarvam voice agent (live, single number) | Dedicated agent numbers per org, inbound calls |
+| Browser speechSynthesis call demo | Retained as offline demo mode |
 | Local file session storage | Cloud session management |
 | Single-instance queue worker | Horizontal scaling with multiple workers |
 | Supabase Auth (email/password) | OAuth/SAML/SSO |
@@ -625,4 +653,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: July 2026. Test count: 178 unit + 91 eval = 269 total. All passing.*
+*Last updated: August 2026. Test count: 205 unit + 91 eval = 296 total. All passing. Sarvam real calling live (S1–S6 complete — see `docs/SARVAM_CALLING_PLAN.md`).*

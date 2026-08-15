@@ -676,6 +676,9 @@ backend/src/db/supabase.ts
 | 8 | `20260104_0001_more_industry_templates.sql` | 4 more templates (legal, auto, salon, insurance) |
 | 9 | `20260105_0001_fix_dequeue_rpc_ambiguous.sql` | Fix column ambiguity in dequeue_job RPC |
 | 10 | `20260106_0001_generic_inventory_items.sql` | Generic inventory table + `inventory_schema` on agent_configs |
+| 11 | `20260107_0001_location_features.sql` | Location sharing + alias resolution features |
+| 12 | `20260108_0001_sarvam_calls.sql` | Sarvam provider CHECK, `interaction_id`, webhook idempotency index, `sarvam_webhook_events` |
+| 13 | `20260109_0001_sarvam_fixes.sql` | Schema alignment: `job_type` CHECK += `process_call_result`/`send_location`, `status` CHECK += `no_answer`/`busy`, `failure_reason`/`lead_temperature` cols |
 
 ### Table Groups
 
@@ -935,7 +938,8 @@ npm run eval
 | **Conversations** | `GET /api/conversations`, `GET /api/conversations/:id`, `PATCH /api/conversations/:id`, `POST /api/conversations/:id/send`, `POST /api/conversations/:id/handoff` |
 | **Inventory** | `GET /api/inventory/projects`, `POST /api/inventory/projects`, `GET /api/inventory/units`, `POST /api/inventory/units`, `GET /api/inventory/search`, `GET/POST /api/inventory/items` (generic) |
 | **Upload** | `POST /api/upload/properties-csv`, `POST /api/upload/inventory-csv` (generic) |
-| **Calls** | `POST /api/calls/start-demo`, `POST /api/calls/:id/turn`, `POST /api/calls/:id/end`, `GET /api/calls/:id` |
+| **Calls** | `POST /api/calls/start-demo`, `POST /api/calls/start-real` (Sarvam), `POST /api/calls/:id/turn`, `POST /api/calls/:id/end`, `GET /api/calls/:id` |
+| **Sarvam Webhook** | `POST /webhooks/sarvam/call-result` (HMAC-verified, async job) |
 | **Agent Config** | `GET /api/agent/config`, `PUT /api/agent/config`, `GET /api/agent/templates`, `POST /api/agent/apply-template` |
 | **AI** | `POST /api/ai/test-extraction`, `POST /api/ai/test-reply` |
 

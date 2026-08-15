@@ -17,6 +17,7 @@ import { leadsRoutes } from './routes/leads.routes';
 import { conversationsRoutes } from './routes/conversations.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
 import { callsRoutes } from './routes/calls.routes';
+import { sarvamWebhookRoutes } from './routes/sarvamWebhook.routes';
 import { aiRoutes } from './routes/ai.routes';
 import { agentRoutes } from './routes/agent.routes';
 import { membersRoutes } from './routes/members.routes';
@@ -50,6 +51,7 @@ async function start() {
   await app.register(conversationsRoutes);
   await app.register(whatsappRoutes);
   await app.register(callsRoutes);
+  await app.register(sarvamWebhookRoutes);
   await app.register(aiRoutes);
   await app.register(agentRoutes);
   await app.register(membersRoutes);
