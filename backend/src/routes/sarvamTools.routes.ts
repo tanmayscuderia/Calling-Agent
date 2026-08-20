@@ -167,6 +167,93 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
+// ── Zero-result guidance (exported for unit tests) ──
+
+/**
+ * Build the count-0 payload that steers the voice agent when a search comes
+ * back empty (e.g. caller asks for Pune but inventory is NCR-only):
+ * say we don't have it, list cities we DO serve, never invent properties.
+ */
+export function zeroResultPayload(
+  filters: Record<string, unknown>,
+  where: string | null,
+  cities: string[]
+): Record<string, any> {
+  const wherePart = where ? ` in ${where}` : ' for those criteria';
+  const cityList = cities.length > 0 ? ` We currently have options in: ${cities.join(', ')}.` : '';
+  const offer = cities.length > 0
+    ? ', offer the cities above, and ask if any of those work'
+    : ' and offer to have the team follow up on WhatsApp';
+  return {
+    count: 0,
+    results: [],
+    filters,
+    note: `No inventory${wherePart}.${cityList} Do NOT invent or guess any property — say we don't have options${where ? ' there' : ' for that'}${offer}.`,
+    available_locations: cities,
+  };
+}
+
+// ── Available locations (zero-result guidance) ──
+
+interface LocationsCache {
+  ts: number;
+  cities: string[];
+}
+const locationsCache = new Map<string, LocationsCache>();
+const LOCATIONS_TTL_MS = 60_000;
+
+/**
+ * Distinct cities this org actually has inventory in, so a zero-result search
+ * can tell the agent "no Pune stock, but we have Noida/Gurgaon" instead of the
+ * voice LLM improvising (or inventing properties). Cached 60s; NEVER throws —
+ * guidance data must not fail a live call.
+ */
+async function getAvailableLocations(
+  orgId: string,
+  cfg: Awaited<ReturnType<typeof getAgentConfig>>
+): Promise<string[]> {
+  const table = cfg.inventory_table ?? '';
+  if (!table) return [];
+  const key = `${orgId}:${table}`;
+  const cached = locationsCache.get(key);
+  if (cached && Date.now() - cached.ts < LOCATIONS_TTL_MS) return cached.cities;
+
+  let cities: string[] = [];
+  try {
+    // Real estate: cities live on projects (units only carry config/price).
+    const isRealEstate = table === 'real_estate_units';
+    const from = isRealEstate ? 'real_estate_projects' : table;
+    // Generic tables: prefer the field mapped to city/location in search_fields.
+    const column = isRealEstate
+      ? 'city'
+      : (cfg.search_fields.find((sf) => ['city', 'preferred_city'].includes(sf.extract_key))?.field ??
+         cfg.search_fields.find((sf) => ['preferred_location', 'location'].includes(sf.extract_key))?.field ??
+         'city');
+
+    let q = supabaseAdmin()
+      .from(from)
+      .select(column)
+      .eq('org_id', orgId)
+      .not(column, 'is', null)
+      .limit(200);
+    if (isRealEstate) q = q.eq('status', 'active');
+
+    const { data } = (await withTimeout(
+      q as unknown as Promise<{ data: any[] | null; error: { message: string } | null }>,
+      8000,
+      'available-locations'
+    )) ?? { data: null, error: null };
+
+    cities = [
+      ...new Set((data ?? []).map((r: any) => String(r[column] ?? '').trim()).filter(Boolean)),
+    ].slice(0, 12);
+  } catch {
+    cities = []; // never fail the tool over optional guidance
+  }
+  locationsCache.set(key, { ts: Date.now(), cities });
+  return cities;
+}
+
 // ── Routes ──
 
 export async function sarvamToolsRoutes(app: FastifyInstance) {
@@ -341,6 +428,18 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
       }
       if (extracted.budget_min != null) filters.budget_min = extracted.budget_min;
       if (extracted.budget_max != null) filters.budget_max = extracted.budget_max;
+
+      // ── ZERO-RESULT GUIDANCE ──
+      // A bare count-0 made the voice LLM improvise (or invent properties) when
+      // callers asked for cities we don't serve (e.g. Pune with NCR-only stock).
+      // Tell the agent exactly what to say + where we DO have inventory.
+      if (matches.length === 0) {
+        const cities = await getAvailableLocations(orgId, cfg);
+        const where = extracted.city ?? extracted.preferred_location ?? null;
+        const out = zeroResultPayload(filters, where, cities);
+        logToolCall({ event: 'inventory-search.zero', ms: Date.now() - started, filters, available_locations: cities });
+        return out;
+      }
 
       const out: Record<string, any> = { ...shapeInventory(matches), filters };
       logToolCall({ event: 'inventory-search.200', ms: Date.now() - started, count: out.count, filters });

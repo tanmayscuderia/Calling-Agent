@@ -12,6 +12,7 @@ import {
   shapeMessages,
   shapeInventory,
   parseInventoryQuery,
+  zeroResultPayload,
 } from '../../src/routes/sarvamTools.routes';
 
 describe('authorized (tool auth)', () => {
@@ -153,5 +154,36 @@ describe('parseInventoryQuery', () => {
     expect(q.budget_max).toBe(60_000_000);
     // configuration has no explicit param → gap-filled from the query
     expect(q.configuration).toBe('3BHK');
+  });
+});
+
+describe('zeroResultPayload (empty-search guidance)', () => {
+  it('unknown city + known cities → note names the city, lists where we DO serve', () => {
+    const out = zeroResultPayload({ city: 'Pune' }, 'Pune', ['Noida', 'Gurgaon']);
+    expect(out.count).toBe(0);
+    expect(out.results).toEqual([]);
+    expect(out.available_locations).toEqual(['Noida', 'Gurgaon']);
+    expect(out.note).toContain('in Pune');
+    expect(out.note).toContain('Noida, Gurgaon');
+    expect(out.note).toContain('Do NOT invent');
+  });
+
+  it('no cities available → falls back to WhatsApp follow-up wording, empty array', () => {
+    const out = zeroResultPayload({ city: 'Pune' }, 'Pune', []);
+    expect(out.available_locations).toEqual([]);
+    expect(out.note).toContain('in Pune');
+    expect(out.note).toContain('WhatsApp');
+  });
+
+  it('no location filter → generic "those criteria" phrasing', () => {
+    const out = zeroResultPayload({}, null, ['Noida']);
+    expect(out.note).toContain('for those criteria');
+    expect(out.note).toContain('for that');
+  });
+
+  it('echoes applied filters back for transcript verification', () => {
+    const filters = { city: 'Pune', budget_max: 80_000_000 };
+    const out = zeroResultPayload(filters, 'Pune', []);
+    expect(out.filters).toBe(filters);
   });
 });
