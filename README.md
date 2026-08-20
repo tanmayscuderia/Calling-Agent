@@ -7,7 +7,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 1. **Multi-industry AI agents** — 12 industry templates (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
 2. **WhatsApp message monitoring** via WhatsApp Web bridge (Baileys)
 3. **Automatic AI replies** for lead qualification (async queue pipeline)
-4. **AI phone calls via Sarvam** — real outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks
+4. **AI phone calls via Sarvam** — real outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks. During live calls the agent calls back into our API tools for lead context and inventory search (`GET /api/tools/sarvam/*`)
 5. **Config-driven AI** — each org configures its own persona, fields, intents, reply templates
 6. **Inventory upload** (CSV) and structured search
 7. **CRM dashboard** for leads and conversations
@@ -15,7 +15,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-12. **296+ tests** — 205 unit tests + 91 LLM eval tests, all green
+12. **331 tests** — 240 unit tests + 91 LLM eval tests, all green
 13. Clean migration path to Meta Cloud API later
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
@@ -35,7 +35,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (296 tests: 205 unit + 91 LLM evals) |
+| **Testing** | Vitest (331 tests: 240 unit + 91 LLM evals) |
 
 ---
 
@@ -159,6 +159,7 @@ All details are in `docs/`:
 | **[DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md)** | Client demo walkthrough |
 | **[DEEPSEEK_GUIDE.md](./docs/DEEPSEEK_GUIDE.md)** | LLM integration, cost, error handling |
 | **[SARVAM_CALLING_PLAN.md](./docs/SARVAM_CALLING_PLAN.md)** | Sarvam voice-calling agent — architecture, endpoints, webhook flow, rollout status |
+| **[SARVAM_GO_LIVE_CHECKLIST.md](./docs/SARVAM_GO_LIVE_CHECKLIST.md)** | Step-by-step live-call verification checklist (dashboard config, tools, real-call tests) |
 
 ---
 
@@ -172,11 +173,11 @@ Calling Agent/
 │   │   ├── auth/         # Cookie-based auth middleware + rate limiter
 │   │   ├── crm/          # Lead, conversation, property services
 │   │   ├── queue/        # Postgres-backed job worker + stale recovery
-│   │   ├── sarvam/       # Sarvam API client + call-result processing service
+│   │   ├── sarvam/       # Sarvam API client, call-result service, query parser, inbound poller
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
-│   │   ├── routes/       # 13 route files (auth, whatsapp, leads, calls, sarvam webhook, agent, ai, etc.)
+│   │   ├── routes/       # 14 route files (auth, whatsapp, leads, calls, sarvam webhook + tools, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 205 unit tests + 91 LLM evals
+│   └── tests/            # 240 unit tests + 91 LLM evals
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups

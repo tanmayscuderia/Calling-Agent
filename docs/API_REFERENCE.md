@@ -590,6 +590,35 @@ Processing (in the queue worker):
 
 ---
 
+## Sarvam Live Tools (mid-call API tools)
+
+Two read-only HTTP endpoints the Sarvam agent calls DURING a live call via its Tools panel. **Never-5xx by design** — every failure path returns HTTP 200 with a graceful note so a tool error can't kill a live call. All requests logged to `logs/sarvam-tool-calls.log`.
+
+**Auth:** one of `X-Tool-Secret: <SARVAM_TOOL_SECRET>` (defaults to `SARVAM_WEBHOOK_SECRET`), `X-API-Key`, or `Authorization: Bearer` — → 401 otherwise. In the Sarvam dashboard set Auth Type = `API Key`, header `X-API-Key`.
+
+### GET /api/tools/sarvam/lead-context
+Called by the agent's on_start hook to personalize the greeting. `?phone=+91…` (E.164, `+` URL-encoded as `%2B`).
+
+**Response (known lead):** `{ "found": true, "lead": { name, phone, temperature, source, status }, "recentMessages": [last 3 WhatsApp messages], "note": "…" }`
+**Response (unknown/error):** `{ "found": false, "note": "No prior conversation — start fresh with the greeting." }`
+
+### GET /api/tools/sarvam/inventory-search
+Live inventory search mid-call. **Preferred: one agent-filled `query` param** with the caller's raw spoken demand (English or Hindi), e.g. `?query=gurgaon penthouse 8-10 crore` — parsed server-side by `backend/src/sarvam/queryParser.ts` into city/sector/configuration/budget filters (explicit `location`/`budget_min`/`budget_max`/`configuration` params still work and win over parsed values; multi-config like "3 or 4 BHK" runs one pass per configuration and merges).
+
+**Response:**
+```json
+{
+  "count": 2,
+  "filters": { "city": "gurgaon", "sectors": ["70"], "configuration": ["3BHK","4BHK"], "budget_min": 0, "budget_max": 100000000 },
+  "results": [ { "title": "Godrej …", "configuration": "3BHK", "price_display": "₹8.5 Cr", "location": "Sector 70, Gurgaon" } ],
+  "note": null
+}
+```
+
+`filters` echoes what was applied — use it to verify each match. `count: 0` + a `note` (e.g. "ask the caller for their budget") is the graceful no-results/error path.
+
+---
+
 ## Agent Configuration
 
 Manage per-org AI agent config — persona, qualifying fields, intents, inventory search, reply templates.

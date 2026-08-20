@@ -306,11 +306,11 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 | **Template-Driven Evals** | Tests config-driven extraction + reply across industries |
 | **Cross-Industry Evals** | Education industry e2e — validates multi-industry support |
 | **Golden Cases** | Curated test cases with expected outcomes |
-| **205 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter, job handler, Sarvam call results |
+| **240 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter, job handler, Sarvam call results, Sarvam tools + query parser |
 | **Rate-Limit Safe** | Evals run sequential (`fileParallelism: false`), 1 concurrent LLM call, 2s min-delay |
 
 ### Test Files
-- `backend/tests/unit/` — 205 tests (14 files)
+- `backend/tests/unit/` — 240 tests (16 files)
 - `backend/tests/evals/` — 91 eval tests (8 files)
 
 ---
@@ -378,6 +378,9 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 | **Result Webhook** | `/webhooks/sarvam/:secret` — unguessable-URL auth (403 on bad secret, 400 malformed, 200 otherwise to stop retries) |
 | **Webhook Audit Trail** | Every raw payload persisted to `sarvam_webhook_events` before processing — replayable + debuggable |
 | **Idempotent Processing** | `process_call_result` queue job correlates Sarvam `attempt_id` → `call_sessions.external_call_id`; terminal-state skip prevents double processing |
+| **Live Mid-Call Tools** | During real calls the Sarvam agent calls our API: `GET /api/tools/sarvam/lead-context?phone=` (lead + recent chat for personalized greeting) and `GET /api/tools/sarvam/inventory-search?query=` (free-text EN/Hindi search) |
+| **Query Parser** | `queryParser.ts` converts free-text queries (`3bhk sector 150 noida 2cr`) into structured city/sector/config/budget filters for inventory search |
+| **Never-5xx Tool Endpoints** | Tool routes auth via `X-Tool-Secret` header and always return 200 with `{ error }` payloads — a failing tool never breaks the live call |
 | **LLM Call Summaries** | DeepSeek `summarizeCall()` turns the raw transcript into summary + outcome + lead updates |
 | **Transcript Storage** | Conversation turns saved to `call_session_turns`; full transcript on `call_sessions.transcript` |
 | **Lead Enrichment** | Call results update lead temperature, preferences, and agent variables automatically |
@@ -389,6 +392,8 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 - `backend/src/sarvam/sarvamClient.ts` — Sarvam Instant Outbound API client
 - `backend/src/sarvam/callResultService.ts` — Webhook payload processing → transcript, summary, lead enrichment
 - `backend/src/routes/sarvamWebhook.routes.ts` — `/webhooks/sarvam/:secret` endpoint
+- `backend/src/routes/sarvamTools.routes.ts` — mid-call lead-context + inventory-search tools
+- `backend/src/sarvam/queryParser.ts` — free-text → structured filters (city/sector/config/budget)
 - `backend/src/routes/calls.routes.ts` — `start-real` endpoint with guards
 - `backend/src/queue/queueWorker.ts` + `jobHandler.ts` — `process_call_result` job processing
 - `supabase/migrations/20260108_0001_sarvam_calls.sql` + `20260109_0001_sarvam_fixes.sql` — schema + idempotent fixes

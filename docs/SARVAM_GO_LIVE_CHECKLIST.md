@@ -15,7 +15,8 @@ Everything below is DONE unless marked **[YOU]**.
 5. **Live-call HTTP tools** (`backend/src/routes/sarvamTools.routes.ts`) — same brain as WhatsApp for the phone agent:
    - `GET /api/tools/sarvam/lead-context?phone=+9198…` → known lead + last 3 messages (Sarvam on_start hook)
    - `GET /api/tools/sarvam/inventory-search?location=whitefield&budget_max=8000000&configuration=3BHK` → live inventory mid-call
-   - Auth: `X-Tool-Secret` header = `SARVAM_TOOL_SECRET` (defaults to webhook secret). tsc clean, 9/9 unit tests pass.
+   - **Preferred:** one agent-filled `query` param (`?query=gurgaon penthouse 8-10 crore`) → `backend/src/sarvam/queryParser.ts` extracts city/sector/configuration/budget (EN+Hindi); explicit structured params still work and win over parsed values; response echoes applied `filters`
+   - Auth: `X-Tool-Secret` header = `SARVAM_TOOL_SECRET` (defaults to webhook secret). tsc clean, full suite 240/240.
 
 ## 🔑 Your webhook URL to give Sarvam
 
@@ -61,6 +62,7 @@ Preview (real_estate template, "Priya" for StaffBadhao Testing) is in `docs/sarv
 6. **(Optional) Wire the live tools in Sarvam** — in the agent's Tools section add the two API tools above (full URLs = `$PUBLIC_BASE_URL/api/tools/sarvam/…`, header `X-Tool-Secret` = your webhook secret). Verify from your machine:
    ```bash
    curl -s "$PUBLIC_BASE_URL/api/tools/sarvam/lead-context?phone=%2B919000000000" -H "X-Tool-Secret: $SARVAM_WEBHOOK_SECRET"  # → {"found":false,...}
+   curl -s "$PUBLIC_BASE_URL/api/tools/sarvam/inventory-search?query=gurgaon%20penthouse%208-10%20crore" -H "X-Tool-Secret: $SARVAM_WEBHOOK_SECRET"  # → results + "filters" echo
    curl -s "$PUBLIC_BASE_URL/api/tools/sarvam/inventory-search?location=whitefield&budget_max=8000000" -H "X-Tool-Secret: $SARVAM_WEBHOOK_SECRET"
    curl -s -o /dev/null -w "%{http_code}\n" "$PUBLIC_BASE_URL/api/tools/sarvam/lead-context?phone=x" -H "X-Tool-Secret: nope"  # → 401
    ```
@@ -120,7 +122,7 @@ The Calls page shows an `↙ Inbound` badge and the caller's number as the title
 4. **API must never 5xx mid-call** — the platform treats tool errors harshly. Backend now hardened: every failure path returns HTTP 200 with `count:0` + a `note` telling the agent the graceful fallback line. Also 8s `withTimeout` guards so a hung Supabase call can't stall a live call.
 
 ### Backend hardening shipped (this session)
-- `inventory-search`: never-5xx (graceful count-0 + note), 8s timeouts, empty-criteria guard ("ask caller for criteria" note), `query` param support — tsc clean, 13/13 unit tests pass, verified live.
+- `inventory-search`: never-5xx (graceful count-0 + note), 8s timeouts, empty-criteria guard ("ask caller for criteria" note), full free-text `query` parsing via `queryParser.ts` (one pass per configuration, merged + deduped, explicit params win) — tsc clean, full suite 240/240, verified live.
 - `lead-context`: never-5xx (returns `found:false` + start-fresh note on any error), 8s timeout.
 - Prompt v4: `docs/sarvam-call-prompt.txt` (compulsory tool-call rule, all property types incl. penthouse/villa/plot, female Priya persona + greeting line).
 

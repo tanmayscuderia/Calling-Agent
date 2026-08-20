@@ -78,7 +78,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **205 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results (14 files)
+- **240 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser (16 files)
 - **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
 - **296 total tests, ALL GREEN**
 - **Eval harness** with rate-limit-safe sequential execution
@@ -100,6 +100,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Auto follow-ups** — `callback_requested` / `site_visit_requested` / `booking_requested` outcomes create follow-up tasks
 - **Safety guards** — calling hours window (IST), per-org daily cost caps, DNC list, API key presence
 - **Correlation + idempotency** — `call_sessions.external_call_id` ↔ Sarvam `attempt_id`; terminal-state skip prevents double processing
+- **Live mid-call tools** — during real calls the agent calls `GET /api/tools/sarvam/lead-context` + `GET /api/tools/sarvam/inventory-search` (free-text EN/Hindi queries via `queryParser.ts`; never-5xx endpoints) — verified on real calls (see `docs/SARVAM_GO_LIVE_CHECKLIST.md`)
 
 ### Phase E3: Generic Inventory System ✅
 - **`generic_inventory_items` table** — single unified inventory table for all non-real-estate industries
@@ -160,7 +161,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 
 ### Phase H: Advanced AI
 - [ ] Multi-turn conversation memory (sliding window + summary)
-- [ ] Function calling / tool use for live inventory queries
+- [x] Function calling / tool use for live inventory queries — **DONE for Sarvam calls** (`GET /api/tools/sarvam/lead-context`, `GET /api/tools/sarvam/inventory-search`); WhatsApp-side function calling still future work
 - [ ] Sentiment analysis on customer messages
 - [ ] A/B testing for prompt variants
 - [ ] Fine-tuned industry-specific models

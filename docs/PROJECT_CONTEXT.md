@@ -38,7 +38,7 @@
 | **LLM** | DeepSeek V4 (default, `deepseek-v4-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
-| **Testing** | Vitest — 205 unit tests + 91 LLM eval tests |
+| **Testing** | Vitest — 240 unit tests + 91 LLM eval tests |
 | **Package Manager** | npm (workspace root with `backend/` and `frontend/`) |
 
 ---
@@ -392,6 +392,8 @@ Temperature scoring:
 | **GET** | `/api/calls/:id` | Get call session + transcript |
 | **GET** | `/api/calls?orgId=` | List call sessions |
 | **POST** | `/webhooks/sarvam/:secret` | Sarvam result webhook (secret in path; idempotent; enqueues `process_call_result`) |
+| **GET** | `/api/tools/sarvam/lead-context?phone=` | Mid-call tool: lead + last 3 messages for greeting personalization (`X-Tool-Secret` auth; never-5xx) |
+| **GET** | `/api/tools/sarvam/inventory-search?query=` | Mid-call tool: free-text (EN/Hindi) inventory search via `queryParser` → city/sector/config/budget filters |
 | | | |
 | **POST** | `/api/ai/test-extraction` | Test extraction without WhatsApp |
 | **POST** | `/api/ai/test-reply` | Test full AI reply without WhatsApp |
@@ -529,7 +531,7 @@ cd frontend && npm run dev
 ```bash
 cd backend
 
-# Unit tests (no API key needed) — 205 tests
+# Unit tests (no API key needed) — 240 tests
 npx vitest run tests/unit/
 
 # LLM evals (requires DEEPSEEK_API_KEY) — 91 tests
@@ -589,13 +591,13 @@ Calling Agent/
 │   │   ├── crm/                 # Lead, conversation, property services
 │   │   ├── db/                  # Supabase client (service-role)
 │   │   ├── queue/               # Postgres job queue + worker + stale recovery
-│   │   ├── sarvam/              # Sarvam API client + call-result service
-│   │   ├── routes/              # 13 Fastify route files
+│   │   ├── sarvam/              # Sarvam API client, call-result service, query parser, inbound poller
+│   │   ├── routes/              # 14 Fastify route files (incl. sarvamWebhook + sarvamTools)
 │   │   ├── uploads/             # CSV import + Supabase Storage
 │   │   ├── utils/               # phone, money, logger, email, locationAliases
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
-│       ├── unit/                # 205 unit tests (14 files)
+│       ├── unit/                # 240 unit tests (16 files)
 │       └── evals/               # 91 LLM eval tests (8 files)
 ├── frontend/
 │   └── src/
@@ -653,4 +655,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: August 2026. Test count: 205 unit + 91 eval = 296 total. All passing. Sarvam real calling live (S1–S6 complete — see `docs/SARVAM_CALLING_PLAN.md`).*
+*Last updated: August 2026. Test count: 240 unit + 91 eval = 331 total. All passing. Sarvam real calling live (S1-S6 complete - see docs/SARVAM_CALLING_PLAN.md); live mid-call tools verified on real calls (docs/SARVAM_GO_LIVE_CHECKLIST.md).*

@@ -352,4 +352,5 @@ Check the dashboard:
 | `SARVAM_ORG_ID` / `SARVAM_WORKSPACE_ID` / `SARVAM_APP_ID` / `SARVAM_CONNECTION_ID` | If calling | — | Sarvam app credentials from https://apps.sarvam.ai |
 | `SARVAM_AGENT_PHONE_NUMBER` | If calling | — | Caller ID shown to leads |
 | `SARVAM_WEBHOOK_SECRET` | If calling | — | Secret in webhook URL `/webhooks/sarvam/<secret>` |
+| `SARVAM_TOOL_SECRET` | No | = `SARVAM_WEBHOOK_SECRET` | Shared secret for mid-call tools (`/api/tools/sarvam/*`) — sent as `X-Tool-Secret` / `X-API-Key` / `Authorization: Bearer` |
 | `SARVAM_CALLING_HOURS_START` / `SARVAM_CALLING_HOURS_END` | No | `9` / `21` | IST calling window guard |

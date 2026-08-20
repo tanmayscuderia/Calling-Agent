@@ -1,6 +1,6 @@
 # Sarvam Voice Calling Agent — Master Integration Plan
 
-> **Status:** PLANNED (not started)
+> **Status:** SHIPPED & LIVE — Phases S0–S6 implemented (see Progress Log); live agent "Priya" calling with mid-call tools (`inventory-search`, `lead-context`) + free-text query parsing
 > **Created:** 2026-08-16
 > **Source docs:** `sarvam-voice-agents-md/` (101 pages)
 > **Related:** `docs/ARCHITECTURE.md` §6 · `docs/ROADMAP.md` Phase F · Fish Audio approach was evaluated and dropped in favour of Sarvam
@@ -214,5 +214,6 @@ S1 → S2 → S3 (test with own phone) → S4 (biggest) → S5 → S6. ~3–4 fo
 | Date | Phase | Note |
 |---|---|---|
 | 2026-08-16 | — | Plan created from repo + Sarvam docs analysis |
+| 2026-08-20 | Live tools | Free-text `query` parser shipped: Sarvam only sends the caller's demand as one agent-filled `query` param, but the tool read only structured params → zero filters → unfiltered top-3 every call. New `backend/src/sarvam/queryParser.ts` (pure regex, EN+Hindi) extracts city/sector/configuration/budget; explicit dashboard params still win; multi-config ("3 or 4 bhk") runs one pass each; response echoes `filters`. 24 new tests, suite 240/240, tsc clean (commit `efbd879`) |
 
 > **Update (S1b — schema alignment):** Live-DB audit found the pre-Sarvam `job_queue.job_type` and `call_sessions.status/provider` CHECKs lacked the values the webhook flow writes, and `callResultService` used `duration_seconds` instead of `duration_sec`. Fixed via migration `20260109_0001_sarvam_fixes.sql` (idempotent, also re-asserts 20260108) + code fix. Run migration 14 in Supabase before first real call.
