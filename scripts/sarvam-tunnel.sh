@@ -1,54 +1,121 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Sarvam tunnel — named Cloudflare tunnel (STABLE URL, no quick-tunnel throttle)
+# Sarvam tunnel — stable public URL for the backend (webhooks + live-call tools)
 #
 # WHY: the free `cloudflared tunnel --url` quick tunnel (trycloudflare.com) is
 # test-only and Cloudflare rate-limits its edge. Symptom: live calls where the
 # first 2-3 tool requests work, then tools "break" — while backend logs show
 # every request that ARRIVED returned 200 (the throttled ones never reach us).
-# A named tunnel (free Cloudflare account + a domain on it) gets a permanent
-# hostname and production-grade edge treatment.
+#
+# DEFAULT PROVIDER: ngrok FREE static domain (no domain purchase, no card).
+#   Static URL forever, ~1 req/sec sustained limit (our peak: 5 req/min).
+#   Non-browser traffic (Sarvam webhooks / python-httpx, curl) never sees the
+#   ngrok browser-warning page.
 #
 # Usage:
-#   ./scripts/sarvam-tunnel.sh setup    # one-time: login, create tunnel, config
-#   ./scripts/sarvam-tunnel.sh start    # run tunnel in background
+#   ./scripts/sarvam-tunnel.sh start    # ngrok on the static domain (default)
+#   ./scripts/sarvam-tunnel.sh stop     # stop ngrok
 #   ./scripts/sarvam-tunnel.sh url      # print the stable public URL
-#   ./scripts/sarvam-tunnel.sh stop     # stop a running tunnel
 #   ./scripts/sarvam-tunnel.sh status   # is it running?
 #
-# After `setup` + `start`, put the printed URL into:
-#   1. .env  → PUBLIC_BASE_URL=https://<your-subdomain>.<your-domain>  (+ restart backend)
+#   ./scripts/sarvam-tunnel.sh cf-setup # LATER: named Cloudflare tunnel on
+#   ./scripts/sarvam-tunnel.sh cf-start #   your own domain (zero rate limits)
+#   (cf-url / cf-stop / cf-status also exist)
+#
+# After `start`, the URL goes into:
+#   1. .env  → PUBLIC_BASE_URL=https://<static-domain>  (+ restart backend)
 #   2. Sarvam dashboard → agent webhook URL + both tool URLs
-# The URL NEVER changes across restarts — no more re-pasting after every tunnel
-# restart (the quick-tunnel dance documented in SARVAM_GO_LIVE_CHECKLIST.md).
+# The URL NEVER changes across restarts.
+#
+# One-time ngrok setup (already done 2026-08-21):
+#   ngrok config add-authtoken <token-from-dashboard>
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+# ── ngrok (default) ─────────────────────────────────────────────────────────
+NGROK_DOMAIN="${SARVAM_NGROK_DOMAIN:-pumice-craving-outweigh.ngrok-free.dev}"
+LOCAL_PORT="${SARVAM_TUNNEL_PORT:-4000}"
+NGROK_PID_FILE="/tmp/sarvam-ngrok.pid"
+NGROK_LOG_FILE="/tmp/sarvam-ngrok.log"
+NGROK_API="http://127.0.0.1:4040"   # ngrok's local inspection API
+
+# ── cloudflared (optional, own domain later) ────────────────────────────────
 TUNNEL_NAME="calling-agent"
 CF_DIR="$HOME/.cloudflared"
 CONFIG_FILE="$CF_DIR/config.yml"
 PID_FILE="/tmp/sarvam-tunnel.pid"
 LOG_FILE="/tmp/cloudflared-named.log"
-LOCAL_PORT="4000"
-
-# Prefer a subdomain the user can override: SARVAM_TUNNEL_SUBDOMAIN=name ./scripts/…
 SUBDOMAIN="${SARVAM_TUNNEL_SUBDOMAIN:-}"
 
-command -v cloudflared >/dev/null 2>&1 || {
-  echo "❌ cloudflared not found. Install: brew install cloudflared"
-  exit 1
+PUBLIC_URL="https://$NGROK_DOMAIN"
+
+print_usage_hints() {
+  echo "  webhook: $PUBLIC_URL/webhooks/sarvam/\$SARVAM_WEBHOOK_SECRET"
+  echo "  tools:   $PUBLIC_URL/api/tools/sarvam/{lead-context,inventory-search}"
 }
 
-get_creds() {
-  # cert.pem is created by `tunnel login` — required to create/manage tunnels
-  if [[ ! -f "$CF_DIR/cert.pem" ]]; then
-    echo "❌ No Cloudflare credentials at $CF_DIR/cert.pem"
-    echo "   Run: ./scripts/sarvam-tunnel.sh setup"
+cmd_start() {
+  command -v ngrok >/dev/null 2>&1 || {
+    echo "❌ ngrok not found. Install: brew install ngrok"
+    exit 1
+  }
+  if curl -s -o /dev/null --max-time 2 "$NGROK_API/api/tunnels"; then
+    echo "✅ ngrok already running"
+    cmd_url
+    exit 0
+  fi
+  echo "🚀 Starting ngrok → localhost:$LOCAL_PORT on static domain $NGROK_DOMAIN (log: $NGROK_LOG_FILE)"
+  nohup ngrok http --url="$NGROK_DOMAIN" "$LOCAL_PORT" --log=stdout > "$NGROK_LOG_FILE" 2>&1 &
+  echo $! > "$NGROK_PID_FILE"
+  # wait for the local API to come up (tunnel established)
+  for _ in $(seq 1 15); do
+    curl -s -o /dev/null --max-time 2 "$NGROK_API/api/tunnels" && break
+    sleep 1
+  done
+  if curl -s -o /dev/null --max-time 2 "$NGROK_API/api/tunnels"; then
+    echo "✅ Running (pid $(cat "$NGROK_PID_FILE"))"
+    cmd_url
+  else
+    echo "❌ Tunnel did not come up — check $NGROK_LOG_FILE"
     exit 1
   fi
 }
 
-cmd_setup() {
+cmd_url() {
+  echo "$PUBLIC_URL"
+  print_usage_hints
+}
+
+cmd_stop() {
+  if [[ -f "$NGROK_PID_FILE" ]] && kill "$(cat "$NGROK_PID_FILE")" 2>/dev/null; then
+    rm -f "$NGROK_PID_FILE"
+    echo "🛑 ngrok stopped."
+  else
+    rm -f "$NGROK_PID_FILE"
+    pkill -f "ngrok http --url=$NGROK_DOMAIN" 2>/dev/null || true
+    echo "Not running."
+  fi
+}
+
+cmd_status() {
+  if curl -s -o /dev/null --max-time 2 "$NGROK_API/api/tunnels"; then
+    echo "running — $PUBLIC_URL"
+    return 0
+  fi
+  echo "not running"
+  return 1
+}
+
+# ── cloudflared named-tunnel commands (own domain, later) ───────────────────
+get_creds() {
+  if [[ ! -f "$CF_DIR/cert.pem" ]]; then
+    echo "❌ No Cloudflare credentials at $CF_DIR/cert.pem"
+    echo "   Run: ./scripts/sarvam-tunnel.sh cf-setup"
+    exit 1
+  fi
+}
+
+cf_setup() {
   echo "👉 Step 1/3: Cloudflare login (opens browser — pick the domain you want the tunnel on)"
   cloudflared tunnel login
 
@@ -62,9 +129,7 @@ cmd_setup() {
   [[ -n "$TUNNEL_ID" ]] || { echo "❌ Could not create/find tunnel"; exit 1; }
   echo "   Tunnel ID: $TUNNEL_ID"
 
-  # Stable public hostname: <subdomain>.<domain> — subdomain defaults to tunnel name
   echo "👉 Step 3/3: Writing $CONFIG_FILE"
-  echo "   (edit SUBDOMAIN there if you want a different hostname prefix)"
   mkdir -p "$CF_DIR"
   cat > "$CONFIG_FILE" <<EOF
 tunnel: $TUNNEL_ID
@@ -77,15 +142,14 @@ EOF
   echo ""
   echo "✅ Almost done — 2 manual steps:"
   echo "   1. Edit $CONFIG_FILE → replace YOUR_DOMAIN_HERE with your Cloudflare domain"
-  echo "      (keep the prefix, e.g. ${SUBDOMAIN:-$TUNNEL_NAME}.example.com)"
   echo "   2. Add the DNS route (one-time):"
   echo "         cloudflared tunnel route dns $TUNNEL_NAME ${SUBDOMAIN:-$TUNNEL_NAME}.YOUR_DOMAIN_HERE"
-  echo "   Then: ./scripts/sarvam-tunnel.sh start && ./scripts/sarvam-tunnel.sh url"
+  echo "   Then: ./scripts/sarvam-tunnel.sh cf-start && ./scripts/sarvam-tunnel.sh cf-url"
 }
 
-cmd_start() {
+cf_start() {
   get_creds
-  if cmd_status >/dev/null 2>&1; then
+  if cf_status >/dev/null 2>&1; then
     echo "✅ Tunnel already running (pid $(cat "$PID_FILE"))"
     exit 0
   fi
@@ -95,14 +159,14 @@ cmd_start() {
   sleep 3
   if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
     echo "✅ Running (pid $(cat "$PID_FILE")). Public URL:"
-    cmd_url
+    cf_url
   else
     echo "❌ Died immediately — check $LOG_FILE"
     exit 1
   fi
 }
 
-cmd_url() {
+cf_url() {
   TUNNEL_ID="$(cloudflared tunnel list -o json 2>/dev/null \
     | /usr/bin/python3 -c "import json,sys; ls=json.load(sys.stdin); print(next((t['id'] for t in ls if t['name']=='$TUNNEL_NAME'), ''))" \
     || true)"
@@ -112,12 +176,12 @@ cmd_url() {
     echo "  → webhook: https://$HOST_LINE/webhooks/sarvam/\$SARVAM_WEBHOOK_SECRET"
     echo "  → tools:   https://$HOST_LINE/api/tools/sarvam/{lead-context,inventory-search}"
   else
-    echo "⚠️  Hostname not configured yet — run ./scripts/sarvam-tunnel.sh setup" >&2
+    echo "⚠️  Hostname not configured yet — run ./scripts/sarvam-tunnel.sh cf-setup" >&2
     exit 1
   fi
 }
 
-cmd_stop() {
+cf_stop() {
   if [[ -f "$PID_FILE" ]] && kill "$(cat "$PID_FILE")" 2>/dev/null; then
     rm -f "$PID_FILE"
     echo "🛑 Stopped."
@@ -127,15 +191,19 @@ cmd_stop() {
   fi
 }
 
-cmd_status() {
+cf_status() {
   [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
 
 case "${1:-}" in
-  setup)  cmd_setup ;;
-  start)  cmd_start ;;
-  url)    cmd_url ;;
-  stop)   cmd_stop ;;
-  status) cmd_status && echo "running (pid $(cat "$PID_FILE"))" || echo "not running" ;;
-  *)      grep '^#' "$0" | sed 's/^# \{0,1\}//;1d' | head -25; exit 1 ;;
+  start)    cmd_start ;;
+  stop)     cmd_stop ;;
+  url)      cmd_url ;;
+  status)   cmd_status ;;
+  cf-setup)  cf_setup ;;
+  cf-start)  cf_start ;;
+  cf-url)    cf_url ;;
+  cf-stop)   cf_stop ;;
+  cf-status) cf_status && echo "running (pid $(cat "$PID_FILE"))" || echo "not running" ;;
+  *)        grep '^#' "$0" | sed 's/^# \{0,1\}//;1d' | head -30; exit 1 ;;
 esac

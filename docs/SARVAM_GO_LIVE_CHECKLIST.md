@@ -9,8 +9,9 @@ Everything below is DONE unless marked **[YOU]**.
    - `PUBLIC_BASE_URL` = live tunnel (currently `https://grocery-lie-certain-inches.trycloudflare.com` — see webhook section below)
    - Org/workspace/app/connection IDs left as `FILL_FROM_DASHBOARD`
 2. **Backend running** on :4000 — health OK, webhook auth verified (403 wrong secret, 400 bad payload) locally AND through the public tunnel.
-3. **Public tunnel live** — `cloudflared` quick tunnel (no account needed; ngrok would need an authtoken). Log: `/tmp/cloudflared.log`.
-   ⚠️ Quick-tunnel URL changes on restart — if it does, update `PUBLIC_BASE_URL` in `.env` and restart the backend.
+3. **Public tunnel live** — **ngrok FREE static domain** (2026-08-21): `https://pumice-craving-outweigh.ngrok-free.dev` → localhost:4000.
+   ✅ URL is PERMANENT — never changes across restarts. Manage with `./scripts/sarvam-tunnel.sh start|stop|status|url` (authtoken already configured). No quick-tunnel rate limiting; our peak (5 req/min) is ~12× under ngrok free's sustained limit.
+   (Old cloudflared quick tunnel killed — it was the cause of the 429-after-3-tool-calls issue.)
 4. **New endpoint** `GET /api/agent/config/call-prompt` — returns the exact phone persona (same as WhatsApp persona) to paste into the Sarvam dashboard. Verified working.
 5. **Live-call HTTP tools** (`backend/src/routes/sarvamTools.routes.ts`) — same brain as WhatsApp for the phone agent:
    - `GET /api/tools/sarvam/lead-context?phone=+9198…` → known lead + last 3 messages (Sarvam on_start hook)
@@ -18,14 +19,14 @@ Everything below is DONE unless marked **[YOU]**.
    - **Preferred:** one agent-filled `query` param (`?query=gurgaon penthouse 8-10 crore`) → `backend/src/sarvam/queryParser.ts` extracts city/sector/configuration/budget (EN+Hindi); explicit structured params still work and win over parsed values; response echoes applied `filters`
    - Auth: `X-Tool-Secret` header = `SARVAM_TOOL_SECRET` (defaults to webhook secret). tsc clean, full suite 240/240.
 
-## 🔑 Your webhook URL to give Sarvam
+## 🔑 Your webhook URL to give Sarvam (PERMANENT — ngrok static domain)
 
 ```
-https://grocery-lie-certain-inches.trycloudflare.com/webhooks/sarvam/4561d9e5e599d7cf1c22970d9d593cb19a51a0f0dd0fd6c53cf114c883860887
+https://pumice-craving-outweigh.ngrok-free.dev/webhooks/sarvam/4561d9e5e599d7cf1c22970d9d593cb19a51a0f0dd0fd6c53cf114c883860887
 ```
 
-> ⚠️ Tunnel restarted 2026-08-20 16:36 — this is the CURRENT URL. Old one is dead.
-> If you restart cloudflared again, re-copy from `PUBLIC_BASE_URL` in `.env` + `/webhooks/sarvam/$SARVAM_WEBHOOK_SECRET`.
+> ✅ 2026-08-21: switched from trycloudflare quick tunnel → ngrok static domain. This URL never changes.
+> `PUBLIC_BASE_URL` in `.env` already updated + backend restarted. Verified through the domain: health 200, webhook auth (400 on bad payload = route OK), tool 200 with secret, 401 without.
 
 (Auth = the secret in the path. Sarvam doesn't sign payloads, so this is the auth layer.)
 
@@ -132,7 +133,8 @@ The Calls page shows an `↙ Inbound` badge and the caller's number as the title
 - [ ] Greeting → Priya line; Voice → female Hindi
 - [ ] Advanced: "If it fails" fallback text + Max wait 10s
 - [ ] Commit agent → repoint inbound deployment → test call (ask Gurgaon penthouse 8-10cr) → verify `logs/sarvam-tool-calls.log` shows real params in URL
-- [ ] **Kill the quick tunnel** — `./scripts/sarvam-tunnel.sh setup` (one-time: Cloudflare login + create tunnel + pick your domain), then `start`. Update `PUBLIC_BASE_URL` in `.env`, the Sarvam webhook URL, and both tool URLs to the stable hostname. After this the URL never changes again and the 429-after-3-calls issue is gone for good.
+- [x] ~~Kill the quick tunnel~~ **DONE 2026-08-21** — replaced with ngrok free static domain (`pumice-craving-outweigh.ngrok-free.dev`). `.env` + backend updated. Remaining: repoint the Sarvam dashboard URLs (webhook + 2 tools) to the new domain — one-time, never changes again.
+- [ ] **[YOU] Repoint Sarvam dashboard now**: webhook URL + both tool URLs → `https://pumice-craving-outweigh.ngrok-free.dev/...` (same paths as before, just the new host)
 
 ### Tunnel diagnosis (2026-08-20 late session)
-Tool calls "broke" after the first 2-3 per call. The backend log proved innocence: 72 events, **zero errors, zero non-200s** — every request that reached Fastify was served in 3-527ms (peak 5 requests/min). The failing requests never arrived → they died at the Cloudflare quick-tunnel edge, which rate-limits ephemeral `trycloudflare.com` tunnels. Shipped: `scripts/sarvam-tunnel.sh` (named tunnel = permanent fix) + 60s response cache on `inventory-search` (identical repeat searches served from memory, logged as `inventory-search.cache-hit`).
+Tool calls "broke" after the first 2-3 per call. The backend log proved innocence: 72 events, **zero errors, zero non-200s** — every request that reached Fastify was served in 3-527ms (peak 5 requests/min). The failing requests never arrived → they died at the Cloudflare quick-tunnel edge, which rate-limits ephemeral `trycloudflare.com` tunnels. Shipped: `scripts/sarvam-tunnel.sh` (ngrok static domain = permanent fix, in use) + 60s response cache on `inventory-search` (identical repeat searches served from memory, logged as `inventory-search.cache-hit`). Later, when a real domain is wanted: `cf-setup` commands in the same script (free Cloudflare named tunnel, zero limits).
