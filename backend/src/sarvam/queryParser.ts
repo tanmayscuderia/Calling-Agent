@@ -51,6 +51,20 @@ const HINDI_CITIES: Record<string, string> = {
   'पुणे': 'Pune',
 };
 
+// ASR variants of गुड़गांव (anusvara/nukta often dropped or shifted):
+// गुड़गाव / गुडगाव / गुरगांव / गुरूग्राम — all still mean Gurugram.
+Object.assign(HINDI_CITIES, {
+  'गुड़गाव': 'Gurugram',
+  'गुडगाव': 'Gurugram',
+  'गुरगांव': 'Gurugram',
+  'गुरूग्राम': 'Gurugram',
+});
+
+// Filler words Sarvam's ASR produces ("haa", "haan", "ji", "हां", "जी")
+// that previously leaked into locationRaw and were searched as locations.
+const ASR_JUNK =
+  /\b(haan?|hmm+|achchha|achha|theek|thik|ji|yes|yeah|no|okay|ok|please|boliye|bataiye)\b|हां|हाँ|हूं|हूँ|जी|अच्छा|ठीक|हैं/g;
+
 const TYPE_WORDS: Array<[RegExp, string]> = [
   [/\bpenthouses?\b|पेंटहाउस/i, 'Penthouse'],
   [/\bvillas?\b|विला/i, 'Villa'],
@@ -156,6 +170,7 @@ export function parseFreeTextQuery(raw: string): ParsedQuery {
     rest = rest.replace(/sector|crore|crores|lakhs?|lac|cr\b|l\b/gi, ' ');
     for (const [re] of TYPE_WORDS) rest = rest.replace(re, ' ');
     rest = rest.replace(NOISE, ' ');
+    rest = rest.replace(ASR_JUNK, ' ');
     const words = rest
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)

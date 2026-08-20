@@ -155,6 +155,40 @@ function normalize(s: string): string {
 }
 
 /**
+ * Expand a location string into ALL equivalent forms: the raw input, the
+ * canonical name it resolves to, and every built-in alias sharing that
+ * canonical. Used by property search so "Gurugram" (user/ASR side) matches
+ * DB rows stored as "Gurgaon" — regardless of which side uses which form.
+ *
+ * @example expandLocationForms('Gurugram') → ['gurugram', 'gurgaon', 'gurgoan']
+ * @example expandLocationForms('Gurgaon')  → ['gurgaon', 'gurugram', 'gurgoan']
+ */
+export function expandLocationForms(
+  input: string | null | undefined,
+  resolvedCanonical?: string | null
+): string[] {
+  if (!input || !input.trim()) return [];
+  const forms = new Set<string>();
+
+  const addWithAliases = (normalized: string) => {
+    if (!normalized) return;
+    forms.add(normalized);
+    const entry = builtInDict.get(normalized);
+    if (entry) {
+      forms.add(normalize(entry.canonical));
+      for (const [alias, e] of builtInDict) {
+        if (e.canonical === entry.canonical) forms.add(alias);
+      }
+    }
+  };
+
+  addWithAliases(normalize(input));
+  if (resolvedCanonical) addWithAliases(normalize(resolvedCanonical));
+
+  return [...forms].filter(Boolean);
+}
+
+/**
  * Resolve a location string to its canonical form.
  * Checks built-in dictionary first, then DB aliases for the org.
  *

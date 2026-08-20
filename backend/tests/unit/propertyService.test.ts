@@ -19,9 +19,32 @@ let mockProjects: any[] = [];
 // Individual tests can override to simulate alias behavior.
 let mockResolvedLocations: { city?: string | null; sector?: string | null; location?: string | null } = {};
 
-vi.mock('../../src/utils/locationAliases', () => ({
-  resolveLocations: vi.fn(async () => mockResolvedLocations),
-}));
+vi.mock('../../src/utils/locationAliases', () => {
+  // Simplified mirror of the production built-in alias groups (only the
+  // ones these tests exercise). expandLocationForms(raw, resolved) must
+  // return every equivalent form so either spelling matches the DB.
+  const norm = (s: string) => s.toLowerCase().trim();
+  const GROUPS: string[][] = [
+    ['gurgaon', 'gurugram', 'gurgoan'],
+    ['delhi', 'new delhi'],
+  ];
+  const expandLocationForms = (input?: string | null, resolved?: string | null): string[] => {
+    const forms = new Set<string>();
+    const add = (v?: string | null) => {
+      if (!v || !v.trim()) return;
+      const n = norm(v);
+      forms.add(n);
+      for (const g of GROUPS) if (g.includes(n)) g.forEach((x) => forms.add(x));
+    };
+    add(input);
+    add(resolved);
+    return [...forms].filter(Boolean);
+  };
+  return {
+    resolveLocations: vi.fn(async () => mockResolvedLocations),
+    expandLocationForms,
+  };
+});
 
 // ── Mock Supabase ──
 // Supports `.in()` filtering for status column (used by searchProperties)
@@ -621,6 +644,85 @@ describe('searchProperties', () => {
       expect(reason.toLowerCase()).toContain('3bhk');
       expect(reason.toLowerCase()).toContain('sector 150');
       expect(reason.toLowerCase()).toContain('within budget');
+    });
+  });
+
+  // ── Regression: live Gurgaon penthouse call failed on 2026-08-20 ──
+  // Caller: "penthouse in Gurgaon 8-10 crore". DB: project named
+  // "Penthouse...", unit config 4BHK, price 6-7 Cr, city stored "Gurgaon".
+  // Old scoring: config -0.1 + budget -0.35 + city +0.1 + base 0.35 = 0.0 -> filtered.
+  describe('regression: voice-agent penthouse search (2026-08-20)', () => {
+    it('returns a cheaper property as an under-budget option', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Penthouse, Teechzone 3',
+          city: 'Gurgaon',
+          sector: 'Sector 14',
+          units: [
+            makeUnit({
+              title: 'Penthouse 4BHK',
+              configuration: '4BHK',
+              priceMin: 60_000_000,
+              priceMax: 70_000_000,
+            }),
+          ],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Gurgaon',
+        configuration: 'Penthouse',
+        budgetMin: 80_000_000,
+        budgetMax: 100_000_000,
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].priceMin).toBe(60_000_000);
+      expect(results[0].reason).toContain('under budget');
+    });
+
+    it('matches city when ASR resolved form (Gurugram) differs from DB (Gurgaon)', async () => {
+      // Hindi "gudgaon" -> resolved "Gurugram", but DB stores "Gurgaon".
+      mockResolvedLocations = { city: 'Gurugram', sector: null, location: null };
+      mockProjects = [
+        makeProject({ name: 'Gurgaon Towers', city: 'Gurgaon', sector: 'Sector 56' }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Gurugram',
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].projectName).toBe('Gurgaon Towers');
+    });
+
+    it('matches configuration against project NAME when unit config is BHK', async () => {
+      // Ask "Penthouse" but the unit's configuration column is "4BHK" and
+      // only the project name says Penthouse -> still a config match.
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Penthouse Collection',
+          city: 'Mumbai',
+          sector: 'Worli',
+          units: [makeUnit({ configuration: '4BHK', priceMin: 40_000_000, priceMax: 55_000_000 })],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Mumbai',
+        configuration: 'Penthouse',
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThan(0.5); // config bonus applied
     });
   });
 });

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
-import { resolveLocations } from '../utils/locationAliases';
+import { resolveLocations, expandLocationForms } from '../utils/locationAliases';
 
 // ── In-memory cache for property search (60s TTL) ──
 // Avoids hitting DB on every AI reply for the same search params.
@@ -179,9 +179,17 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     // Otherwise pick the first available unit (or null if no units).
     const availableUnits = (p.units ?? []).filter((u) => u.availability_status === 'available');
 
+    // "Penthouse"/"Villa" asks arrive as `configuration` from the voice
+    // parser, but the type often lives in the unit TITLE or project NAME
+    // while unit.configuration is "4BHK". Match any of the three.
+    const configMatches = (u: UnitRow) =>
+      (u.configuration != null && norm(u.configuration).includes(norm(configuration))) ||
+      (u.title != null && norm(u.title).includes(norm(configuration))) ||
+      norm(p.name).includes(norm(configuration));
+
     let bestUnit: UnitRow | null = null;
     if (configuration && availableUnits.length > 0) {
-      bestUnit = availableUnits.find((u) => u.configuration && norm(u.configuration).includes(norm(configuration))) ?? availableUnits[0]!;
+      bestUnit = availableUnits.find((u) => configMatches(u)) ?? availableUnits[0]!;
     } else if (availableUnits.length > 0) {
       bestUnit = availableUnits[0]!;
     }
@@ -190,11 +198,18 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     let score = 0.35; // base score for being an active project
     const reasons: string[] = [];
 
-    // Configuration scoring (from unit if available)
-    if (configuration && bestUnit?.configuration) {
-      if (norm(bestUnit.configuration).includes(norm(configuration))) {
+    // Configuration scoring — unit config, unit title, OR project name
+    // (a "Penthouse" ask must match a 4BHK unit in a project named "Penthouse")
+    if (configuration) {
+      const nameOrTitleHit =
+        (bestUnit?.title != null && norm(bestUnit.title).includes(norm(configuration))) ||
+        norm(p.name).includes(norm(configuration));
+      if (bestUnit?.configuration && norm(bestUnit.configuration).includes(norm(configuration))) {
         score += 0.2;
         reasons.push(bestUnit.configuration);
+      } else if (nameOrTitleHit) {
+        score += 0.2;
+        reasons.push(configuration);
       } else {
         score -= 0.1;
       }
@@ -213,17 +228,24 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
         if (budgetMax != null && uMax <= budgetMax && uMin >= (budgetMin ?? 0)) {
           score += 0.05;
         }
+      } else if (uMax < bMin) {
+        // Entirely BELOW the budget floor — a cheaper option is a valid
+        // candidate ("we have a 6–7 Cr penthouse within your 8–10 Cr range"),
+        // not a mismatch. Only ABOVE the ceiling stays penalized.
+        score += 0.15;
+        reasons.push('under budget — great value');
       } else {
         score -= 0.35;
       }
     }
 
     // ── BIDIRECTIONAL LOCATION MATCHING ──
-    // Check both raw and resolved forms against DB values.
-    // Fixes: "Delhi" resolved to "New Delhi" but stored as "Delhi" → was missed.
-    const cityVals = [cityRaw, cityResolved].filter(Boolean).map(norm);
-    const sectorVals = [sectorRaw, sectorResolved].filter(Boolean).map(norm);
-    const locVals = [locRaw, locResolved].filter(Boolean).map(norm);
+    // Expand each input to ALL its alias forms (gurgaon/gurugram/gurgoan…)
+    // so the user's spelling matches the DB's spelling, whichever side uses
+    // which form. Fixes: caller says गुड़गांव → "Gurugram", DB stores "Gurgaon".
+    const cityVals = [...new Set(expandLocationForms(cityRaw, cityResolved))];
+    const sectorVals = [...new Set(expandLocationForms(sectorRaw, sectorResolved))];
+    const locVals = [...new Set(expandLocationForms(locRaw, locResolved))];
 
     const pCity = norm(p.city);
     const pSector = norm(p.sector);
@@ -280,8 +302,12 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     if (bestUnit?.configuration) reasonParts.push(bestUnit.configuration);
     const locStr = [p.sector, p.city].filter(Boolean).join(', ');
     if (locStr) reasonParts.push(`in ${locStr}`);
-    if (budgetMax != null && uMin != null && uMax != null) {
-      if (uMin <= budgetMax && uMax >= (budgetMin ?? 0)) reasonParts.push('within budget');
+    if ((budgetMin != null || budgetMax != null) && uMin != null && uMax != null) {
+      if (uMin <= (budgetMax ?? Number.MAX_SAFE_INTEGER) && uMax >= (budgetMin ?? 0)) {
+        reasonParts.push('within budget');
+      } else if (uMax < (budgetMin ?? 0)) {
+        reasonParts.push('under budget');
+      }
     }
     if (bestUnit?.possession_status) reasonParts.push(bestUnit.possession_status.replace(/_/g, ' '));
 

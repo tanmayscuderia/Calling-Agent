@@ -49,4 +49,21 @@ describe('parseFreeTextQuery', () => {
     expect(p.city).toBeUndefined();
     expect(p.budgetMax).toBeUndefined();
   });
+
+  // ── Regression: live-call failures on 2026-08-20 ──
+
+  it('recognizes ASR variants of Gurugram (dropped anusvara) as Gurugram', () => {
+    expect(parseFreeTextQuery('गुड़गाव में कुछ है').city).toBe('Gurugram');
+    expect(parseFreeTextQuery('गुरगांव में 3 bhk').city).toBe('Gurugram');
+    expect(parseFreeTextQuery('गुरूग्राम प्रॉपर्टी').city).toBe('Gurugram');
+  });
+
+  it('strips ASR filler words so they never become the location', () => {
+    // Live log showed {"filters":{"location":"haa"}} — "haa" was searched
+    // as a location. Filler must be stripped entirely.
+    const p = parseFreeTextQuery('haa ji property chahiye');
+    expect(p.locationRaw).toBeUndefined();
+    const p2 = parseFreeTextQuery('haan whitefield me dikhao');
+    expect(p2.locationRaw).toBe('whitefield');
+  });
 });
