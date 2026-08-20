@@ -1,14 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import { supabaseAdmin } from '../db/supabase';
-import { config } from '../config';
-import { getLead, updateLead, createFollowup } from '../crm/leadService';
-import { generateAgentReply, summarizeCall, openingLine, CallTurn } from '../ai/callAgent';
+import { getOrgIdFromRequest } from '../auth/authMiddleware';
+import { getLead } from '../crm/leadService';
+import { generateAgentReply, openingLine, CallTurn } from '../ai/callAgent';
 import { createOutboundCall, isSarvamConfigured, buildWebhookUrl } from '../sarvam/sarvamClient';
+import { finalizeCall } from '../sarvam/callFinalizer';
 import { normalizePhone } from '../utils/phone';
 import { logger } from '../utils/logger';
 
 function orgId(req: any): string {
-  return (req.query as any).orgId || config.defaultOrgId;
+  return getOrgIdFromRequest(req);
 }
 
 async function getTurns(callSessionId: string): Promise<CallTurn[]> {
@@ -20,7 +21,7 @@ async function getTurns(callSessionId: string): Promise<CallTurn[]> {
   return (data ?? []).map((t) => ({ speaker: t.speaker, text: t.text }));
 }
 
-async function addTurn(callSessionId: string, orgId: string, speaker: 'agent' | 'customer' | 'system', text: string): Promise<void> {
+async function addTurn(callSessionId: string, oid: string, speaker: 'agent' | 'customer' | 'system', text: string): Promise<void> {
   const { data: last } = await supabaseAdmin()
     .from('call_session_turns')
     .select('sequence_index')
@@ -30,7 +31,7 @@ async function addTurn(callSessionId: string, orgId: string, speaker: 'agent' | 
     .maybeSingle();
   const seq = (last?.sequence_index ?? -1) + 1;
   await supabaseAdmin().from('call_session_turns').insert({
-    org_id: orgId,
+    org_id: oid,
     call_session_id: callSessionId,
     speaker,
     text,
@@ -39,6 +40,25 @@ async function addTurn(callSessionId: string, orgId: string, speaker: 'agent' | 
 }
 
 export async function callsRoutes(app: FastifyInstance) {
+  // List all call sessions for the org (newest first) — single fetch for the Calls page
+  app.get('/api/calls', async (req) => {
+    const oid = orgId(req);
+    const { data, error } = await supabaseAdmin()
+      .from('call_sessions')
+      .select('*, turns:call_session_turns(*), lead:crm_leads(id, full_name, phone)')
+      .eq('org_id', oid)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) return { calls: [], error: error.message };
+    // PostgREST returns an array for FK joins — normalize to the object the UI expects
+    const calls = (data ?? []).map((c: any) => ({
+      ...c,
+      lead: Array.isArray(c.lead) ? c.lead[0] : c.lead,
+      turns: [...(c.turns ?? [])].sort((a: any, b: any) => a.sequence_index - b.sequence_index),
+    }));
+    return { calls };
+  });
+
   // Start a browser demo call for a lead
   app.post('/api/calls/start-demo', async (req, reply) => {
     const { leadId } = req.body as any;
@@ -97,52 +117,33 @@ export async function callsRoutes(app: FastifyInstance) {
     return { agentReply: result.reply, callSessionId: id, model: result.model, latencyMs: result.latencyMs };
   });
 
-  // End the call — generate summary
+  // End the call — generate summary via the shared finalizer
+  // (same pipeline as the Sarvam webhook path: summary, lead enrichment,
+  // follow-ups — so enrichment rules can never drift between providers)
   app.post('/api/calls/:id/end', async (req, reply) => {
     const { id } = req.params as any;
     const oid = orgId(req);
 
-    const turns = await getTurns(id);
-    const summary = await summarizeCall(turns, oid);
-
-    const transcript = turns.map((t) => `${t.speaker === 'agent' ? 'Agent' : 'Customer'}: ${t.text}`).join('\n');
-
-    const { data: call } = await supabaseAdmin()
+    const { data: call, error: callErr } = await supabaseAdmin()
       .from('call_sessions')
-      .update({
-        status: 'completed',
-        ended_at: new Date().toISOString(),
-        transcript,
-        summary: summary.data?.summary ?? null,
-        outcome: summary.data?.outcome ?? null,
-      })
+      .select('id, lead_id, started_at')
+      .eq('org_id', oid)
       .eq('id', id)
-      .select()
-      .single();
+      .maybeSingle();
+    if (callErr || !call) return reply.code(404).send({ error: 'call session not found' });
 
-    // Update lead with outcome
-    if (call?.lead_id && summary.data) {
-      const leadPatch: Record<string, any> = {};
-      if (summary.data.lead_temperature) leadPatch.temperature = summary.data.lead_temperature;
-      if (summary.data.updated_preferences) {
-        Object.assign(leadPatch, summary.data.updated_preferences);
-      }
-      if (Object.keys(leadPatch).length) {
-        await updateLead(oid, call.lead_id, leadPatch).catch(() => {});
-      }
-      // Create follow-up if requested
-      if (summary.data.outcome === 'callback_requested' || summary.data.outcome === 'site_visit_requested') {
-        await createFollowup(oid, call.lead_id, {
-          type: summary.data.outcome === 'site_visit_requested' ? 'site_visit' : 'call',
-          title: summary.data.outcome === 'site_visit_requested' ? 'Site visit requested' : 'Callback requested',
-          notes: summary.data?.summary ?? '',
-          scheduled_at: summary.data?.next_follow_up_at ?? null,
-          status: 'pending',
-        }).catch(() => {});
-      }
-    }
+    const turns = await getTurns(id);
+    const { summaryData } = await finalizeCall({
+      orgId: oid,
+      callSessionId: id,
+      leadId: call.lead_id,
+      status: 'completed',
+      transcriptRows: turns,
+      startedAt: call.started_at,
+      persistTurns: false, // demo turns are persisted live per-turn
+    });
 
-    return { callSessionId: id, summary: summary.data };
+    return { callSessionId: id, summary: summaryData };
   });
 
   // Start a REAL outbound call via Sarvam Voice Agents

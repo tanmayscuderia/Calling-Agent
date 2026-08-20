@@ -5,12 +5,13 @@
  *   GET    /api/agent/config           — get org's current config
  *   PUT    /api/agent/config           — update org's config
  *   GET    /api/agent/templates        — list available industry templates
+ *   GET    /api/agent/config/call-prompt — call persona text (paste into Sarvam dashboard)
  *   POST   /api/agent/apply-template   — apply a template to this org
  *   POST   /api/agent/clear-cache      — clear config cache (dev)
  */
 
 import { FastifyInstance } from 'fastify';
-import { config } from '../config';
+import { getOrgIdFromRequest } from '../auth/authMiddleware';
 import {
   getAgentConfig,
   listTemplates,
@@ -18,10 +19,13 @@ import {
   updateAgentConfig,
   invalidateConfigCache,
 } from '../ai/agentConfigService';
+import { buildCallSystemPrompt } from '../ai/promptEngine';
+import { suggestOutputVariables } from '../sarvam/callResultService';
 import { logger } from '../utils/logger';
 
 function orgId(req: any): string {
-  return (req.query as any).orgId || config.defaultOrgId;
+  // Auth-aware: JWT orgId wins, query-param/default fallback preserved
+  return getOrgIdFromRequest(req);
 }
 
 export async function agentRoutes(app: FastifyInstance) {
@@ -55,6 +59,21 @@ export async function agentRoutes(app: FastifyInstance) {
     const updated = await updateAgentConfig(oid, current.id, body);
     logger.info({ orgId: oid, fields: Object.keys(body) }, '[Agent] Config updated');
     return { config: updated };
+  });
+
+  // ── Call persona export (paste into Sarvam voice-agent dashboard) ──
+  app.get('/api/agent/config/call-prompt', async (req) => {
+    const oid = orgId(req);
+    const cfg = await getAgentConfig(oid);
+    return {
+      orgId: oid,
+      industry: cfg.industry,
+      prompt: buildCallSystemPrompt(cfg),
+      // Optional enrichment variables (derived from this org's qualifying
+      // fields — copy into the Sarvam dashboard if you want structured
+      // extraction in addition to the DeepSeek post-call summary).
+      output_variables: suggestOutputVariables(cfg.qualifying_fields ?? []),
+    };
   });
 
   // ── List templates ──

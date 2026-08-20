@@ -7,6 +7,7 @@ import { logger } from './utils/logger';
 import { authMiddleware } from './auth/authMiddleware';
 import { waManager } from './whatsapp/connectionManager';
 import { startQueueWorker, stopQueueWorker } from './queue/queueWorker';
+import { startInboundPoller, stopInboundPoller } from './sarvam/inboundPoller';
 import { recoverStaleJobs } from './queue/staleRecovery';
 
 import { healthRoutes } from './routes/health.routes';
@@ -18,6 +19,7 @@ import { conversationsRoutes } from './routes/conversations.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
 import { callsRoutes } from './routes/calls.routes';
 import { sarvamWebhookRoutes } from './routes/sarvamWebhook.routes';
+import { sarvamToolsRoutes } from './routes/sarvamTools.routes';
 import { aiRoutes } from './routes/ai.routes';
 import { agentRoutes } from './routes/agent.routes';
 import { membersRoutes } from './routes/members.routes';
@@ -52,6 +54,7 @@ async function start() {
   await app.register(whatsappRoutes);
   await app.register(callsRoutes);
   await app.register(sarvamWebhookRoutes);
+  await app.register(sarvamToolsRoutes);
   await app.register(aiRoutes);
   await app.register(agentRoutes);
   await app.register(membersRoutes);
@@ -114,6 +117,9 @@ async function start() {
     // Start the async queue worker (polls job_queue every 2s)
     startQueueWorker();
 
+    // Sarvam inbound poller (webhook fallback; no-op unless env-flagged)
+    startInboundPoller();
+
     // Boot all connected WhatsApp accounts (multi-instance)
     if (config.whatsapp.autoBootConnections) {
       waManager.bootAll().catch((err) => {
@@ -130,6 +136,7 @@ async function start() {
     logger.info({ signal }, 'Shutting down gracefully...');
     try {
       stopQueueWorker();
+      stopInboundPoller();
       // Note: waManager doesn't expose stopAll yet, individual adapters handle cleanup
       await app.close();
       logger.info('Server closed');

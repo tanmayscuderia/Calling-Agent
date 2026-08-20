@@ -56,9 +56,17 @@ export async function sarvamWebhookRoutes(app: FastifyInstance) {
       return reply.code(200).send({ ok: true });
     }
 
-    // 2. Resolve org: webhook_config.metadata echoes orgId from the call request
+    // 2. Resolve org: outbound calls echo orgId via webhook_config.metadata.
+    //    Dashboard-configured INBOUND deployments can't set metadata — fall
+    //    back to SARVAM_DEFAULT_ORG_ID (the job's unknown-attempt branch
+    //    then resolves the caller via the analytics API).
     const metaOrgId = p.webhook_config?.metadata?.orgId;
-    const orgId = typeof metaOrgId === 'string' ? metaOrgId : null;
+    const orgId =
+      typeof metaOrgId === 'string'
+        ? metaOrgId
+        : config.sarvam.inboundNumber && config.sarvam.defaultOrgId
+          ? config.sarvam.defaultOrgId
+          : null;
 
     if (!orgId) {
       // No org correlation — mark processed with error note, ack 200.

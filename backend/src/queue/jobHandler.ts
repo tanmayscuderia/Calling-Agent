@@ -319,13 +319,16 @@ export async function processSendLocationJob(orgId: string, payload: SendLocatio
 
 /**
  * Generate a call summary (for async post-call processing).
+ * Delegates to the shared callFinalizer — same pipeline as the Sarvam
+ * webhook path and the demo /end route (summary, lead enrichment,
+ * follow-ups), so enrichment rules can never drift between providers.
  */
 export async function processSummaryJob(orgId: string, payload: SummaryJobPayload): Promise<void> {
   const { callSessionId } = payload;
 
   const { data: callSession } = await supabaseAdmin()
     .from('call_sessions')
-    .select('*')
+    .select('id, lead_id, started_at')
     .eq('org_id', orgId)
     .eq('id', callSessionId)
     .maybeSingle();
@@ -342,38 +345,15 @@ export async function processSummaryJob(orgId: string, payload: SummaryJobPayloa
     .eq('call_session_id', callSessionId)
     .order('sequence_index', { ascending: true });
 
-  const callTurns = (turns || []).map((t: any) => ({
-    speaker: t.speaker as 'agent' | 'customer' | 'system',
-    text: t.text,
-  }));
-
-  // Import here to avoid circular dependency
-  const { summarizeCall } = await import('../ai/callAgent');
-  const result = await summarizeCall(callTurns);
-  const d = result.data || {};
-
-  // Calculate duration if started_at is present
-  const durationSec = callSession.started_at
-    ? Math.round((Date.now() - new Date(callSession.started_at).getTime()) / 1000)
-    : null;
-
-  // Save summary to call session
-  await supabaseAdmin()
-    .from('call_sessions')
-    .update({
-      summary: d.summary ?? null,
-      outcome: d.outcome ?? null,
-      status: 'completed',
-      ended_at: new Date().toISOString(),
-      duration_sec: durationSec,
-    })
-    .eq('id', callSessionId);
-
-  // Update lead temperature if provided
-  if (d.lead_temperature && callSession.lead_id) {
-    await supabaseAdmin()
-      .from('crm_leads')
-      .update({ temperature: d.lead_temperature })
-      .eq('id', callSession.lead_id);
-  }
+  const { finalizeCall } = await import('../sarvam/callFinalizer');
+  await finalizeCall({
+    orgId,
+    callSessionId,
+    leadId: callSession.lead_id,
+    status: 'completed',
+    transcriptRows: turns || [],
+    startedAt: callSession.started_at,
+    // Turns were persisted live during the demo — no re-insert needed.
+    persistTurns: false,
+  });
 }

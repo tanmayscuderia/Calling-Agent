@@ -191,3 +191,62 @@ export async function getInteractionTranscript(
     `/api/analytics/v1/${s.orgId}/${s.workspaceId}/${s.appId}/transcripts/${interactionId}`
   );
 }
+
+// ── Analytics attempts API (inbound caller identity) ──────────────────
+
+export interface AttemptRecord {
+  attempt_id: string;
+  interaction_id?: string | null;
+  /** Caller's phone number (E.164). The ONLY caller-identity source —
+   *  the result webhook payload carries no caller number. */
+  user_identifier?: string | null;
+  connectivity_status?: string | null;
+  failure_reason?: string | null;
+  duration_in_seconds?: number | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+  /** 'inbound' | 'outbound' — distinguishes dial-in calls from campaigns. */
+  channel_direction?: string | null;
+  agent_variables?: Record<string, unknown> | null;
+  audio_url?: string | null;
+  ended_by?: string | null;
+}
+
+export interface AttemptsPage {
+  items: AttemptRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+  next_page_uri?: string | null;
+}
+
+/**
+ * Analytics attempts API — paginated call log with caller identity
+ * (`user_identifier`) and `channel_direction`. Required for inbound:
+ * webhook payloads have no caller number, so we look the attempt up here.
+ */
+export async function listAttempts(opts: {
+  startDatetime: string;
+  endDatetime: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  filterConditions?: Array<{ id: string; field: string; operator: string; value: unknown }>;
+}): Promise<AttemptsPage | null> {
+  const s = config.sarvam;
+  const qs = new URLSearchParams({
+    start_datetime: opts.startDatetime,
+    end_datetime: opts.endDatetime,
+  });
+  if (opts.limit != null) qs.set('limit', String(opts.limit));
+  if (opts.offset != null) qs.set('offset', String(opts.offset));
+  if (opts.sortBy) qs.set('sort_by', opts.sortBy);
+  if (opts.sortOrder) qs.set('sort_order', opts.sortOrder);
+  if (opts.filterConditions) qs.set('filter_conditions', JSON.stringify(opts.filterConditions));
+
+  return sarvamRequest<AttemptsPage>(
+    'GET',
+    `/api/analytics/v1/${s.orgId}/${s.workspaceId}/${s.appId}/attempts?${qs.toString()}`
+  );
+}
