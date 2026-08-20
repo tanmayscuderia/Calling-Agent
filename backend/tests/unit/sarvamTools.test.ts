@@ -4,7 +4,7 @@
  * response shapers (voice-friendly output), and query parsing.
  * Full HTTP tests would need a supabase mock — kept light per repo test style.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { config } from '../../src/config';
 import {
   authorized,
@@ -13,6 +13,8 @@ import {
   shapeInventory,
   parseInventoryQuery,
   zeroResultPayload,
+  cacheGet,
+  cacheSet,
 } from '../../src/routes/sarvamTools.routes';
 
 describe('authorized (tool auth)', () => {
@@ -185,5 +187,43 @@ describe('zeroResultPayload (empty-search guidance)', () => {
     const filters = { city: 'Pune', budget_max: 80_000_000 };
     const out = zeroResultPayload(filters, 'Pune', []);
     expect(out.filters).toBe(filters);
+  });
+});
+
+describe('response cache (tunnel-budget saver)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns null for unknown keys (cache miss)', () => {
+    expect(cacheGet('search:/api/tools/sarvam/inventory-search?query=miss-' + Date.now())).toBeNull();
+  });
+
+  it('serves identical repeat requests within the TTL', () => {
+    const key = `search:/api/tools/sarvam/inventory-search?query=hit-${Date.now()}`;
+    const body = { count: 1, results: [{ label: 'Test Tower' }] };
+    cacheSet(key, body);
+    expect(cacheGet(key)).toEqual(body);
+  });
+
+  it('expires entries after 60s (stale data never served)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-21T10:00:00Z'));
+    const key = 'search:/api/tools/sarvam/inventory-search?query=stale';
+    cacheSet(key, { count: 2 });
+    vi.setSystemTime(new Date('2026-08-21T10:01:01Z')); // +61s
+    expect(cacheGet(key)).toBeNull();
+  });
+
+  it('evicts the oldest entry when over the size cap', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-21T10:00:00Z'));
+    const oldKey = 'search:/old';
+    cacheSet(oldKey, { count: 0 });
+    vi.setSystemTime(new Date('2026-08-21T10:00:01Z'));
+    for (let i = 0; i < 200; i++) cacheSet(`search:/bulk-${i}`, { count: i });
+    // oldKey was the first inserted — evicted by the 200-cap
+    expect(cacheGet(oldKey)).toBeNull();
+    expect(cacheGet('search:/bulk-199')).toEqual({ count: 199 });
   });
 });

@@ -102,6 +102,7 @@ The Calls page shows an `↙ Inbound` badge and the caller's number as the title
 | `Sarvam not configured` on start-real | One of the `FILL_FROM_DASHBOARD` values still set |
 | 401/403 from Sarvam API | Bad `SARVAM_API_KEY` |
 | No webhook hits | Tunnel died → check `/tmp/cloudflared.log`, restart, update `PUBLIC_BASE_URL`, restart backend |
+| **First 2-3 tool calls work, later ones "break" (429 / no backend log)** | **trycloudflare quick-tunnel edge throttling** — verified 2026-08-20: backend 200'd *every* request it received (0 failures in `logs/sarvam-tool-calls.log`), so the dropped calls never reached us. Fix: switch to a named tunnel (`./scripts/sarvam-tunnel.sh setup && ./scripts/sarvam-tunnel.sh start`) — free, stable URL, no quick-tunnel rate limits. Interim mitigation: tool responses now cached 60s so identical repeat requests don't re-traverse the tunnel. |
 | Webhook 400s in logs | Payload shape changed — inspect `sarvam_webhook_events.payload` |
 | No `attempt_id` | Wrong org/workspace/app IDs (Sarvam 404s) |
 | Calls rejected outside hours | `SARVAM_CALLING_HOURS_START/END` guard (IST) |
@@ -131,3 +132,7 @@ The Calls page shows an `↙ Inbound` badge and the caller's number as the title
 - [ ] Greeting → Priya line; Voice → female Hindi
 - [ ] Advanced: "If it fails" fallback text + Max wait 10s
 - [ ] Commit agent → repoint inbound deployment → test call (ask Gurgaon penthouse 8-10cr) → verify `logs/sarvam-tool-calls.log` shows real params in URL
+- [ ] **Kill the quick tunnel** — `./scripts/sarvam-tunnel.sh setup` (one-time: Cloudflare login + create tunnel + pick your domain), then `start`. Update `PUBLIC_BASE_URL` in `.env`, the Sarvam webhook URL, and both tool URLs to the stable hostname. After this the URL never changes again and the 429-after-3-calls issue is gone for good.
+
+### Tunnel diagnosis (2026-08-20 late session)
+Tool calls "broke" after the first 2-3 per call. The backend log proved innocence: 72 events, **zero errors, zero non-200s** — every request that reached Fastify was served in 3-527ms (peak 5 requests/min). The failing requests never arrived → they died at the Cloudflare quick-tunnel edge, which rate-limits ephemeral `trycloudflare.com` tunnels. Shipped: `scripts/sarvam-tunnel.sh` (named tunnel = permanent fix) + 60s response cache on `inventory-search` (identical repeat searches served from memory, logged as `inventory-search.cache-hit`).

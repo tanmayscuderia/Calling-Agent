@@ -254,6 +254,45 @@ async function getAvailableLocations(
   return cities;
 }
 
+// ── Response cache (dedupe Sarvam retries / repeat searches within a call) ──
+
+/**
+ * WHY: the free trycloudflare quick tunnel rate-limits request bursts at its
+ * edge — the backend 200s everything it receives, but redundant requests still
+ * burn the tunnel's per-minute budget (symptom: first 2-3 tool calls work,
+ * later ones "break" with no backend log entry). Identical requests within
+ * 60s are served from memory instead. Inventory doesn't change mid-call, so a
+ * 60s TTL is safe. (The permanent fix is a named tunnel: scripts/sarvam-tunnel.sh.)
+ */
+interface ResponseCacheEntry {
+  ts: number;
+  body: Record<string, any>;
+}
+const responseCache = new Map<string, ResponseCacheEntry>();
+const RESPONSE_TTL_MS = 60_000;
+const RESPONSE_CACHE_MAX = 200;
+
+// exported for unit tests
+export function cacheGet(key: string): Record<string, any> | null {
+  const hit = responseCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > RESPONSE_TTL_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+  return hit.body;
+}
+
+// exported for unit tests
+export function cacheSet(key: string, body: Record<string, any>): void {
+  if (responseCache.size >= RESPONSE_CACHE_MAX) {
+    // Map preserves insertion order — drop the oldest entry
+    const oldest = responseCache.keys().next().value;
+    if (oldest !== undefined) responseCache.delete(oldest);
+  }
+  responseCache.set(key, { ts: Date.now(), body });
+}
+
 // ── Routes ──
 
 export async function sarvamToolsRoutes(app: FastifyInstance) {
@@ -350,6 +389,14 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
     const extracted = parseInventoryQuery(q);
     const limit = Math.min(Math.max(Number(q.limit ?? 3) || 3, 1), 5);
 
+    // Serve identical repeat searches from cache — saves tunnel requests
+    const cacheKey = `search:${req.url}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      logToolCall({ event: 'inventory-search.cache-hit', ms: Date.now() - started });
+      return cached;
+    }
+
     // No criteria at all (empty/blank params) — guide the agent instead of a blind search.
     const hasCriteria =
       extracted.query ||
@@ -437,11 +484,13 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         const cities = await getAvailableLocations(orgId, cfg);
         const where = extracted.city ?? extracted.preferred_location ?? null;
         const out = zeroResultPayload(filters, where, cities);
+        cacheSet(cacheKey, out);
         logToolCall({ event: 'inventory-search.zero', ms: Date.now() - started, filters, available_locations: cities });
         return out;
       }
 
       const out: Record<string, any> = { ...shapeInventory(matches), filters };
+      cacheSet(cacheKey, out);
       logToolCall({ event: 'inventory-search.200', ms: Date.now() - started, count: out.count, filters });
       return out;
     } catch (err) {
