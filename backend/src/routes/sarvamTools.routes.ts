@@ -25,6 +25,7 @@ import { normalizePhone } from '../utils/phone';
 import { getAgentConfig } from '../ai/agentConfigService';
 import { searchInventory, InventoryMatch } from '../ai/inventorySearch';
 import { getLeadMessages } from '../crm/leadService';
+import { parseFreeTextQuery } from '../sarvam/queryParser';
 import type { ExtractedData } from '../ai/agentTypes';
 
 // ── Debug logging (temporary — remove once live tool calls are stable) ──
@@ -134,6 +135,27 @@ export function parseInventoryQuery(q: Record<string, any>): ExtractedData {
   if (q.configuration) extracted.configuration = String(q.configuration);
   if (q.budget_min) extracted.budget_min = num(q.budget_min);
   if (q.budget_max) extracted.budget_max = num(q.budget_max);
+
+  // Fill gaps from the free-text query (explicit params above always win).
+  // The Sarvam dashboard sends the caller's demand as ONE agent-filled
+  // `query` param ("Noida sector 70 to 80, 2BHK, 8 to 10 crore") — without
+  // this the engine got no structured filters and returned an unfiltered top-3.
+  if (extracted.query) {
+    const p = parseFreeTextQuery(extracted.query);
+    if (!extracted.city && p.city) extracted.city = p.city;
+    if (!extracted.sector && p.sector) extracted.sector = p.sector;
+    if (!extracted.preferred_location && p.locationRaw) {
+      extracted.preferred_location = p.locationRaw;
+      extracted.location = p.locationRaw;
+    }
+    if (extracted.budget_min == null && p.budgetMin != null) extracted.budget_min = p.budgetMin;
+    if (extracted.budget_max == null && p.budgetMax != null) extracted.budget_max = p.budgetMax;
+    if (!extracted.configuration && p.configurations.length > 0) {
+      extracted.configuration = p.configurations[0];
+    } else if (!extracted.configuration && p.propertyTypes.length > 0) {
+      extracted.configuration = p.propertyTypes[0];
+    }
+  }
   return extracted;
 }
 
@@ -267,25 +289,61 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         return { count: 0, results: [], note: 'Inventory not enabled for this workspace' };
       }
 
-      const matches = await withTimeout(
-        searchInventory(
-          orgId,
-          cfg,
-          extracted,
-          {
-            preferred_location: extracted.preferred_location,
-            budget_min: extracted.budget_min,
-            budget_max: extracted.budget_max,
-            configuration: extracted.configuration,
-          },
-          limit
-        ),
-        8000,
-        'inventory-search'
-      );
+      // "3 or 4 BHK" → one search pass per configuration, merged + deduped.
+      const parsedConfigs = extracted.query
+        ? parseFreeTextQuery(extracted.query).configurations
+        : [];
+      const configurations: Array<string | undefined> = extracted.configuration
+        ? [String(extracted.configuration)]
+        : parsedConfigs.length > 0
+          ? parsedConfigs
+          : [undefined];
 
-      const out = shapeInventory(matches);
-      logToolCall({ event: 'inventory-search.200', ms: Date.now() - started, count: out.count });
+      const seen = new Set<string>();
+      const merged: InventoryMatch[] = [];
+      for (const configuration of configurations) {
+        const variant: ExtractedData = { ...extracted, configuration };
+        const matches = await withTimeout(
+          searchInventory(
+            orgId,
+            cfg,
+            variant,
+            {
+              preferred_location: extracted.preferred_location,
+              budget_min: extracted.budget_min,
+              budget_max: extracted.budget_max,
+              configuration: configuration ?? undefined,
+            },
+            limit
+          ),
+          8000,
+          'inventory-search'
+        );
+        for (const m of matches) {
+          if (!seen.has(m.id)) {
+            seen.add(m.id);
+            merged.push(m);
+          }
+        }
+      }
+      merged.sort((a, b) => b.score - a.score);
+      const matches = merged.slice(0, limit);
+
+      // Echo the filters actually applied so the agent (and the transcript)
+      // can verify the search matched what the caller asked for.
+      const filters: Record<string, unknown> = {};
+      if (extracted.city) filters.city = extracted.city;
+      if (extracted.sector) filters.sector = extracted.sector;
+      if (extracted.preferred_location) filters.location = extracted.preferred_location;
+      if (extracted.configuration) filters.configuration = extracted.configuration;
+      else if (configurations.filter(Boolean).length > 1) {
+        filters.configuration = (configurations as string[]).join(' / ');
+      }
+      if (extracted.budget_min != null) filters.budget_min = extracted.budget_min;
+      if (extracted.budget_max != null) filters.budget_max = extracted.budget_max;
+
+      const out: Record<string, any> = { ...shapeInventory(matches), filters };
+      logToolCall({ event: 'inventory-search.200', ms: Date.now() - started, count: out.count, filters });
       return out;
     } catch (err) {
       logger.error(

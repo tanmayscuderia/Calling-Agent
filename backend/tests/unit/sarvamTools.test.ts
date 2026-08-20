@@ -128,4 +128,30 @@ describe('parseInventoryQuery', () => {
     const q = parseInventoryQuery({ budget_max: 'abc' });
     expect(q.budget_max).toBeUndefined();
   });
+
+  it('parses free-text query into structured filters (city/budget)', () => {
+    const q = parseInventoryQuery({ query: 'Noida property 8 to 10 crore' });
+    expect(q.city).toBe('Noida');
+    expect(q.budget_min).toBe(80_000_000);
+    expect(q.budget_max).toBe(100_000_000);
+  });
+
+  it('parses sector + BHK from free-text query', () => {
+    const q = parseInventoryQuery({ query: 'Noida sector 70 to 80, 2BHK' });
+    expect(q.city).toBe('Noida');
+    expect(q.sector).toBe('Sector 70');
+    expect(q.configuration).toBe('2BHK');
+  });
+
+  it('explicit params win over parsed query values', () => {
+    const q = parseInventoryQuery({
+      query: 'gurgaon 3bhk 5 crore',
+      city: 'Noida',
+      budget_max: '60000000',
+    });
+    expect(q.city).toBe('Noida');
+    expect(q.budget_max).toBe(60_000_000);
+    // configuration has no explicit param → gap-filled from the query
+    expect(q.configuration).toBe('3BHK');
+  });
 });
