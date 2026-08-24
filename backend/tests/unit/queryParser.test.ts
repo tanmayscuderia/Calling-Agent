@@ -66,4 +66,26 @@ describe('parseFreeTextQuery', () => {
     const p2 = parseFreeTextQuery('haan whitefield me dikhao');
     expect(p2.locationRaw).toBe('whitefield');
   });
+
+  // ── Regression: live-call failures on 2026-08-21 ──
+
+  it('collects ALL cities ("Gurgaon and Pune"), not just the first', () => {
+    const p = parseFreeTextQuery('gurgaon and pune me 3bhk chahiye');
+    expect(p.cities).toEqual(['Gurgaon', 'Pune']);
+    expect(p.city).toBe('Gurgaon'); // legacy single value = first city
+  });
+
+  it('dedupes overlapping city names ("greater noida" absorbs "noida")', () => {
+    expect(parseFreeTextQuery('greater noida or noida').cities).toEqual(['Greater Noida']);
+  });
+
+  it('recognizes ASR variants of Bengaluru — never falls through unfiltered', () => {
+    expect(parseFreeTextQuery('बैंगलोर में 2bhk').city).toBe('Bengaluru');
+    expect(parseFreeTextQuery('बेंगलोर 3 बीएचेके').city).toBe('Bengaluru');
+    expect(parseFreeTextQuery('बंगलौर में प्रॉपर्टी').city).toBe('Bengaluru');
+  });
+
+  it('strips junk words ("available") so they never become the location', () => {
+    expect(parseFreeTextQuery('kya available hai').locationRaw).toBeUndefined();
+  });
 });

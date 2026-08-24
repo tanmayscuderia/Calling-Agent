@@ -18,7 +18,10 @@ export interface ParsedQuery {
   /** absolute ₹ */
   budgetMin?: number;
   budgetMax?: number;
+  /** first of `cities` — kept for single-value callers */
   city?: string;
+  /** ALL detected cities, e.g. ['Gurgaon', 'Pune'] for "Gurgaon and Pune" */
+  cities: string[];
   /** e.g. 'Sector 70' */
   sector?: string;
   /** leftover location-ish text when nothing better matched */
@@ -60,10 +63,19 @@ Object.assign(HINDI_CITIES, {
   'गुरूग्राम': 'Gurugram',
 });
 
+// ASR variants of Bengaluru. Live 2026-08-20: "बैंगलोर में" matched nothing,
+// so the search fell through UNFILTERED and the agent read out a random
+// top-3 as if they were Bangalore options. बैंगलोर/बेंगलोर/बंगलौर = Bengaluru.
+Object.assign(HINDI_CITIES, {
+  'बैंगलोर': 'Bengaluru',
+  'बेंगलोर': 'Bengaluru',
+  'बंगलौर': 'Bengaluru',
+});
+
 // Filler words Sarvam's ASR produces ("haa", "haan", "ji", "हां", "जी")
 // that previously leaked into locationRaw and were searched as locations.
 const ASR_JUNK =
-  /\b(haan?|hmm+|achchha|achha|theek|thik|ji|yes|yeah|no|okay|ok|please|boliye|bataiye)\b|हां|हाँ|हूं|हूँ|जी|अच्छा|ठीक|हैं/g;
+  /\b(haa[nl]?|hmm+|achchha|achha|theek|thik|ji|yes|yeah|no|okay|ok|please|boliye|bataiye)\b|हां|हाँ|हूं|हूँ|जी|अच्छा|ठीक|हैं/g;
 
 const TYPE_WORDS: Array<[RegExp, string]> = [
   [/\bpenthouses?\b|पेंटहाउस/i, 'Penthouse'],
@@ -81,7 +93,7 @@ const LK = 'lakhs?|lac|लाख';
 
 /** Noise stripped before the locationRaw fallback kicks in. */
 const NOISE =
-  /\b(propert(?:y|ies)|flat|apartments?|options?|list|show|need|want|looking|under|between|budget|price|and|or|for|in|near|at|kya|hai|chahiye|dikhao|batao|ghar)\b|में|चाहिए|दिखाओ|बताओ|मकान|फ्लैट|प्रॉपर्टी/gi;
+  /\b(propert(?:y|ies)|flat|apartments?|options?|list|show|need|want|looking|under|between|budget|price|and|or|for|in|near|at|kya|hai|chahiye|dikhao|batao|ghar|available|ready|kaise|kaisa|kuch|koi)\b|में|चाहिए|दिखाओ|बताओ|मकान|फ्लैट|प्रॉपर्टी|कुछ|कोई|कैसे|कैसा/gi;
 
 const CR_MULT = 10_000_000;
 const LK_MULT = 100_000;
@@ -109,7 +121,7 @@ function parseBudget(text: string): { min?: number; max?: number } {
 }
 
 export function parseFreeTextQuery(raw: string): ParsedQuery {
-  const out: ParsedQuery = { configurations: [], propertyTypes: [] };
+  const out: ParsedQuery = { configurations: [], propertyTypes: [], cities: [] };
   if (!raw || !raw.trim()) return out;
   const text = raw.trim();
 
@@ -141,22 +153,28 @@ export function parseFreeTextQuery(raw: string): ParsedQuery {
   const sm = text.match(/sector\s*[-:]?\s*(\d{1,3})/i);
   if (sm) out.sector = `Sector ${Number(sm[1])}`;
 
-  // ── City (English list + Hindi map), longest-first ──
+  // ── Cities (English list + Hindi map) — collect ALL, longest-first ──
+  // "Gurgaon and Pune" is a real caller pattern; the old first-match-only
+  // loop silently dropped every city after the first (live 2026-08-21:
+  // only Gurgaon was searched, agent never learned we have no Pune stock).
   const lower = text.toLowerCase();
+  const cityKeys = new Set<string>();
   for (const c of CITIES) {
     if (lower.includes(c)) {
-      out.city = c.replace(/\b\w/g, (ch) => ch.toUpperCase());
-      break;
+      // 'noida' is a substring of an already-collected 'greater noida' — keep the longer
+      if ([...cityKeys].some((x) => x.includes(c))) continue;
+      cityKeys.add(c);
     }
   }
-  if (!out.city) {
-    for (const [hindi, canonical] of Object.entries(HINDI_CITIES)) {
-      if (text.includes(hindi)) {
-        out.city = canonical;
-        break;
-      }
+  for (const [hindi, canonical] of Object.entries(HINDI_CITIES)) {
+    if (text.includes(hindi)) {
+      const canon = canonical.toLowerCase();
+      if ([...cityKeys].some((x) => x.includes(canon) || canon.includes(x))) continue;
+      cityKeys.add(canon);
     }
   }
+  out.cities = [...cityKeys].map((c) => c.replace(/\b\w/g, (ch) => ch.toUpperCase()));
+  out.city = out.cities[0];
 
   // ── Property types ──
   for (const [re, label] of TYPE_WORDS) {

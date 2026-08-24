@@ -25,7 +25,7 @@ import { normalizePhone } from '../utils/phone';
 import { getAgentConfig } from '../ai/agentConfigService';
 import { searchInventory, InventoryMatch } from '../ai/inventorySearch';
 import { getLeadMessages } from '../crm/leadService';
-import { parseFreeTextQuery } from '../sarvam/queryParser';
+import { parseFreeTextQuery, type ParsedQuery } from '../sarvam/queryParser';
 import type { ExtractedData } from '../ai/agentTypes';
 
 // ── Debug logging (temporary — remove once live tool calls are stable) ──
@@ -142,7 +142,12 @@ export function parseInventoryQuery(q: Record<string, any>): ExtractedData {
   // this the engine got no structured filters and returned an unfiltered top-3.
   if (extracted.query) {
     const p = parseFreeTextQuery(extracted.query);
-    if (!extracted.city && p.city) extracted.city = p.city;
+    // Multi-city ("Gurgaon and Pune") / multi-config ("3 or 4 BHK") queries
+    // stay UNFILLED here so buildSearchPasses() below fans out one search per
+    // value. Filling only the first made that fan-out dead code (live
+    // 2026-08-21: "3BHK and 4BHK" searched 3BHK only; "Gurgaon and Pune"
+    // silently dropped Pune).
+    if (!extracted.city && p.cities.length === 1) extracted.city = p.cities[0];
     if (!extracted.sector && p.sector) extracted.sector = p.sector;
     if (!extracted.preferred_location && p.locationRaw) {
       extracted.preferred_location = p.locationRaw;
@@ -150,13 +155,81 @@ export function parseInventoryQuery(q: Record<string, any>): ExtractedData {
     }
     if (extracted.budget_min == null && p.budgetMin != null) extracted.budget_min = p.budgetMin;
     if (extracted.budget_max == null && p.budgetMax != null) extracted.budget_max = p.budgetMax;
-    if (!extracted.configuration && p.configurations.length > 0) {
+    if (!extracted.configuration && p.configurations.length === 1) {
       extracted.configuration = p.configurations[0];
-    } else if (!extracted.configuration && p.propertyTypes.length > 0) {
+    } else if (
+      !extracted.configuration &&
+      p.configurations.length === 0 &&
+      p.propertyTypes.length > 0
+    ) {
       extracted.configuration = p.propertyTypes[0];
     }
   }
   return extracted;
+}
+
+/**
+ * Fan out one search pass per (city × configuration) the caller asked for:
+ *   "Gurgaon and Pune, 3 or 4 BHK" → 4 passes, merged + deduped by id.
+ * Explicit dashboard params collapse to a single pass. Hard cap of 6 passes
+ * so a garbled ASR query can never trigger an unbounded query storm against
+ * Supabase mid-call.
+ */
+// exported for unit tests
+export function buildSearchPasses(
+  extracted: ExtractedData,
+  parsed: ParsedQuery | null
+): Array<{ city?: string; configuration?: string }> {
+  const cities: Array<string | undefined> = extracted.city
+    ? [String(extracted.city)]
+    : parsed && parsed.cities.length > 0
+      ? parsed.cities
+      : [undefined];
+  const configurations: Array<string | undefined> = extracted.configuration
+    ? [String(extracted.configuration)]
+    : parsed && parsed.configurations.length > 0
+      ? parsed.configurations
+      : [undefined];
+
+  const passes: Array<{ city?: string; configuration?: string }> = [];
+  for (const city of cities) {
+    for (const configuration of configurations) {
+      if (passes.length >= 6) return passes;
+      if (passes.some((p) => p.city === city && p.configuration === configuration)) continue;
+      passes.push({ city, configuration });
+    }
+  }
+  return passes;
+}
+
+/**
+ * True when the extracted data contains anything worth searching on. A
+ * free-text query counts ONLY if it parses to at least one usable filter —
+ * pure ASR garble ("kya available hai") previously fell through to an
+ * UNFILTERED top-3 that the agent read out as if it matched the caller's
+ * demand. Explicit dashboard params always count.
+ */
+// exported for unit tests
+export function hasUsableCriteria(extracted: ExtractedData): boolean {
+  const structured =
+    extracted.preferred_location ||
+    extracted.city ||
+    extracted.area ||
+    extracted.configuration ||
+    extracted.budget_min ||
+    extracted.budget_max;
+  if (structured) return true;
+  if (!extracted.query) return false;
+  const p = parseFreeTextQuery(extracted.query);
+  return (
+    p.cities.length > 0 ||
+    p.configurations.length > 0 ||
+    p.propertyTypes.length > 0 ||
+    p.sector != null ||
+    p.budgetMin != null ||
+    p.budgetMax != null ||
+    p.locationRaw != null
+  );
 }
 
 /** Reject if a promise hangs past `ms` — a stuck Supabase call must never stall a live phone call. */
@@ -177,19 +250,30 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 export function zeroResultPayload(
   filters: Record<string, unknown>,
   where: string | null,
-  cities: string[]
+  cities: string[],
+  requestedCities: string[] = []
 ): Record<string, any> {
   const wherePart = where ? ` in ${where}` : ' for those criteria';
   const cityList = cities.length > 0 ? ` We currently have options in: ${cities.join(', ')}.` : '';
   const offer = cities.length > 0
     ? ', offer the cities above, and ask if any of those work'
     : ' and offer to have the team follow up on WhatsApp';
+  // Machine-readable truth for the voice LLM: coverage of every requested city
+  // is explicitly ZERO — the agent must never say we have anything there.
+  const requested = requestedCities.length > 0 ? requestedCities : where ? [where] : [];
   return {
     count: 0,
     results: [],
     filters,
     note: `No inventory${wherePart}.${cityList} Do NOT invent or guess any property — say we don't have options${where ? ' there' : ' for that'}${offer}.`,
     available_locations: cities,
+    ...(requested.length > 0
+      ? {
+          requested_cities: requested,
+          coverage: Object.fromEntries(requested.map((c) => [c, 0])),
+          no_results_in: requested,
+        }
+      : {}),
   };
 }
 
@@ -320,6 +404,12 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
     } catch {
       return reply.code(400).send({ error: 'Invalid phone' });
     }
+    // normalizePhone('') returns '' (never throws) — without this guard the
+    // PostgREST .or filter degenerates to `phone.eq.` and matches leads with
+    // empty phone fields, leaking an unrelated caller's context.
+    if (!phone) {
+      return reply.code(400).send({ error: 'Missing phone parameter' });
+    }
 
     const orgId = String(q.orgId ?? config.defaultOrgId);
 
@@ -397,20 +487,16 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
       return cached;
     }
 
-    // No criteria at all (empty/blank params) — guide the agent instead of a blind search.
-    const hasCriteria =
-      extracted.query ||
-      extracted.preferred_location ||
-      extracted.city ||
-      extracted.area ||
-      extracted.configuration ||
-      extracted.budget_min ||
-      extracted.budget_max;
-    if (!hasCriteria) {
+    // No criteria at all (empty/blank params OR a query that parses to nothing)
+    // — guide the agent instead of a blind search. A garbled ASR query used to
+    // fall through to an unfiltered top-3 that the agent read out as if it
+    // matched the caller's demand.
+    if (!hasUsableCriteria(extracted)) {
       return {
         count: 0,
         results: [],
-        note: 'No search criteria — ask the caller for a location, configuration, or budget, then search again.',
+        ask_for: ['location', 'configuration', 'budget'],
+        note: 'No usable search criteria — ask the caller for a location, configuration, or budget, then search again. Do NOT list random properties.',
       };
     }
 
@@ -423,21 +509,20 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         return { count: 0, results: [], note: 'Inventory not enabled for this workspace' };
       }
 
-      // "3 or 4 BHK" → one search pass per configuration, merged + deduped.
-      const parsedConfigs = extracted.query
-        ? parseFreeTextQuery(extracted.query).configurations
-        : [];
-      const configurations: Array<string | undefined> = extracted.configuration
-        ? [String(extracted.configuration)]
-        : parsedConfigs.length > 0
-          ? parsedConfigs
-          : [undefined];
+      // One pass per (city × configuration) the caller named — see buildSearchPasses.
+      const parsed = extracted.query ? parseFreeTextQuery(extracted.query) : null;
+      const passes = buildSearchPasses(extracted, parsed);
 
       const seen = new Set<string>();
       const merged: InventoryMatch[] = [];
-      for (const configuration of configurations) {
-        const variant: ExtractedData = { ...extracted, configuration };
-        const matches = await withTimeout(
+      const perCityHits = new Map<string, number>();
+      for (const pass of passes) {
+        const variant: ExtractedData = {
+          ...extracted,
+          city: pass.city,
+          configuration: pass.configuration,
+        };
+        const passMatches = await withTimeout(
           searchInventory(
             orgId,
             cfg,
@@ -446,14 +531,17 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
               preferred_location: extracted.preferred_location,
               budget_min: extracted.budget_min,
               budget_max: extracted.budget_max,
-              configuration: configuration ?? undefined,
+              configuration: pass.configuration ?? undefined,
             },
             limit
           ),
           8000,
           'inventory-search'
         );
-        for (const m of matches) {
+        if (pass.city && passMatches.length > 0) {
+          perCityHits.set(pass.city, (perCityHits.get(pass.city) ?? 0) + passMatches.length);
+        }
+        for (const m of passMatches) {
           if (!seen.has(m.id)) {
             seen.add(m.id);
             merged.push(m);
@@ -466,13 +554,16 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
       // Echo the filters actually applied so the agent (and the transcript)
       // can verify the search matched what the caller asked for.
       const filters: Record<string, unknown> = {};
-      if (extracted.city) filters.city = extracted.city;
+      const searchedCities = [...new Set(passes.map((p) => p.city).filter(Boolean))] as string[];
+      if (searchedCities.length > 1) filters.cities = searchedCities;
+      else if (searchedCities.length === 1) filters.city = searchedCities[0];
       if (extracted.sector) filters.sector = extracted.sector;
       if (extracted.preferred_location) filters.location = extracted.preferred_location;
-      if (extracted.configuration) filters.configuration = extracted.configuration;
-      else if (configurations.filter(Boolean).length > 1) {
-        filters.configuration = (configurations as string[]).join(' / ');
-      }
+      const searchedConfigs = [
+        ...new Set(passes.map((p) => p.configuration).filter(Boolean)),
+      ] as string[];
+      if (searchedConfigs.length > 1) filters.configuration = searchedConfigs.join(' / ');
+      else if (searchedConfigs.length === 1) filters.configuration = searchedConfigs[0];
       if (extracted.budget_min != null) filters.budget_min = extracted.budget_min;
       if (extracted.budget_max != null) filters.budget_max = extracted.budget_max;
 
@@ -482,16 +573,57 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
       // Tell the agent exactly what to say + where we DO have inventory.
       if (matches.length === 0) {
         const cities = await getAvailableLocations(orgId, cfg);
-        const where = extracted.city ?? extracted.preferred_location ?? null;
-        const out = zeroResultPayload(filters, where, cities);
+        const where = searchedCities.join(' / ') || extracted.preferred_location || null;
+        const out = zeroResultPayload(filters, where, cities, searchedCities);
         cacheSet(cacheKey, out);
         logToolCall({ event: 'inventory-search.zero', ms: Date.now() - started, filters, available_locations: cities });
         return out;
       }
 
-      const out: Record<string, any> = { ...shapeInventory(matches), filters };
+      // ── COVERAGE TRUTH ──
+      // Per-city hit counts from ACTUAL DB matches — the only authoritative
+      // answer to "do we have anything in <city>?". `filters` above is a request
+      // echo (what was ASKED); coverage is what we HAVE. A live-call incident
+      // had the voice LLM read the echo `filters.cities` as availability and
+      // promise stock in a city we don't serve, so the two must never conflate.
+      const coverage: Record<string, number> = {};
+      for (const c of searchedCities) coverage[c] = perCityHits.get(c) ?? 0;
+      const noResultsIn = searchedCities.filter((c) => (perCityHits.get(c) ?? 0) === 0);
+
+      // Multi-city honesty: if the caller named several cities but we only have
+      // stock in some, SAY SO — the agent must never present partial results as
+      // complete coverage of everything asked.
+      let note: string | undefined;
+      if (searchedCities.length > 1) {
+        const withResults = searchedCities.filter((c) => (perCityHits.get(c) ?? 0) > 0);
+        if (noResultsIn.length > 0 && withResults.length > 0) {
+          note =
+            `We have options in ${withResults.join(' and ')} but NOTHING in ${noResultsIn.join(' or ')} — ` +
+            `never say we have anything in ${noResultsIn.join(' or ')}; present only the listed results, ` +
+            `and offer to have the team follow up on WhatsApp for ${noResultsIn.join(' and ')}.`;
+        }
+      }
+
+      const out: Record<string, any> = {
+        ...shapeInventory(matches),
+        filters,
+        ...(searchedCities.length > 0
+          ? {
+              requested_cities: searchedCities,
+              coverage,
+              ...(noResultsIn.length > 0 ? { no_results_in: noResultsIn } : {}),
+            }
+          : {}),
+        ...(note ? { note } : {}),
+      };
       cacheSet(cacheKey, out);
-      logToolCall({ event: 'inventory-search.200', ms: Date.now() - started, count: out.count, filters });
+      logToolCall({
+        event: 'inventory-search.200',
+        ms: Date.now() - started,
+        count: out.count,
+        filters,
+        ...(noResultsIn.length > 0 ? { no_results_in: noResultsIn } : {}),
+      });
       return out;
     } catch (err) {
       logger.error(

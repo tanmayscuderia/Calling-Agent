@@ -6,12 +6,16 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { config } from '../../src/config';
+import { normalizePhone } from '../../src/utils/phone';
+import { parseFreeTextQuery } from '../../src/sarvam/queryParser';
 import {
   authorized,
   shapeLead,
   shapeMessages,
   shapeInventory,
   parseInventoryQuery,
+  buildSearchPasses,
+  hasUsableCriteria,
   zeroResultPayload,
   cacheGet,
   cacheSet,
@@ -184,9 +188,34 @@ describe('zeroResultPayload (empty-search guidance)', () => {
   });
 
   it('echoes applied filters back for transcript verification', () => {
-    const filters = { city: 'Pune', budget_max: 80_000_000 };
+    const filters = { cities: ['Noida', 'Pune'], budget_max: 120000000 };
     const out = zeroResultPayload(filters, 'Pune', []);
-    expect(out.filters).toBe(filters);
+    expect(out.filters).toEqual(filters);
+  });
+
+  // ── Coverage-truth regression (live incident 2026-08-24) ──
+  // The voice LLM read the request-echo `filters.cities` as availability and
+  // told the caller we had stock in Pune (we didn't). Zero-result payloads now
+  // carry machine-readable truth: every requested city is explicitly coverage 0.
+  it('explicit requested cities → coverage 0 for each + no_results_in list', () => {
+    const out = zeroResultPayload({ cities: ['Noida', 'Pune'] }, 'Noida / Pune', [], ['Noida', 'Pune']);
+    expect(out.requested_cities).toEqual(['Noida', 'Pune']);
+    expect(out.coverage).toEqual({ Noida: 0, Pune: 0 });
+    expect(out.no_results_in).toEqual(['Noida', 'Pune']);
+  });
+
+  it('no requested-cities array → derives them from the `where` string (single city)', () => {
+    const out = zeroResultPayload({ city: 'Gurgaon' }, 'Gurgaon', ['Noida']);
+    expect(out.requested_cities).toEqual(['Gurgaon']);
+    expect(out.coverage).toEqual({ Gurgaon: 0 });
+    expect(out.no_results_in).toEqual(['Gurgaon']);
+  });
+
+  it('no city information at all → coverage fields omitted (nothing to claim)', () => {
+    const out = zeroResultPayload({ budget_max: 5000000 }, null, ['Noida']);
+    expect(out).not.toHaveProperty('coverage');
+    expect(out).not.toHaveProperty('requested_cities');
+    expect(out).not.toHaveProperty('no_results_in');
   });
 });
 
@@ -225,5 +254,110 @@ describe('response cache (tunnel-budget saver)', () => {
     // oldKey was the first inserted — evicted by the 200-cap
     expect(cacheGet(oldKey)).toBeNull();
     expect(cacheGet('search:/bulk-199')).toEqual({ count: 199 });
+  });
+});
+
+describe('lead-context phone guard (empty-phone leak regression)', () => {
+  // Found live 2026-08-21: with NO phone param, normalizePhone('') returns ''
+  // (never throws), so the old catch-based 400 guard was dead code and the
+  // PostgREST .or filter `phone.eq.,whatsapp_number.eq.` matched a lead with
+  // empty phone fields — leaking an unrelated caller's context to the voice
+  // agent. The route now rejects empty phone with a 400 BEFORE querying.
+  it('normalizePhone returns empty string (not throw) for missing/blank input — the invariant the guard covers', () => {
+    expect(normalizePhone('')).toBe('');
+    expect(normalizePhone(String(undefined))).toBe('');
+    expect(normalizePhone('   ')).toBe('');
+  });
+
+  it('a phone with digits still normalizes (prefixed with +)', () => {
+    expect(normalizePhone('9876543210')).toBe('+9876543210');
+    expect(normalizePhone('+919876543210')).toBe('+919876543210');
+  });
+});
+
+
+// ── Regression: 2026-08-21 fan-out bugs (multi-city dropped, multi-config dead code) ──
+
+describe('buildSearchPasses (city × configuration fan-out)', () => {
+  it('explicit params → single pass', () => {
+    expect(buildSearchPasses({ city: 'Noida', configuration: '3BHK' }, null)).toEqual([
+      { city: 'Noida', configuration: '3BHK' },
+    ]);
+  });
+
+  it('multi-city query → one pass per city (Pune no longer dropped)', () => {
+    const q = 'gurgaon and pune me 3bhk';
+    const parsed = parseFreeTextQuery(q);
+    expect(buildSearchPasses({ query: q }, parsed)).toEqual([
+      { city: 'Gurgaon', configuration: '3BHK' },
+      { city: 'Pune', configuration: '3BHK' },
+    ]);
+  });
+
+  it('multi-city × multi-config → full cross product ("Gurgaon and Pune, 3 or 4 bhk")', () => {
+    const q = 'gurgaon and pune, 3 or 4 bhk';
+    const parsed = parseFreeTextQuery(q);
+    expect(buildSearchPasses({ query: q }, parsed)).toEqual([
+      { city: 'Gurgaon', configuration: '3BHK' },
+      { city: 'Gurgaon', configuration: '4BHK' },
+      { city: 'Pune', configuration: '3BHK' },
+      { city: 'Pune', configuration: '4BHK' },
+    ]);
+  });
+
+  it('explicit dashboard params collapse parsed multi-values to one pass', () => {
+    const parsed = parseFreeTextQuery('gurgaon and pune 3bhk');
+    expect(buildSearchPasses({ city: 'Noida', configuration: '2BHK' }, parsed)).toEqual([
+      { city: 'Noida', configuration: '2BHK' },
+    ]);
+  });
+
+  it('caps at 6 passes so garbled ASR cannot storm Supabase', () => {
+    const parsed = {
+      configurations: ['1BHK', '2BHK', '3BHK', '4BHK'],
+      propertyTypes: [],
+      cities: ['Noida', 'Gurgaon', 'Pune'],
+    };
+    expect(buildSearchPasses({}, parsed)).toHaveLength(6);
+  });
+
+  it('parseInventoryQuery leaves multi-value fields unfilled for fan-out', () => {
+    expect(parseInventoryQuery({ query: 'gurgaon and pune 3bhk' }).city).toBeUndefined();
+    expect(parseInventoryQuery({ query: '3 or 4 bhk in noida' }).configuration).toBeUndefined();
+    // single values still gap-fill as before
+    expect(parseInventoryQuery({ query: 'noida 3bhk' }).city).toBe('Noida');
+    expect(parseInventoryQuery({ query: 'noida 3bhk' }).configuration).toBe('3BHK');
+  });
+
+  it('property-type fallback still fills configuration when no BHK present', () => {
+    expect(parseInventoryQuery({ query: 'penthouse in mumbai' }).configuration).toBe('Penthouse');
+  });
+});
+
+
+// ── Regression: garbled queries must NOT trigger an unfiltered blind search ──
+
+describe('hasUsableCriteria (unfiltered-search guard)', () => {
+  it('pure ASR garble with no explicit params → NOT usable (guidance instead of blind top-3)', () => {
+    expect(hasUsableCriteria({ query: 'kya available hai' })).toBe(false);
+    expect(hasUsableCriteria({ query: 'haa ji' })).toBe(false);
+  });
+
+  it('query parsing to ANY filter → usable', () => {
+    expect(hasUsableCriteria({ query: 'noida 3bhk' })).toBe(true); // city + config
+    expect(hasUsableCriteria({ query: 'whitefield me dikhao' })).toBe(true); // locationRaw only
+    expect(hasUsableCriteria({ query: 'under 2 crore' })).toBe(true); // budget only
+    expect(hasUsableCriteria({ query: 'penthouse' })).toBe(true); // property type only
+    expect(hasUsableCriteria({ query: 'sector 70' })).toBe(true); // sector only
+  });
+
+  it('explicit dashboard params → usable regardless of query', () => {
+    expect(hasUsableCriteria({ preferred_location: 'whitefield' })).toBe(true);
+    expect(hasUsableCriteria({ configuration: '3BHK' })).toBe(true);
+    expect(hasUsableCriteria({ budget_max: 8_000_000 })).toBe(true);
+  });
+
+  it('empty params → not usable', () => {
+    expect(hasUsableCriteria({})).toBe(false);
   });
 });

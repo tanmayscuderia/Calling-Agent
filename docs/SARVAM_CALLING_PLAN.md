@@ -21,7 +21,14 @@ Lead Detail → "Call via AI Agent" → POST /api/calls/start-real
   → sarvamClient.createOutboundCall() with webhook metadata {callSessionId, leadId, orgId}
   → Sarvam calls the phone (their STT/LLM/TTS/telephony)
   → webhook hits /webhooks/sarvam/:secret → 200 instantly → enqueue job
-  → worker: transcript + summary + name capture + auto-categorize + follow-up
+  → worker: finalizeCall → transcript + summary + name capture + auto-categorize + follow-up
+    Extraction is now WhatsApp-grade & config-driven:
+    - buildCallSummaryPrompt(cfg): schema built from the org's qualifying_fields
+      (same Indian budget rules + hot/warm/cold rules as WhatsApp extraction), plus caller_name
+    - normalizeCallPreferences(): whitelists LLM output to real crm_leads columns
+      (preferred_city/sector/location mapping, enum validation, junk keys dropped,
+      industry extras merged into lead metadata)
+    - caller_name → full_name only when the lead has no name yet
 
 INBOUND (Phase 7, later): caller dials Sarvam number → webhook → findOrCreateLeadByPhone → same processing
 ```
