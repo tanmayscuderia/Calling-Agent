@@ -1,0 +1,71 @@
+{
+  "interaction_id": "20260824/b9180c18-14:25:33-3df96211",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Hello.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते! क्या आप अभी 2 मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "हाँ बताएँ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद। दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी भी कोई property लेने में interested हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "हाँ मुझे 2 BHK property चाहिए Noida में।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n Noida में हमारे पास कुछ options हैं। Central Noida Residency है Sector 76 में, जिसकी price पिचानवे लाख से एक करोड़ पच्चीस लाख रुपये तक है। इसके अलावा कुछ और options भी हैं, क्या आप अपना budget बता सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "बजट है वन करोड़।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। आपके budget में Central Noida Residency एकदम सही रहेगा, जो Sector 76, Noida में है और इसकी price पिचानवे लाख से एक करोड़ पच्चीस लाख रुपये के बीच है। वैसे, आप यह property खुद रहने के लिए देख रहे हैं या investment के लिए?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "और ऑप्शन बताएं?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

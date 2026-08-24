@@ -1,0 +1,71 @@
+{
+  "interaction_id": "20260824/e99ee615-13:35:46-3fb1400d",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "यार ये पता है पुणे में प्रॉपर्टी है नोएडा गुड़दौं में है क्या?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n हाँ जी, नोएडा और गुड़गाँव दोनों जगह options हैं। गुड़गाँव के Sector 14 में एक Penthouse है छह से सात करोड़ रुपये में, और नोएडा के Sector 124 में ATS Knightsbridge है सात दशमलव पाँच से बारह करोड़ रुपये में। वैसे, आप किस तरह की property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "कोई पुणे में है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। पुणे में अभी हमारे पास options नहीं हैं। वैसे, क्या आप investment के लिए देख रहे हैं या खुद रहने के लिए?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "अच्छा ये गुड़गाव का पता है यार।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "हाँ जी, गुड़गाँव में हमारे पास Sector 14 में एक बहुत बढ़िया Penthouse है, जिसकी price छह से सात करोड़ रुपये के बीच है। क्या आप इसकी और details जानना चाहेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "कोई तीन बीएचके और है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n गुड़गाँव में तो अभी 3BHK नहीं दिख रहा है, पर नोएडा के Sector 146 में Godrej Tropical Isle है दो दशमलव दो से तीन दशमलव दो करोड़ रुपये में। इसके अलावा Sector 150 में Demo Heights है एक दशमलव छह पाँच से दो दशमलव एक करोड़ रुपये में। क्या आप नोएडा में देखना चाहेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "नहीं मैं बाद में बात करता हूँ, कुछ save करिए मैं बाद में call कर लूँगा, ठीक है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "कोई बात नहीं जी। मैं आपकी details save कर लेता हूँ, आप जब free हों तब call कर लीजिएगा। धन्यवाद!\n\n",
+      "language_name": "Hindi"
+    }
+  ]
+}

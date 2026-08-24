@@ -192,6 +192,70 @@ export async function getInteractionTranscript(
   );
 }
 
+// ── Analytics interactions API (call list + transcript fetch driver) ──────
+
+export interface InteractionRecord {
+  interaction_id: string;
+  user_identifier?: string | null;
+  duration_in_seconds?: number | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+  language_name?: string | null;
+  num_messages?: number | null;
+  average_agent_response_time_in_seconds?: number | null;
+  average_user_response_time_in_seconds?: number | null;
+  user_contact_masked?: string | null;
+  user_contact_hashed?: string | null;
+  channel_direction?: string | null;
+  retry_attempt?: number | null;
+  campaign_id?: string | null;
+  is_debug_call?: number | null;
+  audio_url?: string | null;
+  ended_by?: string | null;
+  has_log_issues?: number | null;
+  agent_variables?: Record<string, unknown> | null;
+  failure_reason?: string | null;
+}
+
+export interface InteractionsPage {
+  items: InteractionRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+  next_page_uri?: string | null;
+  prev_page_uri?: string | null;
+}
+
+/**
+ * Analytics interactions API — paginated call list with metadata.
+ * Used by exportSarvamTranscripts to drive transcript fetches.
+ */
+export async function listInteractions(opts: {
+  startDatetime: string;
+  endDatetime: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  filterConditions?: Array<{ id: string; field: string; operator: string; value: unknown }>;
+}): Promise<InteractionsPage | null> {
+  const s = config.sarvam;
+  const qs = new URLSearchParams({
+    start_datetime: opts.startDatetime,
+    end_datetime: opts.endDatetime,
+  });
+  if (opts.limit != null) qs.set('limit', String(opts.limit));
+  if (opts.offset != null) qs.set('offset', String(opts.offset));
+  if (opts.sortBy) qs.set('sort_by', opts.sortBy);
+  if (opts.sortOrder) qs.set('sort_order', opts.sortOrder);
+  if (opts.filterConditions) qs.set('filter_conditions', JSON.stringify(opts.filterConditions));
+
+  return sarvamRequest<InteractionsPage>(
+    'GET',
+    `/api/analytics/v1/${s.orgId}/${s.workspaceId}/${s.appId}/interactions?${qs.toString()}`
+  );
+}
+
 // ── Analytics attempts API (inbound caller identity) ──────────────────
 
 export interface AttemptRecord {

@@ -1,0 +1,47 @@
+{
+  "interaction_id": "20260824/e99ee615-13:21:15-dea4de79",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "हमारे यार ये बताओ कोई नोएडा गुड़गांव में है कुछ?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "अभी system में दिख नहीं रहा है, मैं team से कहूँगा कि आपको WhatsApp पर options भेज दें। वैसे, आप किस  <interruption>",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "তিন বি এস পি তিন বি এস পি নয়ডা",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "আচ্ছা, এক second, আমি check করে দেখছি।\n\nআসলে এখন system-এ কিছু দেখা যাচ্ছে না। আমি team-কে বলে দেব যাতে আপনাকে WhatsApp-এ সব options পাঠিয়ে দেয়। \n\nআপনার budget কত টাকার মধ্যে হবে?",
+      "language_name": "Bengali"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "15 বিএইচকে নোইডা পে",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "আচ্ছা, এক second, আমি check করে নিচ্ছি।\n\n আসলে system-এ এখন কিছু দেখা যাচ্ছে না। আমি team-কে বলে দেব যাতে আপনাকে WhatsApp-এ options পাঠিয়ে দেয়। \n\nআপনি কি নিজের থাকার জন্য খুঁজছেন নাকি investment-এর জন্য?",
+      "language_name": "Bengali"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+Interaction: 20260824/e99ee615-13:38:51-b5490691
+Phone: b78894800057e2e3c6f3fe2cea69f49e0d70bed9658e325058c8baed2313f58c  |  Direction: inbound  |  Duration: 37.389930725097656s
+Started: 2026-08-24T08:08:51  |  Ended: 2026-08-24T08:09:28  |  Ended by: USER_ENDS
+Messages: 5  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: पावर थ्री बी एच के कहां कहां है?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हमारे पास नोएडा के Sector 146 में Godrej Tropical Isle है, जिसकी price दो करोड़ बीस लाख से तीन करोड़ बीस लाख रुपये है। इसके अलावा Sector 150 में Demo Heights है, जो एक करोड़ पैंसठ लाख से दो करोड़ दस लाख रुपये के बीच है। 
+
+वैसे, आप किस location पर property देख रहे हैं?
+
+USER: दिल्ली में कुछ है क्या दिल्ली है दिल्ली में?
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

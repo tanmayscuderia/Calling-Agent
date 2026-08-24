@@ -251,19 +251,19 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
     const pSector = norm(p.sector);
     const pLoc = norm(p.location);
 
-    // City match (bidirectional)
-    // Strong penalty: if user specifies a city and it doesn't match,
-    // the property is almost certainly irrelevant.
+    // City match (bidirectional) — HARD GATE
+    // When the caller names a city and it doesn't match, skip the project
+    // entirely. Bonuses (config, budget) must never override wrong-city results.
+    // Fixes: "2BHK in Pune" leaking Noida 2BHKs (score 0.15 > cutoff 0.1).
     if (cityVals.length > 0) {
       const matched = cityVals.some((cv) => pCity.includes(cv) || cv.includes(pCity));
       if (matched && pCity) {
         score += 0.1;
         reasons.push(p.city!);
       } else {
-        score -= 0.4; // strong penalty — effectively excludes non-matching cities
+        continue; // wrong city — skip regardless of config/budget match
       }
     }
-
     // Sector match (bidirectional)
     if (sectorVals.length > 0) {
       const matched = sectorVals.some((sv) => pSector.includes(sv) || sv.includes(pSector));

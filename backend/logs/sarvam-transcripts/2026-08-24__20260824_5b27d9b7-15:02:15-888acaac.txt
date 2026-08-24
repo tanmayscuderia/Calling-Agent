@@ -1,0 +1,13 @@
+Interaction: 20260824/5b27d9b7-15:02:15-888acaac
+Phone: 27fa53ee65b92154037f738c558d744daa3c9f3c09f5c0658c151602849eefee  |  Direction: inbound  |  Duration: 17.860952377319336s
+Started: 2026-08-24T09:32:15  |  Ended: 2026-08-24T09:32:24  |  Ended by: USER_ENDS
+Messages: 3  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: गुड़ुगाव में प्रॉपर्टी है?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हाँ जी, हमारे पास गुड़गांव के Sector 14 में एक Penthouse available है। इसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसी तरह की property देख रहे हैं?

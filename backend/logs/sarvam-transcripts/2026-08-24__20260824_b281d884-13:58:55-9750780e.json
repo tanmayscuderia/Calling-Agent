@@ -1,0 +1,47 @@
+{
+  "interaction_id": "20260824/b281d884-13:58:55-9750780e",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "जी मैं आशीष बोल रहा हूं नोएडा सेक्टर 53 से। मैं एक्चुअली एक",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते आशीष जी। बताइए, आप क्या देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "एक्चुअली मुझे 1 CR के रेंज में 2 BHK एक फ्लैट लेनी लेना है सो मैं कुछ ऑप्शंस के बारे में जानना चाहता हूं।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n हमारे पास Central Noida Residency है, जो Sector 76, Noida में है। इसकी price पचानवे लाख से एक करोड़ पच्चीस लाख रुपये के बीच है। क्या यह आपको suit करेगा?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "जी, यह ऑप्शन सही है। इसके अलावा और कोई ऑप्शन?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं फिर से check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

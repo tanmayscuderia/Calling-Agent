@@ -1,0 +1,29 @@
+Interaction: 20260824/5b27d9b7-15:06:16-77f20dfc
+Phone: 27fa53ee65b92154037f738c558d744daa3c9f3c09f5c0658c151602849eefee  |  Direction: inbound  |  Duration: 74.90095520019531s
+Started: 2026-08-24T09:36:16  |  Ended: 2026-08-24T09:37:31  |  Ended by: USER_ENDS
+Messages: 11  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: जी बोला भाई।
+
+ASSISTANT: धन्यवाद। क्या आप अभी 2 मिनट बात कर सकते हैं?
+
+USER: गुड़गांव में प्रॉपर्टी है क्या कि नहीं?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हाँ जी, गुड़गांव के Sector 14 में हमारे पास एक Penthouse available है। इसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसी तरह की कोई property देख रहे हैं?
+
+USER: पुणे में कोई है?
+
+ASSISTANT: एक second, मैं check करता हूँ। पुणे में अभी हमारे पास options नहीं हैं। वैसे, आप पुणे में ही देख रहे हैं या कोई और city भी suit करेगी?
+
+USER: नोएडा में है कि नहीं है?
+
+ASSISTANT: एक second, मैं check करता हूँ। हाँ जी, नोएडा में हमारे पास तीन options हैं। Sector 124 में ATS Knightsbridge है जिसकी price सात करोड़ पचास लाख से बारह करोड़ रुपये है, Sector 146 में Godrej Tropical Isle है दो करोड़ बीस लाख से साढ़े तीन करोड़ के बीच, और Greater Noida West में Luxury Greens Villa है दो करोड़ अस्सी लाख से चार करोड़ रुपये तक। इनमें से कोई आपको suit करेगा?
+
+USER: कोई और प्रॉपर्टी है क्या कहते हैं? दो-तीन बीएचके की अलग-अलग रेंज है नोएडा में।
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

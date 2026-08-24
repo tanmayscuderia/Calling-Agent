@@ -1,0 +1,25 @@
+Interaction: 20260824/2675e006-18:15:32-cbb7002d
+Phone: 0e9244d007a722f42ac91c0065c9a68f59bf2d05daf596f36a08ff6cac10fe2c  |  Direction: inbound  |  Duration: 60.2029914855957s
+Started: 2026-08-24T12:45:32  |  Ended: 2026-08-24T12:46:32  |  Ended by: USER_ENDS
+Messages: 9  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: Hello.
+
+ASSISTANT: नमस्ते! क्या आप अभी 2 मिनट बात कर सकते हैं?
+
+USER: हाँ बिल्कुल।
+
+ASSISTANT: धन्यवाद! दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी भी property लेने में interested हैं?
+
+USER: हाँ मेरे को पता है ना कुछ नोएडा में गुरगाव में कुछ है प्रॉपर्टी?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हाँ जी, हमारे पास कुछ अच्छे options हैं। गुड़गांव के Sector 14 में एक Penthouse है जिसकी price छह से सात करोड़ रुपये है। नोएडा के Sector 124 में ATS Knightsbridge है, जो साढ़े सात से बारह करोड़ रुपये के बीच है। और Greater Noida West में Luxury Greens Villa है, जिसकी price दो करोड़ अस्सी लाख से चार करोड़ रुपये है। इनमें से कोई आपको suit करेगा?
+
+USER: नहीं कुछ पुणे में है क्या आपके पास?
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

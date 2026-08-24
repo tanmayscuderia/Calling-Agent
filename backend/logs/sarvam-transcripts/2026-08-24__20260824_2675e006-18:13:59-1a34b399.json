@@ -1,0 +1,59 @@
+{
+  "interaction_id": "20260824/2675e006-18:13:59-1a34b399",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Hello.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते! मैं शुभ बोल रहा हूँ, Staffbadhao Testing से। क्या आप अभी 2 मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "हाँ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद। वैसे, क्या आप अभी कोई property देख रहे हैं या investment के लिए कुछ प्लान कर रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "हाँ देख रहा हूँ नोएडा में।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n नोएडा में हमारे पास कुछ अच्छे options हैं। जैसे Sector 124 में ATS Knightsbridge है जिसकी price सात दशमलव पाँच करोड़ से बारह करोड़ रुपये तक है। और Sector 146 में Godrej Tropical Isle है, जो दो दशमलव दो करोड़ से साढ़े तीन करोड़ रुपये के बीच है।\n\nइनमें से कोई आपको suit करता है या आपका कोई specific budget है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "नहीं यार मेरे को पुणे में दिखाओ कुछ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

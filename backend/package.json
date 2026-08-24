@@ -13,7 +13,8 @@
     "test:evals": "VITEST_EVAL_MODE=1 LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run",
     "test:evals:fresh": "VITEST_EVAL_MODE=1 EVAL_NO_CACHE=1 LLM_MAX_CONCURRENT=1 LLM_MIN_DELAY_MS=2000 vitest run",
     "test:evals:dry": "VITEST_EVAL_MODE=1 EVAL_DRY_RUN=1 vitest run",
-    "test:all": "npm test && npm run test:evals"
+    "test:all": "npm test && npm run test:evals",
+    "export:transcripts": "npx tsx scripts/exportSarvamTranscripts.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",

@@ -1,0 +1,35 @@
+{
+  "interaction_id": "20260824/e99ee615-12:22:19-965ac774",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "बाबा ये कुछ पुणे में प्रॉपर्टी है कोई क्या?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n अरे, अभी system में दिख नहीं रहा है। मैं team से कहती हूँ कि आपको WhatsApp पर options भेज दें। वैसे, आपका budget कितना है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "यार एक काम कर चल वहां नहीं होता ना दो करोड़ों से तीन करोड़ों में नोएडा या गुड़गांव में है।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

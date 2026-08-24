@@ -239,7 +239,59 @@ describe('searchProperties', () => {
       expect(cities).toContain('Noida');
       expect(cities).not.toContain('Delhi');
     });
+
+    it('scores matching city higher than non-matching', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({ name: 'Noida A', city: 'Noida', sector: 'Sector 150' }),
+        makeProject({ name: 'Delhi B', city: 'Delhi', sector: 'South Delhi' }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Noida',
+        limit: 5,
+      });
+
+      // Noida project should be in results, Delhi should be excluded
+      const cities = results.map((r) => r.city);
+      expect(cities).toContain('Noida');
+      expect(cities).not.toContain('Delhi');
+    });
+
+    // Regression: config+budget bonus must NOT override wrong-city hard gate.
+    // A "2BHK in Pune" search must return ZERO results even if Noida has
+    // matching 2BHKs with budget overlap (the pre-fix leak path).
+    it('regression: wrong-city config+budget bonus does not leak results (Pune → 0)', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Noida 2BHK Deal',
+          city: 'Noida',
+          sector: 'Sector 146',
+          units: [{ configuration: '2BHK', price_min: 2000000, price_max: 3500000, availability_status: 'available' }],
+        }),
+        makeProject({
+          name: 'Gurgaon Penthouse',
+          city: 'Gurgaon',
+          sector: 'Sector 14',
+          units: [{ configuration: 'Penthouse', price_min: 60000000, price_max: 70000000, availability_status: 'available' }],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Pune',
+        configuration: '2BHK',
+        budgetMax: 5000000,
+        limit: 5,
+      });
+
+      expect(results.length).toBe(0);
+    });
   });
+
+  // ── BUG #3: Projects without unit rows being invisible ──
 
   // ── BUG #3: Projects without unit rows being invisible ──
   describe('Bug #3 fix: projects as primary source', () => {

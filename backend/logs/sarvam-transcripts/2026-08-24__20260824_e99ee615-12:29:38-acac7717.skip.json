@@ -1,0 +1,21 @@
+{
+  "interaction_id": "20260824/e99ee615-12:29:38-acac7717",
+  "call_start": "2026-08-24T06:59:38",
+  "call_end": "2026-08-24T06:59:56",
+  "tool_calls_in_window": 0,
+  "skipped": [],
+  "incidents": [
+    {
+      "type": "garbage_phrase",
+      "turn_index": 2,
+      "speaker": "ASSISTANT",
+      "text": "एक second, मैं check करता हूँ। अरे, है क्या तू?"
+    },
+    {
+      "type": "broken_tool_promise",
+      "turn_index": 2,
+      "speaker": "ASSISTANT",
+      "text": "एक second, मैं check करता हूँ। अरे, है क्या तू?"
+    }
+  ]
+}
