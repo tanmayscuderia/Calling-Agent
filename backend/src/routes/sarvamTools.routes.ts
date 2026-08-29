@@ -25,6 +25,7 @@ import { normalizePhone } from '../utils/phone';
 import { getAgentConfig } from '../ai/agentConfigService';
 import { searchInventory, InventoryMatch } from '../ai/inventorySearch';
 import { getLeadMessages } from '../crm/leadService';
+import { getInventorySnapshot } from '../crm/propertyService';
 import { parseFreeTextQuery, type ParsedQuery } from '../sarvam/queryParser';
 import type { ExtractedData } from '../ai/agentTypes';
 
@@ -131,6 +132,13 @@ export function parseInventoryQuery(q: Record<string, any>): ExtractedData {
     extracted.location = String(q.location);
   }
   if (q.city) extracted.city = String(q.city);
+  // City-like location values must respect the hard city gate. Live
+  // 2026-08-28: location="New York Goa" / "Allahabad" returned an unfiltered
+  // top-3 because the location param only fed the soft-scoring path.
+  if (!extracted.city && extracted.preferred_location) {
+    const pl = parseFreeTextQuery(extracted.preferred_location);
+    if (pl.cities.length > 0) extracted.city = pl.cities[0];
+  }
   if (q.area) extracted.area = String(q.area);
   if (q.configuration) extracted.configuration = String(q.configuration);
   if (q.budget_min) extracted.budget_min = num(q.budget_min);
@@ -454,6 +462,61 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
       logger.error({ err: (err as Error).message }, '[SarvamTools] lead lookup failed — starting fresh');
       logToolCall({ event: 'lead-context.fallback', ms: Date.now() - started });
       return { found: false, lead: null, recent_messages: [], note: 'context unavailable, start fresh' };
+    }
+  });
+
+  /**
+   * GET /api/tools/sarvam/inventory-snapshot
+   * on_start hook: pre-loads a COMPACT full-inventory summary into an agent
+   * variable at call start. Resilience layer against the Sarvam harness bug
+   * where a mid-call dispatch silently dies (docs/sarvam-tool-failure-evidence.md):
+   * with the snapshot loaded, the agent can answer availability questions
+   * ("पुणे में कुछ है?") even when every live tool call fails.
+   * Dashboard: map reply field `inventory_summary` into an agent variable.
+   */
+  app.get('/api/tools/sarvam/inventory-snapshot', async (req, reply) => {
+    const started = Date.now();
+    logToolCall({
+      event: 'inventory-snapshot.request',
+      method: req.method,
+      url: req.url,
+      headers: maskHeaders(req.headers as Record<string, unknown>),
+    });
+    if (!authorized(req)) {
+      logToolCall({ event: 'inventory-snapshot.401', ms: Date.now() - started });
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+
+    const q = req.query as Record<string, any>;
+    const orgId = String(q.orgId ?? config.defaultOrgId);
+
+    // NEVER fail this hook — an empty summary tells the agent to use the
+    // graceful line instead of inventing stock.
+    try {
+      const snap = await withTimeout(getInventorySnapshot(orgId), 8000, 'inventory-snapshot');
+      logToolCall({
+        event: 'inventory-snapshot.200',
+        ms: Date.now() - started,
+        total: snap.total_properties,
+      });
+      return {
+        inventory_summary: snap.text,
+        available_cities: snap.cities,
+        total_properties: snap.total_properties,
+        note: 'Pre-loaded at call start. If live tools fail, answer from inventory_summary. Never invent properties outside this list.',
+      };
+    } catch (err) {
+      logger.error(
+        { err: (err as Error).message },
+        '[SarvamTools] inventory snapshot failed — returning empty summary'
+      );
+      logToolCall({ event: 'inventory-snapshot.fallback', ms: Date.now() - started });
+      return {
+        inventory_summary: '',
+        available_cities: [],
+        total_properties: 0,
+        note: 'inventory unavailable — do not invent properties',
+      };
     }
   });
 

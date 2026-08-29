@@ -1,0 +1,27 @@
+{
+  "interaction_id": "20260828/e99ee615-23:44:41-ef63caec",
+  "call_start": "2026-08-28T18:14:41",
+  "call_end": "2026-08-28T18:14:59",
+  "tool_calls_in_window": 0,
+  "skipped": [],
+  "incidents": [
+    {
+      "type": "garbage_phrase",
+      "turn_index": 2,
+      "speaker": "ASSISTANT",
+      "text": "एक second, मैं check करता हूँ। अरे, है क्या तू?"
+    },
+    {
+      "type": "broken_tool_promise",
+      "turn_index": 2,
+      "speaker": "ASSISTANT",
+      "text": "एक second, मैं check करता हूँ। अरे, है क्या तू?"
+    }
+  ],
+  "harness": {
+    "has_log_issues": 0,
+    "failure_reason": "NO_FAILURE_REASON",
+    "ended_by": "AGENT_ENDS",
+    "server_retry_attempt": 1
+  }
+}

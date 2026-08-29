@@ -617,6 +617,11 @@ Live inventory search mid-call. **Preferred: one agent-filled `query` param** wi
 
 `filters` echoes what was applied — use it to verify each match. `count: 0` + a `note` (e.g. "ask the caller for their budget") is the graceful no-results/error path.
 
+### GET /api/tools/sarvam/inventory-snapshot
+Called by a second on_start hook at CALL START. Returns a compact voice-friendly summary of ALL findable inventory (projects LEFT JOIN units; prices/configs from `availability_status = 'available'` units only — sold-out projects show "price on request"). Map reply field `inventory_summary` into an agent variable; prompt v7.5 rule 11(ख) makes the agent answer availability from it when mid-call tool dispatches fail (harness bug — `docs/sarvam-tool-failure-evidence.md`), so availability questions never depend on a live dispatch.
+
+**Response:** `{ "inventory_summary": "AVAILABLE INVENTORY (only these exist — never invent others): Noida — Central Noida Residency (Sector 124) 2BHK/3BHK 1.2–1.5 cr | …", "available_cities": ["Noida"], "total_properties": 3, "note": "…" }` — on internal error: empty summary + `total_properties: 0` (never 5xx).
+
 ---
 
 ## Agent Configuration

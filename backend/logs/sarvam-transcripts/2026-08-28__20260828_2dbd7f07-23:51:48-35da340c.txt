@@ -1,0 +1,51 @@
+Interaction: 20260828/2dbd7f07-23:51:48-35da340c
+Phone: fb7c74068c7d0cebf80514033c63ac95e7a932ac19029fae47ab853fea4c54a0  |  Direction: inbound  |  Duration: 113.37995147705078s
+Started: 2026-08-28T18:21:48  |  Ended: 2026-08-28T18:23:41  |  Ended by: AGENT_ENDS
+Messages: 21  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: Hello.
+
+ASSISTANT: नमस्ते! क्या आप अभी 2 मिनट बात कर सकते हैं?
+
+USER: हाँ जी बताइए।
+
+ASSISTANT: धन्यवाद! दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी भी property लेने में interested हैं?
+
+USER: अह कहां पर?
+
+ASSISTANT: अरे, वो मैं आपसे ही पूछना चाह रहा था। आप किस location पर property देख रहे हैं?
+
+USER: आप कहां पे ओन करते हैं प्रॉपर्टी? आप कहां दिखा सकते हैं प्रॉपर्टी?
+
+ASSISTANT: दरअसल, हमारे पास कई locations पर options available हैं। आप बस अपनी पसंद की city या area बता दीजिए, मैं check करके आपको best options बता दूँगा।
+
+USER: इलाहाबाद में?
+
+ASSISTANT: माफ़ कीजिए, इलाहाबाद में अभी हमारे पास कोई property available <interruption>
+
+USER: मैं इसीलिए तो पूछ रहा था आप कहां दिखा सकते हो?
+
+ASSISTANT: हाँ जी, मैं समझ सकता हूँ। फिलहाल हमारे पास Delhi, Gurgaon और Greater Noida West में बहुत अच्छे options हैं। क्या इनमें से कोई location आपके काम की है?
+
+USER: गुड़गाव में भी है?
+
+ASSISTANT: हाँ जी, गुड़गांव में भी options हैं। एक second, मैं check करता हूँ।
+
+ गुड़गांव के Sector 14 में हमारे पास एक Penthouse available है, जिसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसी तरह की property देख रहे हैं या आपका budget कुछ और है?
+
+USER: Uh, देख तो ऐसी ही property रहा हूं but I am looking for a budget friendly option.
+
+ASSISTANT: अच्छा, मैं समझ गया। वैसे आपका budget कितना है, ताकि मैं आपके लिए कुछ budget friendly options check कर सकूँ?
+
+USER: Around one CR?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ माफ़ कीजिए, गुड़गांव में एक करोड़ के budget में अभी कोई property available नहीं है। वैसे, क्या आप Noida या Delhi की तरफ भी options देखना चाहेंगे?
+
+USER: जी बिल्कुल।
+
+ASSISTANT: ठीक है। एक second, मैं check करता हूँ कि Noida और Delhi में एक करोड़ के budget में क्या available है। अरे, है क्या तू?

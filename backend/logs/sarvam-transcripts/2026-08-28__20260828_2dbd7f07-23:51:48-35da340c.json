@@ -1,0 +1,131 @@
+{
+  "interaction_id": "20260828/2dbd7f07-23:51:48-35da340c",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Hello.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते! क्या आप अभी 2 मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "हाँ जी बताइए।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद! दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी भी property लेने में interested हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "अह कहां पर?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "अरे, वो मैं आपसे ही पूछना चाह रहा था। आप किस location पर property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "आप कहां पे ओन करते हैं प्रॉपर्टी? आप कहां दिखा सकते हैं प्रॉपर्टी?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "दरअसल, हमारे पास कई locations पर options available हैं। आप बस अपनी पसंद की city या area बता दीजिए, मैं check करके आपको best options बता दूँगा।",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "इलाहाबाद में?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "माफ़ कीजिए, इलाहाबाद में अभी हमारे पास कोई property available <interruption>",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 12,
+      "role": "user",
+      "content": "मैं इसीलिए तो पूछ रहा था आप कहां दिखा सकते हो?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 13,
+      "role": "assistant",
+      "content": "हाँ जी, मैं समझ सकता हूँ। फिलहाल हमारे पास Delhi, Gurgaon और Greater Noida West में बहुत अच्छे options हैं। क्या इनमें से कोई location आपके काम की है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 14,
+      "role": "user",
+      "content": "गुड़गाव में भी है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 15,
+      "role": "assistant",
+      "content": "हाँ जी, गुड़गांव में भी options हैं। एक second, मैं check करता हूँ।\n\n गुड़गांव के Sector 14 में हमारे पास एक Penthouse available है, जिसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसी तरह की property देख रहे हैं या आपका budget कुछ और है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 16,
+      "role": "user",
+      "content": "Uh, देख तो ऐसी ही property रहा हूं but I am looking for a budget friendly option.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 17,
+      "role": "assistant",
+      "content": "अच्छा, मैं समझ गया। वैसे आपका budget कितना है, ताकि मैं आपके लिए कुछ budget friendly options check कर सकूँ?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 18,
+      "role": "user",
+      "content": "Around one CR?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 19,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n माफ़ कीजिए, गुड़गांव में एक करोड़ के budget में अभी कोई property available नहीं है। वैसे, क्या आप Noida या Delhi की तरफ भी options देखना चाहेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 20,
+      "role": "user",
+      "content": "जी बिल्कुल।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 21,
+      "role": "assistant",
+      "content": "ठीक है। एक second, मैं check करता हूँ कि Noida और Delhi में एक करोड़ के budget में क्या available है। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

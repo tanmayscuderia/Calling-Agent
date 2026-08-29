@@ -96,6 +96,104 @@ export async function createUnit(orgId: string, input: Record<string, any>) {
   return data;
 }
 
+// ── Inventory snapshot (Sarvam on_start resilience layer) ──
+
+export interface InventorySnapshot {
+  text: string;
+  cities: string[];
+  total_properties: number;
+}
+
+function formatInrRange(min: number, max: number): string {
+  const parts = (v: number): { n: string; unit: string } => {
+    if (v >= 1_00_00_000) return { n: String(Math.round((v / 1_00_00_000) * 10) / 10), unit: 'cr' };
+    if (v >= 1_00_000) return { n: String(Math.round((v / 1_00_000) * 10) / 10), unit: 'L' };
+    return { n: String(Math.round(v)), unit: '' };
+  };
+  const side = (p: { n: string; unit: string }): string => `${p.n} ${p.unit}`.trim();
+  if (min > 0 && max > 0 && min !== max) {
+    const a = parts(min);
+    const b = parts(max);
+    // Same unit → compact "1.2–2.1 cr"; mixed units → "45 L–1.2 cr"
+    return a.unit === b.unit ? `${a.n}–${b.n} ${b.unit}`.trim() : `${side(a)}–${side(b)}`;
+  }
+  if (max > 0) return side(parts(max));
+  if (min > 0) return side(parts(min));
+  return 'price on request';
+}
+
+/**
+ * Compact summary of ALL findable inventory (projects LEFT JOIN units — every
+ * project appears even with no available units, priced "price on request").
+ * Prices/configs come ONLY from units with availability_status === 'available'
+ * so a sold-out project never advertises a price.
+ *
+ * Purpose: loaded into a Sarvam agent variable at CALL START via the
+ * /api/tools/sarvam/inventory-snapshot on_start hook. Resilience: if mid-call
+ * tool dispatches die (Sarvam harness bug — see
+ * docs/sarvam-tool-failure-evidence.md), the agent still KNOWS the inventory
+ * and can answer "पुणे में कुछ है?" without any live dispatch.
+ */
+export async function getInventorySnapshot(orgId: string): Promise<InventorySnapshot> {
+  const { data, error } = await supabaseAdmin()
+    .from('real_estate_projects')
+    .select(
+      'name, city, sector, units:real_estate_units ( configuration, title, price_min, price_max, availability_status )'
+    )
+    .eq('org_id', orgId);
+  if (error) throw error;
+
+  const byCity = new Map<
+    string,
+    { name: string; sector: string | null; min: number; max: number; configs: Set<string> }[]
+  >();
+  for (const p of data ?? []) {
+    const city = String(p.city ?? '').trim() || 'Unknown';
+    const units: any[] = Array.isArray(p.units) ? p.units : [];
+    const available = units.filter((u) => u.availability_status === 'available');
+
+    const mins = available.map((u) => Number(u.price_min) || 0).filter((v) => v > 0);
+    const maxs = available.map((u) => Number(u.price_max) || 0).filter((v) => v > 0);
+    const configs = new Set<string>();
+    for (const u of available) {
+      const cfg = String(u.configuration ?? '').trim();
+      if (cfg) configs.add(cfg);
+    }
+
+    const entry = {
+      name: String(p.name ?? '').trim() || 'Unnamed project',
+      sector: String(p.sector ?? '').trim() || null,
+      min: mins.length > 0 ? Math.min(...mins) : 0,
+      max: maxs.length > 0 ? Math.max(...maxs) : 0,
+      configs,
+    };
+    if (!byCity.has(city)) byCity.set(city, []);
+    byCity.get(city)!.push(entry);
+  }
+
+  const cities = [...byCity.keys()].sort((a, b) => a.localeCompare(b));
+  const total_properties = cities.reduce((n, c) => n + byCity.get(c)!.length, 0);
+
+  const text =
+    cities.length === 0
+      ? ''
+      : `AVAILABLE INVENTORY (only these exist — never invent others): ${cities
+          .map((city) => {
+            const projs = byCity
+              .get(city)!
+              .map((pr) => {
+                const cfg = pr.configs.size > 0 ? ` ${[...pr.configs].slice(0, 4).join('/')}` : '';
+                const sector = pr.sector ? ` (${pr.sector})` : '';
+                return `${pr.name}${sector}${cfg} ${formatInrRange(pr.min, pr.max)}`;
+              })
+              .join('; ');
+            return `${city} — ${projs}`;
+          })
+          .join(' | ')}`;
+
+  return { text, cities, total_properties };
+}
+
 function norm(s?: string | null): string {
   return (s ?? '').trim().toLowerCase();
 }
@@ -275,12 +373,25 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
       }
     }
 
-    // Location match (bidirectional, checks both location and sector fields)
+    // Location match (bidirectional, checks location + sector + city fields)
+    // REQUIREMENT, not a bonus: a caller-named location the project doesn't
+    // have (city/sector/location) excludes it entirely. Live 2026-08-28:
+    // location="Allahabad" / "New York Goa" leaked an unfiltered top-3 because
+    // a non-matching location previously cost nothing (base 0.35 passed).
+    // City is included in the check so a locationRaw equal to the city name
+    // ("2BHK Noida" -> location "Noida") never wrongly excludes a match.
     if (locVals.length > 0) {
-      const matched = locVals.some((lv) => pLoc.includes(lv) || lv.includes(pLoc) || pSector.includes(lv) || lv.includes(pSector));
+      const matched = locVals.some(
+        (lv) =>
+          (pLoc && (pLoc.includes(lv) || lv.includes(pLoc))) ||
+          (pSector && (pSector.includes(lv) || lv.includes(pSector))) ||
+          (pCity && (pCity.includes(lv) || lv.includes(pCity)))
+      );
       if (matched) {
         score += 0.05;
         reasons.push(p.location ?? p.sector ?? '');
+      } else {
+        continue; // wrong/unknown location — skip regardless of other bonuses
       }
     }
 

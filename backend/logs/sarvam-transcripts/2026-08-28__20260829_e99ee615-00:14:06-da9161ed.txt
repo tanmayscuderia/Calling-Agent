@@ -1,0 +1,21 @@
+Interaction: 20260829/e99ee615-00:14:06-da9161ed
+Phone: b78894800057e2e3c6f3fe2cea69f49e0d70bed9658e325058c8baed2313f58c  |  Direction: inbound  |  Duration: 52.62394714355469s
+Started: 2026-08-28T18:44:06  |  Ended: 2026-08-28T18:44:58  |  Ended by: AGENT_ENDS
+Messages: 7  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: Man, do you have any properties in New York or Goa?
+
+ASSISTANT: One second, let me check that for you.
+
+ Actually, I don't see anything in New York or Goa right now. But I do have some great options in Delhi, Noida, and Gurgaon. Would you be interested in any of those?
+
+USER: पवन नोएडा में करा बताइए।
+
+ASSISTANT: नोएडा में मेरे पास कुछ अच्छे options हैं। Sector 124 में ATS Knightsbridge है जिसकी price साढ़े सात से बारह करोड़ रुपये है, और Sector 146 में Godrej Tropical Isle है जो दो करोड़ बीस लाख से साढ़े तीन कर <interruption>
+
+USER: पुणे में कुछ है? पुणे में कुछ है?
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

@@ -115,6 +115,76 @@ interface InteractionsPage {
   next_page_uri?: string | null;
 }
 
+interface AttemptRecord {
+  attempt_id?: string;
+  interaction_id?: string;
+  ended_by?: string | null;
+  failure_reason?: string | null;
+  has_log_issues?: number | null;
+  server_retry_attempt?: number | null;
+  [k: string]: unknown;
+}
+
+interface AttemptsPage {
+  items: AttemptRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+  next_page_uri?: string | null;
+}
+
+/** Harness-side flags from the attempts API (Sarvam's own issue telemetry). */
+interface HarnessFlags {
+  has_log_issues?: number | null;
+  failure_reason?: string | null;
+  ended_by?: string | null;
+  server_retry_attempt?: number | null;
+}
+
+type AttemptsMap = Map<string, HarnessFlags>;
+
+/**
+ * Page through attempts for the same window, indexed by interaction_id.
+ * `has_log_issues = 1` + `failure_reason` are Sarvam's OWN telemetry that a
+ * call had harness problems (e.g. the tool-dispatch crashes that never reach
+ * our endpoint). This is the only API-visible slice of what the dashboard's
+ * Log Analyser shows — turn-level tool details remain dashboard-only.
+ */
+async function fetchAllAttempts(): Promise<AttemptsMap> {
+  const map: AttemptsMap = new Map();
+  let offset = 0;
+  const limit = 500;
+
+  while (true) {
+    const qs = new URLSearchParams({
+      start_datetime: startDt,
+      end_datetime: endDt,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const url = `${API_BASE}/attempts?${qs}`;
+    const page = await sarvamGet<AttemptsPage>(url);
+    if (!page?.items) {
+      console.error(`  ✗ attempts page failed at offset ${offset}`);
+      break;
+    }
+    for (const a of page.items) {
+      if (!a.interaction_id) continue;
+      map.set(String(a.interaction_id), {
+        has_log_issues: a.has_log_issues ?? null,
+        failure_reason: a.failure_reason ?? null,
+        ended_by: a.ended_by ?? null,
+        server_retry_attempt: a.server_retry_attempt ?? null,
+      });
+    }
+    console.log(`  → fetched ${page.items.length} attempts (offset ${offset}, total ${page.total})`);
+    if (offset + limit >= page.total || !page.next_page_uri) break;
+    offset += limit;
+  }
+
+  return map;
+}
+
 type TranscriptResponse = Record<string, unknown>;
 
 // ── Page through interactions ────────────────────────────────────────────
@@ -196,7 +266,7 @@ function extractTurns(raw: TranscriptResponse): Array<{ speaker: string; text: s
   return [{ speaker: 'RAW', text: JSON.stringify(raw, null, 2) }];
 }
 
-async function fetchAndSaveTranscript(interaction: InteractionRecord): Promise<void> {
+async function fetchAndSaveTranscript(interaction: InteractionRecord, attempts: AttemptsMap): Promise<void> {
   const id = interaction.interaction_id;
   const prefix = datePrefix(interaction.start_datetime);
   const safe = safeFileName(id);
@@ -234,11 +304,14 @@ async function fetchAndSaveTranscript(interaction: InteractionRecord): Promise<v
   const body = turns.map((t) => `${t.speaker}: ${t.text}`).join('\n\n');
   fs.writeFileSync(txtPath, `${header}\n\n${body}\n`, 'utf-8');
 
-  // Run skip + incident detection
+  // Run skip + incident detection, plus harness flags from the attempts API
   const skipResult = await detectSkips(interaction, turns);
+  const harness = attempts.get(id);
+  if (harness) skipResult.harness = harness;
   const hasSkips = skipResult.skipped.length > 0;
   const hasIncidents = skipResult.incidents.length > 0;
-  if (hasSkips || hasIncidents) {
+  const hasHarnessIssue = harness?.has_log_issues === 1;
+  if (hasSkips || hasIncidents || hasHarnessIssue) {
     fs.writeFileSync(skipPath, JSON.stringify(skipResult, null, 2), 'utf-8');
     const parts: string[] = [];
     if (hasSkips) parts.push(`${skipResult.skipped.length} skip(s)`);
@@ -311,6 +384,8 @@ interface SkipAnalysis {
     speaker: string;
     text: string;
   }>;
+  /** Sarvam-side harness flags (attempts API) — crash/issue telemetry. */
+  harness?: HarnessFlags;
 }
 
 
@@ -381,8 +456,10 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const interactions = await fetchAllInteractions();
+  const attempts = await fetchAllAttempts();
+  const flaggedCalls = [...attempts.entries()].filter(([, h]) => h.has_log_issues === 1);
   console.log();
-  console.log(`ℹ️  Found ${interactions.length} interaction(s)`);
+  console.log(`ℹ️  Found ${interactions.length} interaction(s) — ${flaggedCalls.length} harness-flagged (has_log_issues)`);
   console.log();
 
   if (interactions.length === 0) {
@@ -393,7 +470,7 @@ async function main() {
   for (const interaction of interactions) {
     const dur = interaction.duration_in_seconds ? `${Math.round(interaction.duration_in_seconds)}s` : '?';
     console.log(`── ${interaction.interaction_id}  ${interaction.start_datetime?.slice(0, 19) ?? '?'}  ${dur}  ${interaction.channel_direction ?? '?'} ──`);
-    await fetchAndSaveTranscript(interaction);
+    await fetchAndSaveTranscript(interaction, attempts);
   }
 
   // ── Summary ──
@@ -415,7 +492,7 @@ async function main() {
   console.log(`✅ Done. ${interactions.length} transcript(s) saved to ${OUT_DIR}`);
   if (totalIncidents > 0) {
     console.log(`⚠️  ${totalIncidents} incident(s): ${totalGarbage} garbage phrase(s), ${totalBroken} broken tool promise(s)`);
-    console.log('   → Fix: set "If it fails" in Sarvam dashboard tool config + update prompt to v7.2');
+    console.log('   → Mitigate: prompt v7.4 retry chain + inventory_search_backup tool; escalate to Sarvam (docs/sarvam-tool-failure-evidence.md)');
   }
   if (totalSkips > 0) {
     console.log(`⚠️  ${totalSkips} caller turn(s) with inventory intent but no tool call (see .skip.json files)`);

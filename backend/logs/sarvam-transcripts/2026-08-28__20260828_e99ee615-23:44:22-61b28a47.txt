@@ -1,0 +1,7 @@
+Interaction: 20260828/e99ee615-23:44:22-61b28a47
+Phone: b78894800057e2e3c6f3fe2cea69f49e0d70bed9658e325058c8baed2313f58c  |  Direction: inbound  |  Duration: 11.098957061767578s
+Started: 2026-08-28T18:14:22  |  Ended: 2026-08-28T18:14:33  |  Ended by: AGENT_ENDS
+Messages: 1  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ अरे, है क्या तू?

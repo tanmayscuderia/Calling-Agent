@@ -78,7 +78,7 @@ vi.mock('../../src/db/supabase', () => ({
 }));
 
 // Import AFTER mocks
-import { searchProperties, clearSearchCache } from '../../src/crm/propertyService';
+import { searchProperties, clearSearchCache, getInventorySnapshot } from '../../src/crm/propertyService';
 
 beforeEach(() => {
   mockProjects = [];
@@ -776,5 +776,74 @@ describe('searchProperties', () => {
       expect(results.length).toBe(1);
       expect(results[0].score).toBeGreaterThan(0.5); // config bonus applied
     });
+  });
+});
+
+// ── getInventorySnapshot (Sarvam on_start resilience layer) ──
+// Feeds /api/tools/sarvam/inventory-snapshot → agent variable
+// `inventory_summary`, so the voice agent can answer availability even when
+// mid-call tool dispatches fail (docs/sarvam-tool-failure-evidence.md).
+
+describe('getInventorySnapshot', () => {
+  beforeEach(() => {
+    mockProjects = [];
+    clearSearchCache();
+  });
+
+  it('groups projects by city with configs, sector and price range from AVAILABLE units', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Central Noida Residency',
+        city: 'Noida',
+        sector: 'Sector 124',
+        units: [
+          makeUnit({ configuration: '2BHK', priceMin: 12_000_000, priceMax: 15_000_000 }),
+          makeUnit({ configuration: '3BHK', priceMin: 18_000_000, priceMax: 21_000_000 }),
+        ],
+      }),
+      makeProject({
+        name: 'ATS Knightsbridge',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '4BHK', priceMin: 75_000_000, priceMax: 120_000_000 })],
+      }),
+    ];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.total_properties).toBe(2);
+    expect(snap.cities).toEqual(['Noida']);
+    expect(snap.text).toContain('Central Noida Residency (Sector 124)');
+    expect(snap.text).toContain('2BHK/3BHK');
+    expect(snap.text).toContain('1.2–2.1 cr');
+    expect(snap.text).toContain('7.5–12 cr');
+    expect(snap.text).toContain('Noida —');
+  });
+
+  it('lists a sold-out project as "price on request" (never advertises sold prices)', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Sold Out Tower',
+        city: 'Gurgaon',
+        units: [makeUnit({ configuration: '3BHK', priceMin: 9_000_000, availability: 'sold' })],
+      }),
+    ];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.total_properties).toBe(1);
+    expect(snap.cities).toEqual(['Gurgaon']);
+    expect(snap.text).toContain('Sold Out Tower');
+    expect(snap.text).toContain('price on request');
+    expect(snap.text).not.toContain('9');
+  });
+
+  it('returns empty text and no cities when there is no inventory', async () => {
+    mockProjects = [];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.text).toBe('');
+    expect(snap.cities).toEqual([]);
+    expect(snap.total_properties).toBe(0);
   });
 });
