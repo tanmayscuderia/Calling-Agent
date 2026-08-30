@@ -531,6 +531,33 @@ call_sessions (1 call = 1 session)
   └── ai_agent_runs (AI processing records)
 ```
 
+### Sarvam Real Calls (Production Telephony)
+
+```
+Outbound: Lead page → POST /api/calls/start-real
+  → sarvamClient.placeCall() (apps.sarvam.ai API)
+  → call_session (provider=sarvam, external_call_id=attempt_id, initiated)
+
+Mid-call (agent tools, called BY Sarvam):
+  GET /api/tools/sarvam/lead-context?phone=…      ← on_start personalization
+  GET /api/tools/sarvam/inventory-search?query=…  ← live inventory
+       └─ queryParser.ts parses free text (EN/Hindi) →
+          city / sector / configuration / budget filters
+       └─ never-5xx: any error → HTTP 200 {count:0, note} fallback
+       └─ 8s withTimeout so a hung query can't stall the call
+
+Completion: POST /webhooks/sarvam/:secret (secret-in-path auth)
+  → sarvam_webhook_events (raw payload, idempotent)
+  → job_queue: process_call_result
+  → callResultService: map status → transcript turns →
+     DeepSeek summary → lead enrichment (temperature, prefs) →
+     auto follow-ups (callback / site visit / booking)
+
+Inbound (Phase S5): SARVAM_INBOUND_NUMBER → same webhook →
+  analytics API resolves caller → find-or-create lead (source=inbound_call)
+  → optional inboundPoller catches missed webhooks
+```
+
 ---
 
 ## 7. Frontend Architecture
@@ -676,6 +703,9 @@ backend/src/db/supabase.ts
 | 8 | `20260104_0001_more_industry_templates.sql` | 4 more templates (legal, auto, salon, insurance) |
 | 9 | `20260105_0001_fix_dequeue_rpc_ambiguous.sql` | Fix column ambiguity in dequeue_job RPC |
 | 10 | `20260106_0001_generic_inventory_items.sql` | Generic inventory table + `inventory_schema` on agent_configs |
+| 11 | `20260107_0001_location_features.sql` | Location sharing + alias resolution features |
+| 12 | `20260108_0001_sarvam_calls.sql` | Sarvam provider CHECK, `interaction_id`, webhook idempotency index, `sarvam_webhook_events` |
+| 13 | `20260109_0001_sarvam_fixes.sql` | Schema alignment: `job_type` CHECK += `process_call_result`/`send_location`, `status` CHECK += `no_answer`/`busy`, `failure_reason`/`lead_temperature` cols |
 
 ### Table Groups
 
@@ -935,7 +965,9 @@ npm run eval
 | **Conversations** | `GET /api/conversations`, `GET /api/conversations/:id`, `PATCH /api/conversations/:id`, `POST /api/conversations/:id/send`, `POST /api/conversations/:id/handoff` |
 | **Inventory** | `GET /api/inventory/projects`, `POST /api/inventory/projects`, `GET /api/inventory/units`, `POST /api/inventory/units`, `GET /api/inventory/search`, `GET/POST /api/inventory/items` (generic) |
 | **Upload** | `POST /api/upload/properties-csv`, `POST /api/upload/inventory-csv` (generic) |
-| **Calls** | `POST /api/calls/start-demo`, `POST /api/calls/:id/turn`, `POST /api/calls/:id/end`, `GET /api/calls/:id` |
+| **Calls** | `POST /api/calls/start-demo`, `POST /api/calls/start-real` (Sarvam), `POST /api/calls/:id/turn`, `POST /api/calls/:id/end`, `GET /api/calls/:id` |
+| **Sarvam Webhook** | `POST /webhooks/sarvam/:secret` (secret-in-path auth, async `process_call_result` job) |
+| **Sarvam Tools** | `GET /api/tools/sarvam/lead-context`, `GET /api/tools/sarvam/inventory-search` (mid-call, never-5xx, `X-Tool-Secret` auth) |
 | **Agent Config** | `GET /api/agent/config`, `PUT /api/agent/config`, `GET /api/agent/templates`, `POST /api/agent/apply-template` |
 | **AI** | `POST /api/ai/test-extraction`, `POST /api/ai/test-reply` |
 

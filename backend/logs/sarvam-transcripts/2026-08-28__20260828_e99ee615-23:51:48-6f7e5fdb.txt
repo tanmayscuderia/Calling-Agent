@@ -1,0 +1,17 @@
+Interaction: 20260828/e99ee615-23:51:48-6f7e5fdb
+Phone: b78894800057e2e3c6f3fe2cea69f49e0d70bed9658e325058c8baed2313f58c  |  Direction: inbound  |  Duration: 29.37496566772461s
+Started: 2026-08-28T18:21:48  |  Ended: 2026-08-28T18:22:17  |  Ended by: AGENT_ENDS
+Messages: 5  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: कोई एक टीम इसके पुणे में है क्या?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ दरअसल, अभी पुणे में हमारे पास कोई property available नहीं है। वैसे, आप किस तरह की property देख रहे हैं?
+
+USER: यार ये हमको तीन घंटे चाहिए थे कोई दिल्ली एनसीआर में है या नौडिया गुड़गांव में?
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

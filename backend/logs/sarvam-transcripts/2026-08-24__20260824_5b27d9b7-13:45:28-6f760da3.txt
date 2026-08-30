@@ -1,0 +1,49 @@
+Interaction: 20260824/5b27d9b7-13:45:28-6f760da3
+Phone: 27fa53ee65b92154037f738c558d744daa3c9f3c09f5c0658c151602849eefee  |  Direction: inbound  |  Duration: 103.34992980957031s
+Started: 2026-08-24T08:15:28  |  Ended: 2026-08-24T08:17:11  |  Ended by: AGENT_ENDS
+Messages: 15  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: भैया ये बताओ यार ये गुड़गांव में कुछ है? तीन बीएचके या दो बीएचके?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हाँ जी, गुड़गांव के Sector 14 में एक Penthouse available है, जिसकी price छह से सात करोड़ रुपये के बीच है। वैसे, क्या आपका कोई specific budget है?
+
+USER: उसका कुछ specs बताए यार क्या क्या है इसमें और नोएडा में बता कोई तीन बी एस क्यू।
+
+ASSISTANT: देखिए, वो Sector 14 वाला Penthouse ready to move है और उसमें 4BHK का space है।
+
+एक second, मैं नोएडा के options check करता हूँ।
+
+ नोएडा में Godrej Tropical Isle है Sector 146 में, जिसकी price दो करोड़ बीस लाख से तीन करोड़ बीस लाख रुपये है। इसके अलावा Sector 150 में Demo Heights है, जो एक करोड़ पैंसठ लाख से दो करोड़ दस लाख रुपये के बीच है।
+
+इनमें से कोई आपको suit करेगा?
+
+USER: ये रहते हैं। पुणे में कुछ है?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ अरे, पुणे में अभी हमारे पास कोई options नहीं हैं। वैसे, क्या आप investment के लिए देख रहे हैं या खुद रहने के लिए?
+
+USER: खुद ही रहने के लिए देखना है अपने को वहां पे नोएडा या गुड़गांव या दिल्ली में। दिल्ली में कुछ है?
+
+ASSISTANT: एक second, मैं check करता हूँ।दिल्ली में South Delhi में एक Super Luxury Green Villa available है, जिसकी price पाँच से छह करोड़ रुपये के बीच है।
+
+क्या ये आपकी budget range में है?
+
+USER: हाँ ये तो है यार।
+
+ASSISTANT: अरे वाह, बहुत बढ़िया! तो क्या मैं team से कहूँ कि आपको इस property की सारी details WhatsApp पर भेज दें?
+
+USER: हाँ हाँ भिजवा देना यार यार कह देना।
+
+ASSISTANT: ठीक है जी, मैं अभी team को बोल देता हूँ कि आपको best options के साथ सारी details WhatsApp कर दें। आपका नाम और WhatsApp number वही है ना जिस पर मैंने call किया है?
+
+USER: हाँ हाँ हाँ यही है भाई।
+
+ASSISTANT: बिल्कुल सही। मैं अभी details भिजवा देता हूँ। आपसे बात करके बहुत अच्छा लगा, आपका दिन शुभ हो!
+
+

@@ -1,0 +1,71 @@
+{
+  "interaction_id": "20260824/e99ee615-13:24:08-6678e411",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "हम आप पुणे में कोई प्रॉपर्टी है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n पुणे में अभी हमारे पास options नहीं हैं। वैसे, आप किस तरह की property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "नोएडा है, गुड़गाव में कुछ है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "हाँ जी, गुड़गांव के Sector 14 में एक Penthouse है, जिसकी price छह से सात करोड़ रुपये है। और नोएडा में Sector 124 में ATS Knightsbridge है, जो साढ़े सात से बारह करोड़ रुपये के बीच है। \n\nइसके अलावा Greater Noida West में एक Luxury Greens Villa भी है, जिसकी price दो पॉइंट आठ से चार करोड़ रुपये है। इनमें से कोई आपको suit करेगा?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "दो BHK है, तीन BHK कितने के हैं? नोएडा में और पुणे में?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। पुणे में तो अभी options नहीं हैं, लेकिन नोएडा में कुछ अच्छे options हैं।\n\nनोएडा के Sector 76 में 2BHK है, जिसकी price पिचानवे लाख से एक करोड़ पच्चीस लाख रुपये है। और 3BHK के लिए Sector 146 में Godrej Tropical Isle है, जो दो पॉइंट दो से साढ़े तीन करोड़ रुपये तक है। \n\nइसके अलावा Sector 150 में Demo Heights भी है, जिसकी price एक करोड़ पैंसठ लाख से दो करोड़ दस लाख रुपये है। आपका budget कितना है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "नहीं यह तो ठीक लग रहा है मैं आपसे बाद में बताऊंगा पर 150 वाली मेरे लिए रख रखना संभाल के।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "अरे बिल्कुल, मैं Sector 150 वाली property का detail संभाल कर रखता हूँ। ठीक है, आप आराम से सोच लीजिए।\n\nवैसे, क्या मैं आपका नाम और WhatsApp number confirm कर लूँ, ताकि मैं आपको details भेज सकूँ?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "हाँ मेरा नाम तन्मय है और नंबर WhatsApp यही जिससे कॉल कर रहा हूँ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "धन्यवाद तन्मय जी। मैं team से कहूँगा कि आपको WhatsApp पर best options और details भेज दें।\n\nआपसे बात करके बहुत अच्छा लगा। आपका दिन शुभ हो!\n\n",
+      "language_name": "Hindi"
+    }
+  ]
+}

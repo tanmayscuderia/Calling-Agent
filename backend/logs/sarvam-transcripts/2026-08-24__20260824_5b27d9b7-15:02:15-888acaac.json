@@ -1,0 +1,23 @@
+{
+  "interaction_id": "20260824/5b27d9b7-15:02:15-888acaac",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "गुड़ुगाव में प्रॉपर्टी है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n हाँ जी, हमारे पास गुड़गांव के Sector 14 में एक Penthouse available है। इसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसी तरह की property देख रहे हैं?",
+      "language_name": "Hindi"
+    }
+  ]
+}

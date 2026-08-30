@@ -1,0 +1,17 @@
+Interaction: 20260824/e99ee615-12:22:19-965ac774
+Phone: b78894800057e2e3c6f3fe2cea69f49e0d70bed9658e325058c8baed2313f58c  |  Direction: inbound  |  Duration: 31.05496597290039s
+Started: 2026-08-24T06:52:19  |  Ended: 2026-08-24T06:52:50  |  Ended by: USER_ENDS
+Messages: 5  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: बाबा ये कुछ पुणे में प्रॉपर्टी है कोई क्या?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ अरे, अभी system में दिख नहीं रहा है। मैं team से कहती हूँ कि आपको WhatsApp पर options भेज दें। वैसे, आपका budget कितना है?
+
+USER: यार एक काम कर चल वहां नहीं होता ना दो करोड़ों से तीन करोड़ों में नोएडा या गुड़गांव में है।
+
+ASSISTANT: एक second, मैं check करता हूँ। अरे, है क्या तू?

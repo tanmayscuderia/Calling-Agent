@@ -1,0 +1,35 @@
+{
+  "interaction_id": "20260824/5b27d9b7-14:02:46-88036b87",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "हम यही बताए यार कुछ है तीन बीएच के में?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n हाँ जी, हमारे पास कुछ अच्छे options हैं। नोएडा के Sector 146 में Godrej Tropical Isle है, जिसकी price दो करोड़ बीस लाख से तीन करोड़ बीस लाख रुपये तक है। इसके अलावा Sector 150 में Demo Heights है, जो एक करोड़ पैंसठ लाख से दो करोड़ दस लाख रुपये के बीच है। क्या इनमें से कोई आपको suit करेगा?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "अगर कोई एक एक करोड़ के नीचे चाहे कोई प्रॉपर्टी है",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

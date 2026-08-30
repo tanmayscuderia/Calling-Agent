@@ -1,0 +1,47 @@
+{
+  "interaction_id": "20260829/e99ee615-00:14:06-da9161ed",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Man, do you have any properties in New York or Goa?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "One second, let me check that for you.\n\n Actually, I don't see anything in New York or Goa right now. But I do have some great options in Delhi, Noida, and Gurgaon. Would you be interested in any of those?",
+      "language_name": "English"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "पवन नोएडा में करा बताइए।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "नोएडा में मेरे पास कुछ अच्छे options हैं। Sector 124 में ATS Knightsbridge है जिसकी price साढ़े सात से बारह करोड़ रुपये है, और Sector 146 में Godrej Tropical Isle है जो दो करोड़ बीस लाख से साढ़े तीन कर <interruption>",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "पुणे में कुछ है? पुणे में कुछ है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

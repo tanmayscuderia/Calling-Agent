@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import CallDemoModal from '@/components/CallDemoModal';
@@ -33,6 +34,8 @@ export default function LeadDetailPage() {
   const [followups, setFollowups] = useState<any[]>([]);
   const [showFollowupModal, setShowFollowupModal] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [startingRealCall, setStartingRealCall] = useState(false);
+  const toast = useToast();
 
   const load = () => {
     setLoading(true);
@@ -74,6 +77,20 @@ export default function LeadDetailPage() {
       console.error('Failed to toggle AI:', e);
     } finally {
       setTogglingAi(false);
+    }
+  };
+
+  const startRealCall = async () => {
+    if (startingRealCall) return;
+    setStartingRealCall(true);
+    try {
+      const res = await api('/api/calls/start-real', { method: 'POST', body: { leadId: id } });
+      toast.success(res.attemptId ? `Real call placed (attempt ${res.attemptId}). Result will appear here when the call completes.` : 'Real call placed — result will appear here when it completes.');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to start real call');
+    } finally {
+      setStartingRealCall(false);
     }
   };
 
@@ -240,6 +257,9 @@ export default function LeadDetailPage() {
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={() => setShowCall(true)}>📞 Start AI Call Demo</button>
+        <button className="btn btn-secondary" onClick={startRealCall} disabled={startingRealCall} title="Places a real outbound call via Sarvam voice agents">
+          {startingRealCall ? 'Calling…' : '📱 Call via Sarvam'}
+        </button>
         <button className="btn btn-secondary" onClick={() => setShowFollowupModal(true)}>📅 Schedule Follow-up</button>
         <Link href="/dashboard/conversations" className="btn btn-ghost">💬 Open Conversation</Link>
       </div>

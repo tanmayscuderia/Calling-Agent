@@ -557,6 +557,73 @@ Get call session details + transcript turns.
 
 ---
 
+### POST /api/calls/start-real
+Place a real outbound call via Sarvam voice agents. Requires SARVAM_API_KEY (falls back to browser demo flow if not configured).
+
+**Request:**
+```json
+{ "leadId": "uuid" }
+```
+
+**Response:**
+```json
+{ "callSessionId": "uuid", "attemptId": "att_9f8a...", "status": "initiated" }
+```
+
+The result arrives asynchronously via the Sarvam webhook; the lead page and Calls page show live status until it completes.
+
+---
+
+## Sarvam Webhook (internal)
+
+### POST /webhooks/sarvam/:secret
+Callback from Sarvam when a call completes. **Auth: unguessable secret in the URL path** (must equal `SARVAM_WEBHOOK_SECRET` → 403 otherwise; malformed body → 400 so Sarvam stops retrying; everything else → 200 immediately). Persists the raw payload to `sarvam_webhook_events` for replay/idempotency, and enqueues a `process_call_result` job (org resolved via `webhook_config.metadata.orgId` echoed from the call request).
+
+**Payload (Sarvam-defined):** `attempt_id`, `status` (`connected|no_answer|busy|failed`), `duration`, `interaction_id`, `failure_reason`, `final_agent_variables`, `interaction_transcript`.
+
+Processing (in the queue worker):
+1. Correlate `attempt_id` → `call_sessions.external_call_id`
+2. Idempotency skip if call already terminal
+3. Map status, store transcript + turns, LLM summary (`summarizeCall`)
+4. Enrich lead (temperature, preferences, agent variables) + auto-create follow-ups for `callback_requested` / `site_visit_requested` / `booking_requested`
+5. Mark webhook event processed
+
+---
+
+## Sarvam Live Tools (mid-call API tools)
+
+Two read-only HTTP endpoints the Sarvam agent calls DURING a live call via its Tools panel. **Never-5xx by design** — every failure path returns HTTP 200 with a graceful note so a tool error can't kill a live call. All requests logged to `logs/sarvam-tool-calls.log`.
+
+**Auth:** one of `X-Tool-Secret: <SARVAM_TOOL_SECRET>` (defaults to `SARVAM_WEBHOOK_SECRET`), `X-API-Key`, or `Authorization: Bearer` — → 401 otherwise. In the Sarvam dashboard set Auth Type = `API Key`, header `X-API-Key`.
+
+### GET /api/tools/sarvam/lead-context
+Called by the agent's on_start hook to personalize the greeting. `?phone=+91…` (E.164, `+` URL-encoded as `%2B`).
+
+**Response (known lead):** `{ "found": true, "lead": { name, phone, temperature, source, status }, "recentMessages": [last 3 WhatsApp messages], "note": "…" }`
+**Response (unknown/error):** `{ "found": false, "note": "No prior conversation — start fresh with the greeting." }`
+
+### GET /api/tools/sarvam/inventory-search
+Live inventory search mid-call. **Preferred: one agent-filled `query` param** with the caller's raw spoken demand (English or Hindi), e.g. `?query=gurgaon penthouse 8-10 crore` — parsed server-side by `backend/src/sarvam/queryParser.ts` into city/sector/configuration/budget filters (explicit `location`/`budget_min`/`budget_max`/`configuration` params still work and win over parsed values; multi-config like "3 or 4 BHK" runs one pass per configuration and merges).
+
+**Response:**
+```json
+{
+  "count": 2,
+  "filters": { "city": "gurgaon", "sectors": ["70"], "configuration": ["3BHK","4BHK"], "budget_min": 0, "budget_max": 100000000 },
+  "results": [ { "title": "Godrej …", "configuration": "3BHK", "price_display": "₹8.5 Cr", "location": "Sector 70, Gurgaon" } ],
+  "note": null
+}
+```
+
+`filters` echoes what was applied — use it to verify each match. `count: 0` + a `note` (e.g. "ask the caller for their budget") is the graceful no-results/error path.
+
+### GET /api/tools/sarvam/inventory-snapshot
+Called by a second on_start hook at CALL START. Returns a compact voice-friendly summary of ALL findable inventory (projects LEFT JOIN units; prices/configs from `availability_status = 'available'` units only — sold-out projects show "price on request"). Map reply field `inventory_summary` into an agent variable; prompt v7.5 rule 11(ख) makes the agent answer availability from it when mid-call tool dispatches fail (harness bug — `docs/sarvam-tool-failure-evidence.md`), so availability questions never depend on a live dispatch.
+
+**Response:** `{ "inventory_summary": "AVAILABLE INVENTORY (only these exist — never invent others): Noida — Central Noida Residency (Sector 124) 2BHK/3BHK 1.2–1.5 cr | …", "available_cities": ["Noida"], "total_properties": 3, "note": "…" }` — on internal error: empty summary + `total_properties: 0` (never 5xx).
+
+---
+
 ## Agent Configuration
 
 Manage per-org AI agent config — persona, qualifying fields, intents, inventory search, reply templates.

@@ -1,0 +1,83 @@
+{
+  "interaction_id": "20260824/cfae328b-16:31:10-df421398",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Hello.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते! क्या आप अभी दो मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "हाँ हाँ बताओ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद! दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी कोई property देख रहे हैं? वैसे, आप कौन सी location prefer करेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "प्रयागराज",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n देखिए, प्रयागराज में अभी हमारे पास options नहीं हैं। वैसे, आप किस तरह की property देख रहे हैं, जैसे 2BHK या 3BHK?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "हम्म",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "मतलब, आप configuration के बारे में सोच रहे हैं? आप बताइए कि आपको कितने bedrooms वाला घर चाहिए?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "Five bedroom.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "अच्छा, five bedroom! वैसे आपका budget कितना है, ताकि मैं आपके लिए best options देख सकूँ?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 12,
+      "role": "user",
+      "content": "लगभग फाइव करोड़।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 13,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

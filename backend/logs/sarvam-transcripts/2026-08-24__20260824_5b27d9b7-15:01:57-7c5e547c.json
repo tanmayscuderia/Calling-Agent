@@ -1,0 +1,23 @@
+{
+  "interaction_id": "20260824/5b27d9b7-15:01:57-7c5e547c",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "ये प्रॉपर्टी है कोई गुड़गांव या नोएडा में?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n हाँ जी, हमारे पास options हैं। गुड़गांव के Sector 14 में एक Penthouse है छह से सात करोड़ रुपये में। नोएडा के Sector 124 में ATS Knightsbridge है साढ़े सात से बारह करोड़ रुपये में, और Greater Noida West में Luxury Greens Villa है ढाई से चार करोड़ रुपये में। इनमें से कोई आपको suit करेगा?",
+      "language_name": "Hindi"
+    }
+  ]
+}

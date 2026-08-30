@@ -1,0 +1,83 @@
+{
+  "interaction_id": "20260828/e99ee615-23:45:47-0315e5ec",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "बाबा गुड़गांव में कोई प्रॉपर्टी है?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n जी, गुड़गांव के Sector 14 में एक Penthouse available है। इसकी price छह से सात करोड़ रुपये के बीच है।",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "चलो सही है भाई और कुछ तीन वीएचके कहीं पे और?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\nवैसे, अभी system में सिर्फ वही Sector 14 वाला Penthouse दिख रहा है। क्या आप किसी और location में 3BHK देखना चाहेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "मैडम मान लो।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "अरे, मैं शुभ बोल रहा हूँ, मैडम नहीं। खैर, कोई बात नहीं। आप बताइए, आपको और कहाँ पर property देखनी है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "नोएडा देख ले नोएडा में।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\nनोएडा में दो अच्छे options हैं। Sector 146 में Godrej Tropical Isle है, जिसकी price दो करोड़ बीस लाख से तीन करोड़ बीस लाख रुपये है। और Sector 150 में Demo Heights है, जो एक करोड़ पैंसठ लाख से दो करोड़ दस लाख रुपये तक है। इनमें से कोई पसंद आया आपको?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "दूसरा वाला।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "अच्छा, Demo Heights वाला! वैसे, आप ये property खुद रहने के लिए देख रहे हैं या investment के लिए?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 12,
+      "role": "user",
+      "content": "खुद रहने के लिए यार इसको रख ले मैं बाद में बात करूंगा फिर बात करेंगे।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 13,
+      "role": "assistant",
+      "content": "ठीक है जी, कोई बात नहीं। मैं team से कहूँगा कि आपको WhatsApp पर Demo Heights की सारी details भेज दें। फिर आप आराम से देख लीजिएगा। धन्यवाद!\n\n",
+      "language_name": "Hindi"
+    }
+  ]
+}

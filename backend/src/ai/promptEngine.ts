@@ -356,6 +356,63 @@ Schema:
   "updated_preferences": {}
 }`;
 
+/**
+ * Config-driven call summary prompt — WhatsApp-grade extraction for calls.
+ *
+ * Merges the summary schema with the org's qualifying_fields so the LLM
+ * extracts the SAME structured preferences from a call transcript that
+ * buildExtractionPrompt() extracts from a WhatsApp message. Same budget /
+ * temperature / anti-hallucination rules, plus `caller_name` (a call can
+ * capture a spoken introduction; WhatsApp gets names from the profile).
+ */
+export function buildCallSummaryPrompt(cfg: AgentConfig): string {
+  const schemaLines = cfg.qualifying_fields.map((f) => {
+    if (f.type === 'number') {
+      return `    "${f.key}": number or null`;
+    } else if (f.type === 'enum') {
+      const opts = (f.options ?? []).join(' | ');
+      return `    "${f.key}": "${opts} or null"`;
+    } else {
+      return `    "${f.key}": "string or null"`;
+    }
+  });
+
+  const schema = `{
+  "summary": "short summary of what the customer wanted and what was agreed",
+  "outcome": "interested | not_interested | callback_requested | site_visit_requested | booking_requested | wrong_number | follow_up_later",
+  "lead_temperature": "hot | warm | cold | unknown",
+  "next_follow_up_at": "ISO datetime or null",
+  "caller_name": "string or null",
+  "updated_preferences": {
+${schemaLines.join(',\n')}
+  }
+}`;
+
+  return `Summarize this phone call and extract the customer's requirements.
+Return only valid JSON, no markdown fences.
+Schema:
+${schema}
+Rules:
+- "summary": 1-2 sentences covering what the customer wanted and the outcome.
+- "outcome": pick the single best fit. "wrong_number" if the person denied enquiring or asked not to be called; "not_interested" only if they clearly declined.
+- "caller_name": the name the customer introduced themselves with, if any.
+- "updated_preferences": ONLY fields the customer actually mentioned during the call. Do not guess. Do not copy values the agent suggested unless the customer confirmed them.
+- Indian budget formats — always convert to absolute rupees:
+  "2 crore" / "2cr" / "2 crore" → 20000000
+  "50 lakhs" / "50L" / "50 lakh" → 5000000
+  "1.5 cr" / "1.5crore" → 15000000
+  "₹1.5 crore" → 15000000
+  "between 1 and 2 crore" → budget_min=10000000, budget_max=20000000
+  Recognize both uppercase and lowercase: "L", "l", "CR", "cr", "Cr".
+  Recognize "50k" / "50 thousand" → 50000, "1 lakh" → 100000.
+- Always extract budget into both budget_min and budget_max when a single value is given.
+- Normalize common abbreviations to canonical form, e.g. "3bhk" → "3BHK".
+- A customer mentioning site visit, callback, or urgency (today, this week, this month, urgent, immediate) is ALWAYS "hot", regardless of other information.
+- If the customer gives at least one preference (but no visit/callback/urgency), lead_temperature = "warm".
+- If the call was unrelated or the person was dismissive, lead_temperature = "cold".
+- If unclear, use null / "unknown".`;
+}
+
 // ── Helpers ──
 
 function fillTemplate(tpl: string, cfg: AgentConfig): string {

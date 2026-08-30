@@ -1,0 +1,71 @@
+{
+  "interaction_id": "20260824/236c7798-14:59:10-8bccf741",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "Hello.",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते! मैं शुभ बोल रहा हूँ, Staffbadhao Testing से। क्या आप अभी 2 मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "हाँ जी कर सकता हूँ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद! दरअसल, मैं यह जानना चाहता था कि क्या आप अभी भी कोई property लेने में interested हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "अह हां जी लेने में इंटरेस्टेड हूं।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "अरे वाह, सुनकर अच्छा लगा। वैसे, आप किस location पर property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "हां खुद हूं।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "अच्छा, मतलब आप खुद के रहने के लिए देख रहे हैं। वैसे, आप किस location पर property ढूंढ रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "अह सेक्टर 49 के आसपास।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

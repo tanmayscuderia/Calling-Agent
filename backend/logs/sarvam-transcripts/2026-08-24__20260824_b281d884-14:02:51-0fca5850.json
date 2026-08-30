@@ -1,0 +1,95 @@
+{
+  "interaction_id": "20260824/b281d884-14:02:51-0fca5850",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "जी नमस्कार मैं आशीष बोल रहा हूं नोएडा सेक्टर 53 से।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "नमस्ते आशीष जी। क्या आप अभी दो मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "जी जरूर।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद। वैसे आशीष जी, क्या आप अपने लिए कोई property देख रहे हैं या investment के लिए?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "जी मैं अपने लिए कुछ कुछ property देख रहा हूं।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "अच्छा, समझ गया। तो आप किस तरह की configuration देख रहे हैं, मतलब 2BHK, 3BHK या कुछ और?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "मैं दो बीएचके देख रहा हूं। वन सीआर से वन पॉइंट पॉइंट फाइव फाइव सीआर के रेंज में।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n आशीष जी, हमारे पास Central Noida Residency है जो Sector 76, Noida में है। इसकी price ninety five लाख से एक point twenty five crore के बीच है। क्या आप इसके बारे में और जानना चाहेंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "जी जानना चाहूंगा।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "ज़रूर। वैसे आशीष जी, आप property कब तक finalize करना चाहते हैं, मतलब कोई timeline है आपके मन में?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 12,
+      "role": "user",
+      "content": "दो से तीन महीने के अंदर।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 13,
+      "role": "assistant",
+      "content": "ठीक है, मतलब आप काफी जल्दी move करना चाहते हैं। मैं team से कहूँगा कि आपको WhatsApp पर details भेज दें best options के साथ। आपका नाम और WhatsApp number वही है ना जिस पर मैंने call किया?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 14,
+      "role": "user",
+      "content": "जी यही है।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 15,
+      "role": "assistant",
+      "content": "बहुत बढ़िया। मैं अभी details send करवा देता हूँ। आपसे बात करके अच्छा लगा, आपका दिन शुभ हो!\n\n",
+      "language_name": "Hindi"
+    }
+  ]
+}

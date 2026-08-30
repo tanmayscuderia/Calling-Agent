@@ -1,6 +1,6 @@
 import { llm } from './llmClient';
 import { getAgentConfig } from './agentConfigService';
-import { buildCallSystemPrompt, buildCallOpening, CALL_SUMMARY_PROMPT_GENERIC } from './promptEngine';
+import { buildCallSystemPrompt, buildCallOpening, buildCallSummaryPrompt, CALL_SUMMARY_PROMPT_GENERIC } from './promptEngine';
 import { searchInventory } from './inventorySearch';
 import { formatPriceRange } from '../utils/money';
 
@@ -81,7 +81,11 @@ Continue the conversation as ${cfg.persona_name}. Reply with ONLY your next line
 }
 
 /**
- * Summarize a call — uses generic summary prompt.
+ * Summarize a call — config-driven when orgId is known.
+ *
+ * Uses buildCallSummaryPrompt(cfg) so the summary extraction schema matches
+ * the org's qualifying_fields (WhatsApp-grade extraction). Falls back to the
+ * generic prompt when no orgId (e.g. playground without org context).
  */
 export async function summarizeCall(turns: CallTurn[], orgId?: string): Promise<{
   data: any;
@@ -89,7 +93,9 @@ export async function summarizeCall(turns: CallTurn[], orgId?: string): Promise<
   model: string;
   latencyMs: number;
 }> {
-  const personaName = orgId ? (await getAgentConfig(orgId)).persona_name : 'Agent';
+  const cfg = orgId ? await getAgentConfig(orgId) : null;
+  const personaName = cfg?.persona_name ?? 'Agent';
+  const summaryPrompt = cfg ? buildCallSummaryPrompt(cfg) : CALL_SUMMARY_PROMPT_GENERIC;
   const transcript = turns
     .map((t) => `${t.speaker === 'agent' ? personaName : 'Customer'}: ${t.text}`)
     .join('\n');
@@ -97,7 +103,7 @@ export async function summarizeCall(turns: CallTurn[], orgId?: string): Promise<
 ${transcript}
 
 Generate the summary JSON.`;
-  return llm.generateJson(userPrompt, CALL_SUMMARY_PROMPT_GENERIC, { temperature: 0.2 });
+  return llm.generateJson(userPrompt, summaryPrompt, { temperature: 0.2 });
 }
 
 /**

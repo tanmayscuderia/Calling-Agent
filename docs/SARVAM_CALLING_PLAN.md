@@ -1,9 +1,9 @@
 # Sarvam Voice Calling Agent — Master Integration Plan
 
-> **Status:** PLANNED (not started)
+> **Status:** SHIPPED & LIVE — Phases S0–S6 implemented (see Progress Log); live agent "Priya" calling with mid-call tools (`inventory-search`, `lead-context`) + free-text query parsing
 > **Created:** 2026-08-16
 > **Source docs:** `sarvam-voice-agents-md/` (101 pages)
-> **Related:** `docs/ARCHITECTURE.md` §6 · `docs/ROADMAP.md` Phase F · `docs/FISH_AUDIO_INTEGRATION.md` (superseded approach)
+> **Related:** `docs/ARCHITECTURE.md` §6 · `docs/ROADMAP.md` Phase F · Fish Audio approach was evaluated and dropped in favour of Sarvam
 > **Working rule:** Work through phases S0→S6 in order. Check off items as they complete. This file is the single source of truth for the calling integration.
 
 ---
@@ -21,7 +21,14 @@ Lead Detail → "Call via AI Agent" → POST /api/calls/start-real
   → sarvamClient.createOutboundCall() with webhook metadata {callSessionId, leadId, orgId}
   → Sarvam calls the phone (their STT/LLM/TTS/telephony)
   → webhook hits /webhooks/sarvam/:secret → 200 instantly → enqueue job
-  → worker: transcript + summary + name capture + auto-categorize + follow-up
+  → worker: finalizeCall → transcript + summary + name capture + auto-categorize + follow-up
+    Extraction is now WhatsApp-grade & config-driven:
+    - buildCallSummaryPrompt(cfg): schema built from the org's qualifying_fields
+      (same Indian budget rules + hot/warm/cold rules as WhatsApp extraction), plus caller_name
+    - normalizeCallPreferences(): whitelists LLM output to real crm_leads columns
+      (preferred_city/sector/location mapping, enum validation, junk keys dropped,
+      industry extras merged into lead metadata)
+    - caller_name → full_name only when the lead has no name yet
 
 INBOUND (Phase 7, later): caller dials Sarvam number → webhook → findOrCreateLeadByPhone → same processing
 ```
@@ -99,7 +106,7 @@ INBOUND (Phase 7, later): caller dials Sarvam number → webhook → findOrCreat
 - [ ] Unique partial index `(org_id, external_call_id) WHERE external_call_id IS NOT NULL` → webhook idempotency
 - [ ] Index `(org_id, interaction_id)` for analytics lookups
 - [ ] New table `sarvam_webhook_events` (id, org_id, attempt_id, payload jsonb, received_at, processed_at, processing_error) — raw audit + retry debugging
-- [ ] Run migration; update `supabase/database_schema.md` + `docs/DATABASE.md` migration table
+- [ ] Run migration; update `docs/DATABASE.md` migration table
 
 **No status-value migration needed** (mapping in §2 uses existing statuses). `crm_leads.source` is free text → `'ai_call'` works as-is.
 
@@ -214,3 +221,6 @@ S1 → S2 → S3 (test with own phone) → S4 (biggest) → S5 → S6. ~3–4 fo
 | Date | Phase | Note |
 |---|---|---|
 | 2026-08-16 | — | Plan created from repo + Sarvam docs analysis |
+| 2026-08-20 | Live tools | Free-text `query` parser shipped: Sarvam only sends the caller's demand as one agent-filled `query` param, but the tool read only structured params → zero filters → unfiltered top-3 every call. New `backend/src/sarvam/queryParser.ts` (pure regex, EN+Hindi) extracts city/sector/configuration/budget; explicit dashboard params still win; multi-config ("3 or 4 bhk") runs one pass each; response echoes `filters`. 24 new tests, suite 240/240, tsc clean (commit `efbd879`) |
+
+> **Update (S1b — schema alignment):** Live-DB audit found the pre-Sarvam `job_queue.job_type` and `call_sessions.status/provider` CHECKs lacked the values the webhook flow writes, and `callResultService` used `duration_seconds` instead of `duration_sec`. Fixed via migration `20260109_0001_sarvam_fixes.sql` (idempotent, also re-asserts 20260108) + code fix. Run migration 14 in Supabase before first real call.

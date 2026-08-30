@@ -1,0 +1,83 @@
+{
+  "interaction_id": "20260824/236c7798-15:04:40-01bd8aaf",
+  "messages": [
+    {
+      "turn_id": 1,
+      "role": "assistant",
+      "content": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 2,
+      "role": "user",
+      "content": "हाँ जी सर बताइए।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "क्या आप अभी 2 मिनट बात कर सकते हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 4,
+      "role": "user",
+      "content": "कर सकते हैं?",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "धन्यवाद। दरअसल, मैं यह जानने के लिए call कर रहा था कि क्या आप अभी कोई property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 6,
+      "role": "user",
+      "content": "हाँ जी देख रहा हूँ।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "अच्छा, तो आप कौन से location पर property देख रहे हैं?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 8,
+      "role": "user",
+      "content": "गुरगांव",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 9,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ।\n\n मेरे पास गुड़गांव के Sector 14 में एक Penthouse है, जिसकी price छह करोड़ से सात करोड़ रुपये के बीच है। क्या आप इसमें interested होंगे?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 10,
+      "role": "user",
+      "content": "पेंट हाउस मेरे को रहने के लिए चाहिए।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 11,
+      "role": "assistant",
+      "content": "अरे वाह, रहने के लिए penthouse बहुत बढ़िया choice है। वैसे, आपका budget कितना है?",
+      "language_name": "Hindi"
+    },
+    {
+      "turn_id": 12,
+      "role": "user",
+      "content": "बजट तो मेरा पचास लाख की है।",
+      "language_name": "UNKNOWN"
+    },
+    {
+      "turn_id": 13,
+      "role": "assistant",
+      "content": "एक second, मैं check करता हूँ। अरे, है क्या तू?",
+      "language_name": "Hindi"
+    }
+  ]
+}

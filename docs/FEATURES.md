@@ -306,11 +306,11 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 | **Template-Driven Evals** | Tests config-driven extraction + reply across industries |
 | **Cross-Industry Evals** | Education industry e2e — validates multi-industry support |
 | **Golden Cases** | Curated test cases with expected outcomes |
-| **178 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter, job handler |
+| **240 Unit Tests** | Phone, money, parser, CSV, inventory, agents, prompts, rate limiter, job handler, Sarvam call results, Sarvam tools + query parser |
 | **Rate-Limit Safe** | Evals run sequential (`fileParallelism: false`), 1 concurrent LLM call, 2s min-delay |
 
 ### Test Files
-- `backend/tests/unit/` — 178 tests (12 files)
+- `backend/tests/unit/` — 240 tests (16 files)
 - `backend/tests/evals/` — 91 eval tests (8 files)
 
 ---
@@ -363,3 +363,38 @@ The platform is no longer real-estate-only. Every org configures their own AI ag
 ### Playground Files
 - `frontend/src/app/dashboard/playground/page.tsx` — Extraction + reply testing UI
 - `backend/src/routes/ai.routes.ts` — `POST /api/ai/test-extraction`, `POST /api/ai/test-reply`
+
+---
+
+## 16. Sarvam Voice Calling Agent ✅ COMPLETE
+
+Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hindi/English) that qualify leads, book site visits, and write results back to the CRM. Full plan: `docs/SARVAM_CALLING_PLAN.md`.
+
+| Feature | Description |
+|---------|-------------|
+| **Real Outbound Calls** | `POST /api/calls/start-real` places an actual phone call to the lead via Sarvam voice agents (Hindi/English PSTN) |
+| **One-Click from Lead Page** | "Call with AI (Sarvam)" button on lead detail page — shows live status until webhook result arrives |
+| **Safety Guards** | API key presence, calling-hours window (IST 9–21 configurable), DNC list, per-org daily cost caps |
+| **Result Webhook** | `/webhooks/sarvam/:secret` — unguessable-URL auth (403 on bad secret, 400 malformed, 200 otherwise to stop retries) |
+| **Webhook Audit Trail** | Every raw payload persisted to `sarvam_webhook_events` before processing — replayable + debuggable |
+| **Idempotent Processing** | `process_call_result` queue job correlates Sarvam `attempt_id` → `call_sessions.external_call_id`; terminal-state skip prevents double processing |
+| **Live Mid-Call Tools** | During real calls the Sarvam agent calls our API: `GET /api/tools/sarvam/lead-context?phone=` (lead + recent chat for personalized greeting) and `GET /api/tools/sarvam/inventory-search?query=` (free-text EN/Hindi search) |
+| **Query Parser** | `queryParser.ts` converts free-text queries (`3bhk sector 150 noida 2cr`) into structured city/sector/config/budget filters for inventory search |
+| **Never-5xx Tool Endpoints** | Tool routes auth via `X-Tool-Secret` header and always return 200 with `{ error }` payloads — a failing tool never breaks the live call |
+| **LLM Call Summaries** | DeepSeek `summarizeCall()` turns the raw transcript into summary + outcome + lead updates |
+| **Transcript Storage** | Conversation turns saved to `call_session_turns`; full transcript on `call_sessions.transcript` |
+| **Lead Enrichment** | Call results update lead temperature, preferences, and agent variables automatically |
+| **Auto Follow-ups** | `callback_requested` / `site_visit_requested` / `booking_requested` outcomes auto-create follow-up tasks |
+| **Graceful Fallback** | No `SARVAM_API_KEY` configured → falls back to browser demo flow, or returns 400 with clear message |
+| **Fallback Demo Retained** | Browser `speechSynthesis` call demo still works with zero telephony setup |
+
+### Sarvam Files
+- `backend/src/sarvam/sarvamClient.ts` — Sarvam Instant Outbound API client
+- `backend/src/sarvam/callResultService.ts` — Webhook payload processing → transcript, summary, lead enrichment
+- `backend/src/routes/sarvamWebhook.routes.ts` — `/webhooks/sarvam/:secret` endpoint
+- `backend/src/routes/sarvamTools.routes.ts` — mid-call lead-context + inventory-search tools
+- `backend/src/sarvam/queryParser.ts` — free-text → structured filters (city/sector/config/budget)
+- `backend/src/routes/calls.routes.ts` — `start-real` endpoint with guards
+- `backend/src/queue/queueWorker.ts` + `jobHandler.ts` — `process_call_result` job processing
+- `supabase/migrations/20260108_0001_sarvam_calls.sql` + `20260109_0001_sarvam_fixes.sql` — schema + idempotent fixes
+- `backend/tests/unit/callResultService.test.ts` — webhook → CRM writeback unit tests

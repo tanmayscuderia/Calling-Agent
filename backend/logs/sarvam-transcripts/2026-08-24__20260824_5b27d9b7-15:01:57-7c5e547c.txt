@@ -1,0 +1,13 @@
+Interaction: 20260824/5b27d9b7-15:01:57-7c5e547c
+Phone: 27fa53ee65b92154037f738c558d744daa3c9f3c09f5c0658c151602849eefee  |  Direction: inbound  |  Duration: 27.1309757232666s
+Started: 2026-08-24T09:31:57  |  Ended: 2026-08-24T09:32:07  |  Ended by: USER_ENDS
+Messages: 3  |  Debug: no
+────────────────────────────────────────────────────────────────────────────────
+
+ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ
+
+USER: ये प्रॉपर्टी है कोई गुड़गांव या नोएडा में?
+
+ASSISTANT: एक second, मैं check करता हूँ।
+
+ हाँ जी, हमारे पास options हैं। गुड़गांव के Sector 14 में एक Penthouse है छह से सात करोड़ रुपये में। नोएडा के Sector 124 में ATS Knightsbridge है साढ़े सात से बारह करोड़ रुपये में, और Greater Noida West में Luxury Greens Villa है ढाई से चार करोड़ रुपये में। इनमें से कोई आपको suit करेगा?

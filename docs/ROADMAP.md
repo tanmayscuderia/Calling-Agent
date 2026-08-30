@@ -17,11 +17,11 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - 5 demo properties seeded
 
 ### Phase 2: Database Schema ✅
-- 15 tables: CRM, WhatsApp, AI, calls, inventory, queue, agent configs
+- 20 tables: CRM, WhatsApp, AI, calls, inventory, queue, agent configs, Sarvam webhook audit
 - All tables multi-tenant (`org_id` → `organizations`)
 - Auto-updating `updated_at` triggers
 - Lead deduplication unique indexes
-- 10 migrations, all idempotent (`IF NOT EXISTS`)
+- 14 migrations, all idempotent (`IF NOT EXISTS`)
 
 ### Phase A: Multi-Tenant Auth ✅
 - Supabase Auth with httpOnly cookies (access + refresh tokens)
@@ -78,9 +78,9 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **150 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter (9 files)
+- **240 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser (16 files)
 - **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
-- **241 total tests, ALL GREEN**
+- **296 total tests, ALL GREEN**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
@@ -91,6 +91,16 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Live extraction** — see what the AI extracts from any message
 - **Live reply** — see the actual reply that would be sent on WhatsApp
 - **Config-aware** — uses the org's current agent config
+
+### Phase S: Sarvam Voice Calling Agent ✅ (see docs/SARVAM_CALLING_PLAN.md)
+- **Real outbound AI calls** via Sarvam voice agents (Hindi/English PSTN calls) — `POST /api/calls/start-real`
+- **Result webhook** `/webhooks/sarvam/:secret` — unguessable-URL auth, raw payload audit table (`sarvam_webhook_events`), idempotent processing
+- **Queue-based result processing** — webhook acks instantly; `process_call_result` job handles transcript storage, LLM summary, outcome mapping with retries
+- **Lead enrichment from calls** — temperature, preferences, agent variables written back to the lead automatically
+- **Auto follow-ups** — `callback_requested` / `site_visit_requested` / `booking_requested` outcomes create follow-up tasks
+- **Safety guards** — calling hours window (IST), per-org daily cost caps, DNC list, API key presence
+- **Correlation + idempotency** — `call_sessions.external_call_id` ↔ Sarvam `attempt_id`; terminal-state skip prevents double processing
+- **Live mid-call tools** — during real calls the agent calls `GET /api/tools/sarvam/lead-context` + `GET /api/tools/sarvam/inventory-search` (free-text EN/Hindi queries via `queryParser.ts`; never-5xx endpoints) — verified on real calls (see `docs/SARVAM_GO_LIVE_CHECKLIST.md`)
 
 ### Phase E3: Generic Inventory System ✅
 - **`generic_inventory_items` table** — single unified inventory table for all non-real-estate industries
@@ -110,11 +120,12 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 |-------|--------|-------|
 | WhatsApp Bridge | Production-ready for BSP swap | Baileys now, Meta Cloud API later via `MessagingAdapter` interface |
 | AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search |
-| Database | Production-ready | 10 migrations, multi-tenant, idempotent |
+| Database | Production-ready | 14 migrations, multi-tenant, idempotent |
+| Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
 | Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals |
-| Testing | Strong | 241 tests covering unit + LLM quality |
+| Testing | Strong | 296 tests covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---
@@ -133,7 +144,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 
 ### Phase F: Production Polish (Next)
 - [ ] Meta Cloud API WhatsApp adapter (replace Baileys for production)
-- [ ] Real voice calling integration (Exotel/Twilio)
+- [x] Real voice calling integration — **DONE via Sarvam AI voice agents** (see `docs/SARVAM_CALLING_PLAN.md`): outbound PSTN calls, webhook result processing, LLM call summaries, lead enrichment, auto follow-ups
 - [ ] Frontend redesign — full production design system
 - [ ] WebSocket real-time message updates (no polling)
 - [ ] Notification system (in-app + email alerts for hot leads)
@@ -150,8 +161,8 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 
 ### Phase H: Advanced AI
 - [ ] Multi-turn conversation memory (sliding window + summary)
-- [ ] Function calling / tool use for live inventory queries
+- [x] Function calling / tool use for live inventory queries — **DONE for Sarvam calls** (`GET /api/tools/sarvam/lead-context`, `GET /api/tools/sarvam/inventory-search`); WhatsApp-side function calling still future work
 - [ ] Sentiment analysis on customer messages
 - [ ] A/B testing for prompt variants
 - [ ] Fine-tuned industry-specific models
-- [ ] Voice-to-voice calling agent (STT + TTS pipeline)
+- [x] Voice-to-voice calling agent — **DONE via Sarvam** (real voice agent handles the full conversation; browser STT/TTS demo retained for offline use)

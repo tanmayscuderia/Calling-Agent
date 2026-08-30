@@ -445,4 +445,5 @@ WHERE t.industry = 'real_estate'
 AND NOT EXISTS (
   SELECT 1 FROM public.agent_configs ac
   WHERE ac.org_id = o.id AND ac.is_active = true
-);
+)
+ON CONFLICT (org_id, name) DO NOTHING;

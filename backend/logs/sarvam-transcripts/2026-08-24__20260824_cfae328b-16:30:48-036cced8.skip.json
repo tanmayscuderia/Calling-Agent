@@ -1,0 +1,15 @@
+{
+  "interaction_id": "20260824/cfae328b-16:30:48-036cced8",
+  "call_start": "2026-08-24T11:00:48",
+  "call_end": "2026-08-24T11:00:59",
+  "tool_calls_in_window": 0,
+  "skipped": [],
+  "incidents": [
+    {
+      "type": "garbage_phrase",
+      "turn_index": 0,
+      "speaker": "ASSISTANT",
+      "text": "नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ अरे, है क्या तू?"
+    }
+  ]
+}

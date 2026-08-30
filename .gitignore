@@ -12,6 +12,7 @@ frontend/.env.local
 backend/dist/
 frontend/.next/
 frontend/out/
+*.tsbuildinfo
 
 # WhatsApp sessions (contains auth state)
 .sessions/

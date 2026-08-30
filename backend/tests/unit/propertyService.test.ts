@@ -19,9 +19,32 @@ let mockProjects: any[] = [];
 // Individual tests can override to simulate alias behavior.
 let mockResolvedLocations: { city?: string | null; sector?: string | null; location?: string | null } = {};
 
-vi.mock('../../src/utils/locationAliases', () => ({
-  resolveLocations: vi.fn(async () => mockResolvedLocations),
-}));
+vi.mock('../../src/utils/locationAliases', () => {
+  // Simplified mirror of the production built-in alias groups (only the
+  // ones these tests exercise). expandLocationForms(raw, resolved) must
+  // return every equivalent form so either spelling matches the DB.
+  const norm = (s: string) => s.toLowerCase().trim();
+  const GROUPS: string[][] = [
+    ['gurgaon', 'gurugram', 'gurgoan'],
+    ['delhi', 'new delhi'],
+  ];
+  const expandLocationForms = (input?: string | null, resolved?: string | null): string[] => {
+    const forms = new Set<string>();
+    const add = (v?: string | null) => {
+      if (!v || !v.trim()) return;
+      const n = norm(v);
+      forms.add(n);
+      for (const g of GROUPS) if (g.includes(n)) g.forEach((x) => forms.add(x));
+    };
+    add(input);
+    add(resolved);
+    return [...forms].filter(Boolean);
+  };
+  return {
+    resolveLocations: vi.fn(async () => mockResolvedLocations),
+    expandLocationForms,
+  };
+});
 
 // ── Mock Supabase ──
 // Supports `.in()` filtering for status column (used by searchProperties)
@@ -55,7 +78,7 @@ vi.mock('../../src/db/supabase', () => ({
 }));
 
 // Import AFTER mocks
-import { searchProperties, clearSearchCache } from '../../src/crm/propertyService';
+import { searchProperties, clearSearchCache, getInventorySnapshot } from '../../src/crm/propertyService';
 
 beforeEach(() => {
   mockProjects = [];
@@ -216,7 +239,59 @@ describe('searchProperties', () => {
       expect(cities).toContain('Noida');
       expect(cities).not.toContain('Delhi');
     });
+
+    it('scores matching city higher than non-matching', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({ name: 'Noida A', city: 'Noida', sector: 'Sector 150' }),
+        makeProject({ name: 'Delhi B', city: 'Delhi', sector: 'South Delhi' }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Noida',
+        limit: 5,
+      });
+
+      // Noida project should be in results, Delhi should be excluded
+      const cities = results.map((r) => r.city);
+      expect(cities).toContain('Noida');
+      expect(cities).not.toContain('Delhi');
+    });
+
+    // Regression: config+budget bonus must NOT override wrong-city hard gate.
+    // A "2BHK in Pune" search must return ZERO results even if Noida has
+    // matching 2BHKs with budget overlap (the pre-fix leak path).
+    it('regression: wrong-city config+budget bonus does not leak results (Pune → 0)', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Noida 2BHK Deal',
+          city: 'Noida',
+          sector: 'Sector 146',
+          units: [{ configuration: '2BHK', price_min: 2000000, price_max: 3500000, availability_status: 'available' }],
+        }),
+        makeProject({
+          name: 'Gurgaon Penthouse',
+          city: 'Gurgaon',
+          sector: 'Sector 14',
+          units: [{ configuration: 'Penthouse', price_min: 60000000, price_max: 70000000, availability_status: 'available' }],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Pune',
+        configuration: '2BHK',
+        budgetMax: 5000000,
+        limit: 5,
+      });
+
+      expect(results.length).toBe(0);
+    });
   });
+
+  // ── BUG #3: Projects without unit rows being invisible ──
 
   // ── BUG #3: Projects without unit rows being invisible ──
   describe('Bug #3 fix: projects as primary source', () => {
@@ -622,5 +697,204 @@ describe('searchProperties', () => {
       expect(reason.toLowerCase()).toContain('sector 150');
       expect(reason.toLowerCase()).toContain('within budget');
     });
+  });
+
+  // ── Regression: live Gurgaon penthouse call failed on 2026-08-20 ──
+  // Caller: "penthouse in Gurgaon 8-10 crore". DB: project named
+  // "Penthouse...", unit config 4BHK, price 6-7 Cr, city stored "Gurgaon".
+  // Old scoring: config -0.1 + budget -0.35 + city +0.1 + base 0.35 = 0.0 -> filtered.
+  describe('regression: voice-agent penthouse search (2026-08-20)', () => {
+    it('returns a cheaper property as an under-budget option', async () => {
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Penthouse, Teechzone 3',
+          city: 'Gurgaon',
+          sector: 'Sector 14',
+          units: [
+            makeUnit({
+              title: 'Penthouse 4BHK',
+              configuration: '4BHK',
+              priceMin: 60_000_000,
+              priceMax: 70_000_000,
+            }),
+          ],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Gurgaon',
+        configuration: 'Penthouse',
+        budgetMin: 80_000_000,
+        budgetMax: 100_000_000,
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].priceMin).toBe(60_000_000);
+      expect(results[0].reason).toContain('under budget');
+    });
+
+    it('matches city when ASR resolved form (Gurugram) differs from DB (Gurgaon)', async () => {
+      // Hindi "gudgaon" -> resolved "Gurugram", but DB stores "Gurgaon".
+      mockResolvedLocations = { city: 'Gurugram', sector: null, location: null };
+      mockProjects = [
+        makeProject({ name: 'Gurgaon Towers', city: 'Gurgaon', sector: 'Sector 56' }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Gurugram',
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].projectName).toBe('Gurgaon Towers');
+    });
+
+    it('matches configuration against project NAME when unit config is BHK', async () => {
+      // Ask "Penthouse" but the unit's configuration column is "4BHK" and
+      // only the project name says Penthouse -> still a config match.
+      mockResolvedLocations = {};
+      mockProjects = [
+        makeProject({
+          name: 'Penthouse Collection',
+          city: 'Mumbai',
+          sector: 'Worli',
+          units: [makeUnit({ configuration: '4BHK', priceMin: 40_000_000, priceMax: 55_000_000 })],
+        }),
+      ];
+
+      const results = await searchProperties({
+        orgId: 'org-1',
+        city: 'Mumbai',
+        configuration: 'Penthouse',
+        limit: 3,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThan(0.5); // config bonus applied
+    });
+  });
+});
+
+// ── getInventorySnapshot (Sarvam on_start — zero-mid-call-tool mode) ──
+// Feeds /api/tools/sarvam/inventory-snapshot → agent variable
+// `inventory_summary`. In zero-mid-call-tool mode this markdown dump is the
+// agent's ONLY inventory source (prompt v7.6) — there are no mid-call tools.
+
+describe('getInventorySnapshot', () => {
+  beforeEach(() => {
+    mockProjects = [];
+    clearSearchCache();
+  });
+
+  it('renders markdown: guard header, ## City (n) sections, dash bullets with configs and price range', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Central Noida Residency',
+        city: 'Noida',
+        sector: 'Sector 124',
+        units: [
+          makeUnit({ configuration: '2BHK', priceMin: 12_000_000, priceMax: 15_000_000 }),
+          makeUnit({ configuration: '3BHK', priceMin: 18_000_000, priceMax: 21_000_000 }),
+        ],
+      }),
+      makeProject({
+        name: 'ATS Knightsbridge',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '4BHK', priceMin: 75_000_000, priceMax: 120_000_000 })],
+      }),
+    ];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.total_properties).toBe(2);
+    expect(snap.cities).toEqual(['Noida']);
+    const lines = snap.text.split('\n');
+    expect(lines[0]).toContain('# INVENTORY');
+    expect(lines[0]).toContain('Never invent');
+    expect(lines[1]).toBe('## Noida (2)');
+    expect(lines[2]).toBe('- Central Noida Residency (Sector 124) — 2BHK/3BHK — 1.2–2.1 cr');
+    expect(lines[3]).toBe('- ATS Knightsbridge — 4BHK — 7.5–12 cr');
+  });
+
+  it('lists a sold-out project as "price on request" (never advertises sold prices)', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Sold Out Tower',
+        city: 'Gurgaon',
+        units: [makeUnit({ configuration: '3BHK', priceMin: 9_000_000, availability: 'sold' })],
+      }),
+    ];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.total_properties).toBe(1);
+    expect(snap.cities).toEqual(['Gurgaon']);
+    expect(snap.text).toContain('- Sold Out Tower — price on request');
+    expect(snap.text).not.toContain('9');
+  });
+
+  it('returns empty text and no cities when there is no inventory', async () => {
+    mockProjects = [];
+
+    const snap = await getInventorySnapshot('org-1');
+
+    expect(snap.text).toBe('');
+    expect(snap.cities).toEqual([]);
+    expect(snap.total_properties).toBe(0);
+  });
+
+  it('caches per org for 5 min — stale on repeat calls until clearSearchCache() invalidates', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Tower A',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '2BHK', priceMin: 5_000_000, priceMax: 6_000_000 })],
+      }),
+    ];
+    const first = await getInventorySnapshot('org-1');
+
+    // Inventory changes in the DB → repeat call must still serve the cached list
+    mockProjects = [
+      makeProject({
+        name: 'Tower B',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '3BHK', priceMin: 7_000_000, priceMax: 8_000_000 })],
+      }),
+    ];
+    const second = await getInventorySnapshot('org-1');
+    expect(second.text).toBe(first.text);
+    expect(second.text).toContain('Tower A');
+
+    // An inventory mutation calls clearSearchCache() — snapshot must refresh
+    clearSearchCache();
+    const third = await getInventorySnapshot('org-1');
+    expect(third.text).toContain('Tower B');
+    expect(third.text).not.toContain('Tower A');
+  });
+
+  it('caps at 300 project lines with a "(+N more — offer callback)" footer (silent truncation)', async () => {
+    mockProjects = [];
+    for (let i = 1; i <= 305; i++) {
+      mockProjects.push(
+        makeProject({
+          name: `Tower ${i}`,
+          city: i % 2 === 0 ? 'Noida' : 'Gurgaon',
+          units: [makeUnit({ configuration: '2BHK', priceMin: 5_000_000, priceMax: 6_000_000 })],
+        })
+      );
+    }
+
+    const snap = await getInventorySnapshot('org-1');
+
+    const bullets = snap.text.split('\n').filter((l) => l.startsWith('- '));
+    expect(bullets.length).toBe(300);
+    expect(snap.text).toContain('(+5 more — offer callback)');
+    // Truth fields stay uncapped — cities/total reflect the full DB
+    expect(snap.total_properties).toBe(305);
+    expect(snap.cities).toEqual(['Gurgaon', 'Noida']);
   });
 });

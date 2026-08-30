@@ -54,7 +54,7 @@ Go to **Settings → API**:
 
 ### Run Migrations
 
-Run all 10 migration files in order:
+Run all 14 migration files in order:
 
 ```bash
 # Option A: via psql
@@ -68,8 +68,13 @@ psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_inde
 psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 
 # Option B: via Supabase SQL Editor (paste each file and Run)
+# Option C (live DB): paste supabase/run_missing_migrations.sql once —
+#          it replays every missing migration idempotently
 ```
 
 **What they create:**
@@ -85,8 +90,11 @@ psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_item
 | `0001_more_industry_templates` | 4 more templates (legal, automotive, salon, insurance) |
 | `0001_fix_dequeue_rpc_ambiguous` | Fix column ambiguity in dequeue RPC |
 | `0001_generic_inventory_items` | Generic inventory table for non-real-estate industries + `inventory_schema` on agent_configs |
+| `0001_location_features` | Location aliases + features for smarter search matching |
+| `0001_sarvam_calls` | Sarvam calling: provider CHECK, correlation columns, webhook audit table |
+| `0001_sarvam_fixes` | Idempotent schema alignment (job_type + call status CHECKs) |
 
-> **Total: 10 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+> **Total: 14 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
 
 ---
 
@@ -340,3 +348,9 @@ Check the dashboard:
 | `WHATSAPP_SESSION_DIR` | No | `.sessions/whatsapp` | Session storage path |
 | `COOKIE_SECRET` | **Yes** | — | Cookie signing secret (32+ chars) |
 | `FRONTEND_ORIGIN` | **Yes** | `http://localhost:3000` | Frontend URL for CORS |
+| `SARVAM_API_KEY` | No | — | Enables real AI calls (`/api/calls/start-real`); leave empty to disable |
+| `SARVAM_ORG_ID` / `SARVAM_WORKSPACE_ID` / `SARVAM_APP_ID` / `SARVAM_CONNECTION_ID` | If calling | — | Sarvam app credentials from https://apps.sarvam.ai |
+| `SARVAM_AGENT_PHONE_NUMBER` | If calling | — | Caller ID shown to leads |
+| `SARVAM_WEBHOOK_SECRET` | If calling | — | Secret in webhook URL `/webhooks/sarvam/<secret>` |
+| `SARVAM_TOOL_SECRET` | No | = `SARVAM_WEBHOOK_SECRET` | Shared secret for mid-call tools (`/api/tools/sarvam/*`) — sent as `X-Tool-Secret` / `X-API-Key` / `Authorization: Bearer` |
+| `SARVAM_CALLING_HOURS_START` / `SARVAM_CALLING_HOURS_END` | No | `9` / `21` | IST calling window guard |
