@@ -15,8 +15,9 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-12. **331 tests** — 240 unit tests + 91 LLM eval tests, all green
+12. **290 unit tests + 21 LLM eval blocks, all green** (recounted 2026-08-30)
 13. Clean migration path to Meta Cloud API later
+14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
 
@@ -35,7 +36,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (331 tests: 240 unit + 91 LLM evals) |
+| **Testing** | Vitest (290 unit tests + 21 LLM eval blocks across 8 suites) |
 
 ---
 
@@ -43,25 +44,26 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 
 ### 1. Database Setup
 
-Create a Supabase project, then run all 14 migrations in order:
+Create a Supabase project, then apply all migrations with the tracked runner:
 
 ```bash
-psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260101_0002_demo_seed.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260102_0001_multi_tenant_production.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260102_0001a_job_queue_base.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260102_0002_queue_hardening.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260103_0001_agent_configs_templates.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260103_0002_lead_dedup_unique_indexes.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260104_0001_more_industry_templates.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260105_0001_fix_dequeue_rpc_ambiguous.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_items.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
-psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
+# DATABASE_URL = Supabase → Project Settings → Database → Connection string (URI)
+cd backend && npm run migrate
 ```
 
-> **Already have a live DB?** Paste `supabase/run_missing_migrations.sql` into the Supabase SQL editor instead — it replays every missing piece idempotently.
+The runner creates a `schema_migrations` table, applies only unapplied files (each
+in a single transaction), and is safe to re-run.
+
+> **Already have a live DB (predates the runner)?** Baseline it once so old
+> migrations are recorded without re-running (re-running the seed migration
+> would duplicate demo rows):
+>
+> ```bash
+> cd backend && npm run migrate -- --baseline   # records all existing files
+> npm run migrate                               # then applies only new ones
+> ```
+>
+> Legacy fallback: `supabase/run_missing_migrations.sql` replays everything idempotently via the Supabase SQL editor.
 
 > **Full setup (user creation, org linking, env config, troubleshooting):** [docs/SETUP.md](./docs/SETUP.md)
 
@@ -83,7 +85,7 @@ COOKIE_SECRET=random-string-at-least-32-chars
 FRONTEND_ORIGIN=http://localhost:3000
 
 # Sarvam AI calling (optional — leave SARVAM_API_KEY empty to disable;
-# /api/calls/start-real returns 400 without it)
+# /api/calls/start-real returns 503 without it)
 SARVAM_API_KEY=your-sarvam-key
 SARVAM_ORG_ID=...           # from https://apps.sarvam.ai
 SARVAM_WORKSPACE_ID=...
@@ -91,6 +93,16 @@ SARVAM_APP_ID=...
 SARVAM_CONNECTION_ID=...
 SARVAM_AGENT_PHONE_NUMBER=+91XXXXXXXXXX
 SARVAM_WEBHOOK_SECRET=random-string-32-chars
+
+# Calling-safety guards (start-real enforces IST calling hours 9–21)
+SARVAM_CALLING_HOURS_START=9
+SARVAM_CALLING_HOURS_END=21
+# Set to false ONLY for out-of-hours testing
+SARVAM_ENFORCE_CALLING_HOURS=true
+
+# Process topology: run the queue worker inside the API (default true).
+# docker-compose sets WORKER_IN_PROCESS=false and runs `npm run start:worker` separately.
+WORKER_IN_PROCESS=true
 ```
 
 > **Note:** The DeepSeek model is hardcoded to `deepseek-v4-flash` in `config.ts`. The `DEEPSEEK_MODEL` env var is not read. See [docs/DEEPSEEK_GUIDE.md](./docs/DEEPSEEK_GUIDE.md).
@@ -182,7 +194,7 @@ Calling Agent/
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
 │   │   ├── routes/       # 14 route files (auth, whatsapp, leads, calls, sarvam webhook + tools, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 240 unit tests + 91 LLM evals
+│   └── tests/            # 290 unit tests + 21 LLM eval blocks
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
@@ -231,7 +243,7 @@ Results with score ≤ 0.1 are filtered out. Top N (default 3) returned, sorted 
 
 ## Production Notes
 
-The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). The Sarvam result webhook is **tolerant by design** (2026-08-30): field aliases, flat variable chips, and empty bodies are audited and acked 200 — a config mistake can never trigger a 400 retry storm; every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. The backend runs durably under `nohup` (`backend/logs/server.log`).
+The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). The Sarvam result webhook is **tolerant by design** (2026-08-30): field aliases, flat variable chips, and empty bodies are audited and acked 200 — a config mistake can never trigger a 400 retry storm; every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. Deploy via `docker compose up` (API + dedicated queue worker + frontend) or run single-process (`npm run dev` / nohup) — the worker runs in-process by default and externalizes with `WORKER_IN_PROCESS=false`.
 
 **Channel status (2026-08-30):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls; the WhatsApp bridge is fully built and proven (753+ messages) but currently disabled — re-enable via Dashboard → WhatsApp (QR scan). Both channels already write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
 

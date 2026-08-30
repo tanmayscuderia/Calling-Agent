@@ -109,13 +109,20 @@ async function start() {
     logger.info(`LLM provider: ${config.llm.provider} (model: ${config.llm.provider === 'openai' ? config.llm.openai.model : config.llm.deepseek.model})`);
     logger.info(`WhatsApp auto-reply: ${config.whatsapp.autoReply ? 'ON' : 'OFF'} | ignoreGroups: ${config.whatsapp.ignoreGroups}`);
 
-    // Recover stale jobs from a previous crash (if any)
+    // Recover stale jobs from a previous crash (if any) — the standalone
+    // worker (src/worker.ts) also does this; both are idempotent.
     await recoverStaleJobs().catch((err: unknown) => {
       logger.error({ err }, '[Server] Stale job recovery failed (non-fatal)');
     });
 
-    // Start the async queue worker (polls job_queue every 2s)
-    startQueueWorker();
+    // Start the async queue worker (polls job_queue every 2s).
+    // Default ON for single-process deploys; set WORKER_IN_PROCESS=false when
+    // running the dedicated worker process (docker-compose does this).
+    if (config.workerInProcess) {
+      startQueueWorker();
+    } else {
+      logger.info('[Server] Queue worker externalized (WORKER_IN_PROCESS=false) — run `npm run worker`');
+    }
 
     // Sarvam inbound poller (webhook fallback; no-op unless env-flagged)
     startInboundPoller();
@@ -135,7 +142,7 @@ async function start() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down gracefully...');
     try {
-      stopQueueWorker();
+      if (config.workerInProcess) stopQueueWorker();
       stopInboundPoller();
       // Note: waManager doesn't expose stopAll yet, individual adapters handle cleanup
       await app.close();

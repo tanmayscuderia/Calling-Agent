@@ -5,8 +5,12 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "worker": "tsx watch src/worker.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
+    "migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,7 +31,8 @@
     "fastify": "^4.28.0",
     "pino": "^9.3.0",
     "pino-pretty": "^11.2.0",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

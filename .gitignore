@@ -21,6 +21,8 @@ backend/.sessions/
 # Logs
 *.log
 npm-debug.log*
+# Call transcripts + webhook forensics contain REAL customer PII — never commit
+backend/logs/
 
 # OS
 .DS_Store

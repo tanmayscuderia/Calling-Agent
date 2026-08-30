@@ -655,4 +655,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: August 2026. Test count: 240 unit + 91 eval = 331 total. All passing. Sarvam real calling live (S1-S6 complete - see docs/SARVAM_CALLING_PLAN.md); live mid-call tools verified on real calls (docs/SARVAM_GO_LIVE_CHECKLIST.md).*
+*Last updated: 2026-08-30. Test count: 290 unit tests (17 files) + 21 LLM eval blocks (8 suites) — all passing (recounted; older figures 240/241/296/331 were stale). Sarvam real calling live (S1-S6 complete - see docs/SARVAM_CALLING_PLAN.md); zero-mid-call-tool architecture verified on real calls (docs/SARVAM_GO_LIVE_CHECKLIST.md). Hardening wave 2026-08-30: calling-safety guards enforced (IST hours + DNC registry + daily limits wired into start-real), zod request validation on mutating routes, calls pagination, standalone worker process (`npm run worker` / WORKER_IN_PROCESS=false), GitHub Actions CI, Dockerfile + docker-compose, tracked migration runner (`npm run migrate`).*

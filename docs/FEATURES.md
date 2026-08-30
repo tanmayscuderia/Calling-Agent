@@ -374,8 +374,8 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 |---------|-------------|
 | **Real Outbound Calls** | `POST /api/calls/start-real` places an actual phone call to the lead via Sarvam voice agents (Hindi/English PSTN) |
 | **One-Click from Lead Page** | "Call with AI (Sarvam)" button on lead detail page — shows live status until webhook result arrives |
-| **Safety Guards** | API key presence, calling-hours window (IST 9–21 configurable), DNC list, per-org daily cost caps |
-| **Result Webhook** | `/webhooks/sarvam/:secret` — unguessable-URL auth (403 on bad secret, 400 malformed, 200 otherwise to stop retries) |
+| **Safety Guards** | ENFORCED (2026-08-30): API key presence, calling-hours window (IST 9–21 configurable), Do-Not-Call registry (`/api/calls/dnc`), per-org daily call limits — see Hardening Wave below |
+| **Result Webhook** | `/webhooks/sarvam/:secret` — unguessable-URL auth (403 on bad secret; otherwise tolerant: aliases / flat chips / empty bodies audited + 200, never 400 — see v7.6 section below) |
 | **Webhook Audit Trail** | Every raw payload persisted to `sarvam_webhook_events` before processing — replayable + debuggable |
 | **Idempotent Processing** | `process_call_result` queue job correlates Sarvam `attempt_id` → `call_sessions.external_call_id`; terminal-state skip prevents double processing |
 | **Zero-Mid-Call-Tool Hooks (v7.6)** | The agent's two on_start hooks call our API at CALL START: `GET /api/tools/sarvam/lead-context?phone=` (lead + last WhatsApp messages for a personalized greeting) and `GET /api/tools/sarvam/inventory-snapshot` (full voice-friendly inventory). The LLM never dispatches tools mid-call — mid-call dispatches died randomly inside Sarvam's harness (`docs/sarvam-tool-failure-evidence.md`) |
@@ -385,7 +385,7 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 | **Transcript Storage** | Conversation turns saved to `call_session_turns`; full transcript on `call_sessions.transcript` |
 | **Lead Enrichment** | Call results update lead temperature, preferences, and agent variables automatically |
 | **Auto Follow-ups** | `callback_requested` / `site_visit_requested` / `booking_requested` outcomes auto-create follow-up tasks |
-| **Graceful Fallback** | No `SARVAM_API_KEY` configured → falls back to browser demo flow, or returns 400 with clear message |
+| **Graceful Fallback** | No `SARVAM_API_KEY` configured → falls back to browser demo flow; `start-real` returns 503 with clear setup message |
 | **Fallback Demo Retained** | Browser `speechSynthesis` call demo still works with zero telephony setup |
 
 ### Sarvam Files
@@ -424,3 +424,18 @@ Both channels share one pipeline: message/call → `job_queue` →
 auto-progression. The voice agent's lead context already reads the last 10
 WhatsApp messages, so the caller's chat history is spoken context, not a
 separate silo.
+
+### Hardening Wave (2026-08-30)
+
+| Item | What shipped |
+|------|--------------|
+| **Calling guards enforced** | `start-real` now actually enforces what the README promised: IST calling hours (env-toggleable), daily call limits (`checkCallAllowed` was dead code), and a Do-Not-Call registry (`do_not_call` table + `/api/calls/dnc` CRUD). New module: `backend/src/sarvam/callingGuards.ts`. `recordCall` now increments usage counters. |
+| **CI** | `.github/workflows/ci.yml` — backend typecheck + 290 unit tests (fully mocked, no secrets) + frontend build on every push/PR. |
+| **Docker** | `backend/Dockerfile` (multi-stage), `frontend/Dockerfile`, `docker-compose.yml` (api + dedicated worker + frontend), `.dockerignore`. |
+| **Migration runner** | `backend/scripts/migrate.ts` + `npm run migrate` — `schema_migrations` table, applies only unapplied files, one transaction each. `--baseline` records legacy files without re-running (protects demo seed from duplication). |
+| **Git hygiene** | `backend/logs/` (Sarvam transcripts with real customer PII) untracked; `.gitignore` covers the whole logs dir. History scrub deferred (security wave). |
+| **zod validation** | `backend/src/validation/schemas.ts`; mutating routes (auth login, leads create/update/followup, start-demo/start-real, agent config/template, DNC add) return clean `400 { error, code: 'VALIDATION' }` instead of 500s from deep inside Postgres. |
+| **Calls pagination** | `GET /api/calls?limit=&offset=` (1–500, default 100) + `total` — replaces the silent hard 200-row cap. |
+| **Worker split** | `backend/src/worker.ts` standalone queue-worker process (`npm run worker` / `start:worker`); API keeps in-process worker by default, `WORKER_IN_PROCESS=false` externalizes it (docker-compose runs it as its own service). WhatsApp bridge + inbound poller stay with the API process. |
+| **Frontend** | `src/middleware.ts` edge gate (no session cookie → dashboard HTML never sent), route-level `error.tsx` boundary (no more white-screen on render errors), React Query provider; leads + conversations pages migrated off manual fetch/setInterval to cached, deduped queries (5s polling preserved via `refetchInterval`). |
+| **Docs truth pass** | Test counts recounted: **290 unit (17 files) + 21 eval blocks (8 suites)** — fixed stale 150/241/296/331 figures across README, ARCHITECTURE, ROADMAP, PROJECT_CONTEXT; FEATURES §16 stale "400 malformed webhook" row corrected. |

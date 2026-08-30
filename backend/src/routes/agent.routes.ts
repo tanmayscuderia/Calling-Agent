@@ -22,6 +22,7 @@ import {
 import { buildCallSystemPrompt } from '../ai/promptEngine';
 import { suggestOutputVariables } from '../sarvam/callResultService';
 import { logger } from '../utils/logger';
+import { agentConfigSaveSchema, applyTemplateSchema, parseBody } from '../validation/schemas';
 
 function orgId(req: any): string {
   // Auth-aware: JWT orgId wins, query-param/default fallback preserved
@@ -39,10 +40,9 @@ export async function agentRoutes(app: FastifyInstance) {
   // ── Update config ──
   app.put('/api/agent/config', async (req, reply) => {
     const oid = orgId(req);
-    const body = req.body as any;
-    if (!body || typeof body !== 'object') {
-      return reply.code(400).send({ error: 'Body must be a JSON object' });
-    }
+    const parsed = parseBody(agentConfigSaveSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const body = parsed.data;
 
     // If configId provided, use updateAgentConfig; otherwise load current and update it
     const current = await getAgentConfig(oid);
@@ -95,8 +95,9 @@ export async function agentRoutes(app: FastifyInstance) {
   // ── Apply template ──
   app.post('/api/agent/apply-template', async (req, reply) => {
     const oid = orgId(req);
-    const { templateId, businessName } = req.body as any;
-    if (!templateId) return reply.code(400).send({ error: 'templateId required' });
+    const parsed = parseBody(applyTemplateSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const { templateId, businessName } = parsed.data;
 
     try {
       const cfg = await applyTemplate(oid, templateId, businessName);

@@ -1,97 +1,79 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export default function ConversationsPage() {
-  const [conversations, setConversations] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
 
-  const fetchConversations = () =>
-    api('/api/conversations')
-      .then((r) => {
-        const list = r.conversations ?? [];
-        setConversations(list);
-        setSelected((prev) => {
-          if (!prev && list.length > 0) return list[0].id;
-          return prev;
-        });
-      })
-      .catch(() => {});
+  // Conversation list — 5s polling via refetchInterval (was manual setInterval)
+  const convQ = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => api('/api/conversations'),
+    refetchInterval: 5000,
+  });
+  const conversations: any[] = convQ.data?.conversations ?? [];
+  const loading = convQ.isLoading;
 
-  const fetchMessages = (convId: string) =>
-    api(`/api/conversations/${convId}`)
-      .then((r) => {
-        const msgs = r.conversation?.messages ?? r.messages ?? [];
-        setMessages(msgs);
-      })
-      .catch(() => setMessages([]));
-
-  // Initial load
+  // Auto-select first conversation once list arrives
   useEffect(() => {
-    fetchConversations().finally(() => setLoading(false));
-  }, []);
+    if (!selected && conversations.length > 0) setSelected(conversations[0].id);
+  }, [conversations, selected]);
 
-  // Fetch messages when selected changes
-  useEffect(() => {
-    if (!selected) {
-      setMessages([]);
-      return;
-    }
-    prevMsgCount.current = 0;
-    fetchMessages(selected);
-  }, [selected]);
+  // Active conversation messages — 5s polling, per-conversation cache
+  const msgQ = useQuery({
+    queryKey: ['messages', selected],
+    queryFn: () => api(`/api/conversations/${selected}`),
+    enabled: !!selected,
+    refetchInterval: 5000,
+  });
+  const messages: any[] = msgQ.data?.conversation?.messages ?? msgQ.data?.messages ?? [];
 
-  // Poll for updates every 5 seconds (list + active conversation)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchConversations();
-      if (selected) fetchMessages(selected);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [selected]);
-
-  // Auto-scroll only when new messages arrive
-  useEffect(() => {
-    if (messages.length > prevMsgCount.current) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }
-    prevMsgCount.current = messages.length;
-  }, [messages]);
-
-  const send = async () => {
-    if (!input.trim() || !selected) return;
-    setSending(true);
-    try {
-      await api(`/api/conversations/${selected}/send`, { method: 'POST', body: { text: input } });
+  const sendMut = useMutation({
+    mutationFn: (text: string) =>
+      api(`/api/conversations/${selected}/send`, { method: 'POST', body: { text } }),
+    onSuccess: () => {
       setInput('');
-      const r = await api(`/api/conversations/${selected}`);
-      setMessages(r.conversation?.messages ?? r.messages ?? []);
-      const cr = await api('/api/conversations');
-      setConversations(cr.conversations ?? []);
-    } catch {}
-    setSending(false);
+      qc.invalidateQueries({ queryKey: ['messages', selected] });
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+  const sending = sendMut.isPending;
+  const send = () => {
+    if (!input.trim() || !selected) return;
+    sendMut.mutate(input);
   };
 
-  const toggleAi = async () => {
-    if (!activeConv) return;
-    const newState = !activeConv.ai_enabled;
-    // Optimistic update
-    setConversations((prev) => prev.map((c) => (c.id === activeConv.id ? { ...c, ai_enabled: newState, human_handoff: false } : c)));
-    try {
-      await api(`/api/conversations/${activeConv.id}`, {
+  // AI toggle — optimistic cache update, revert on failure
+  const toggleMut = useMutation({
+    mutationFn: (v: { id: string; ai_enabled: boolean }) =>
+      api(`/api/conversations/${v.id}`, {
         method: 'PATCH',
-        body: { ai_enabled: newState, human_handoff: false },
-      });
-    } catch {
-      // Revert on failure
-      setConversations((prev) => prev.map((c) => (c.id === activeConv.id ? { ...c, ai_enabled: !newState } : c)));
-    }
+        body: { ai_enabled: v.ai_enabled, human_handoff: false },
+      }),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ['conversations'] });
+      const prev = qc.getQueryData(['conversations']);
+      qc.setQueryData(['conversations'], (old: any) => ({
+        ...old,
+        conversations: (old?.conversations ?? []).map((c: any) =>
+          c.id === v.id ? { ...c, ai_enabled: v.ai_enabled, human_handoff: false } : c
+        ),
+      }));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['conversations'], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
+  });
+  const toggleAi = () => {
+    if (!activeConv) return;
+    toggleMut.mutate({ id: activeConv.id, ai_enabled: !activeConv.ai_enabled });
   };
 
   const activeConv = conversations.find((c) => c.id === selected);

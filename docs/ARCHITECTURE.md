@@ -913,7 +913,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 150 tests (no LLM, instant)
+├── unit/                          ← 290 tests across 17 files (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing
@@ -926,7 +926,7 @@ backend/tests/
 │   ├── realEstateAgent.helpers    ← Agent helper functions
 │   └── promptEngine/              ← Prompt building tests
 │
-├── evals/                         ← 91 tests (real LLM calls, ~5min)
+├── evals/                         ← 21 test blocks across 8 suites (real LLM calls, opt-in, ~5min)
 │   ├── eval-harness.ts            ← Test framework
 │   ├── golden-cases.ts            ← Real estate test cases
 │   ├── education-cases.ts         ← Education test cases
@@ -954,7 +954,7 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 241 tests (150 unit + 91 eval) — ALL GREEN**
+**Total: 290 unit tests (17 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-08-30; earlier docs said 241/296/331 — all stale)
 
 ---
 

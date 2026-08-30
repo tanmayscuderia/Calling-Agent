@@ -1,14 +1,17 @@
 import { FastifyInstance } from 'fastify';
 import { listLeads, getLead, updateLead, createLead, getLeadMessages, getLeadCalls, getLeadMatches, createFollowup, listFollowups, getLeadFollowups } from '../crm/leadService';
 import { config } from '../config';
+import { leadCreateSchema, leadUpdateSchema, followupCreateSchema, parseBody } from '../validation/schemas';
 
 function orgId(req: any): string {
   return (req.query as any).orgId || config.defaultOrgId;
 }
 
 export async function leadsRoutes(app: FastifyInstance) {
-  app.post('/api/leads', async (req) => {
-    const lead = await createLead(orgId(req), req.body as any);
+  app.post('/api/leads', async (req, reply) => {
+    const parsed = parseBody(leadCreateSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const lead = await createLead(orgId(req), parsed.data);
     return { lead };
   });
 
@@ -25,9 +28,11 @@ export async function leadsRoutes(app: FastifyInstance) {
     return { lead };
   });
 
-  app.patch('/api/leads/:id', async (req) => {
+  app.patch('/api/leads/:id', async (req, reply) => {
     const { id } = req.params as any;
-    const lead = await updateLead(orgId(req), id, req.body as any);
+    const parsed = parseBody(leadUpdateSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const lead = await updateLead(orgId(req), id, parsed.data);
     return { lead };
   });
 
@@ -55,9 +60,11 @@ export async function leadsRoutes(app: FastifyInstance) {
     return { followups };
   });
 
-  app.post('/api/leads/:id/followups', async (req) => {
+  app.post('/api/leads/:id/followups', async (req, reply) => {
     const { id } = req.params as any;
-    const followup = await createFollowup(orgId(req), id, req.body as any);
+    const parsed = parseBody(followupCreateSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const followup = await createFollowup(orgId(req), id, parsed.data);
     return { followup };
   });
 

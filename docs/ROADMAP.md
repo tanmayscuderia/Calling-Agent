@@ -78,9 +78,9 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **240 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser (16 files)
-- **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
-- **296 total tests, ALL GREEN**
+- **290 unit tests (17 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser, calling guards, validation
+- **21 LLM eval blocks (8 suites)** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry
+- **290 unit + 21 eval blocks, ALL GREEN (recounted 2026-08-30)**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
@@ -146,9 +146,10 @@ write to it — linking already works via normalized phone numbers).
 | Database | Production-ready | 14 migrations, multi-tenant, idempotent |
 | Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
-| Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
-| Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals |
-| Testing | Strong | 296 tests covering unit + LLM quality |
+| Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |
+| CI / Deploys | Production-ready | GitHub Actions (typecheck + 290 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner |
+| Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals; edge auth gate + error boundary + React Query |
+| Testing | Strong | 290 unit tests + 21 LLM eval blocks covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---

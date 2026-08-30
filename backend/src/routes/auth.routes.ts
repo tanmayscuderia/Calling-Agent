@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { resolveAuthContext } from '../auth/authMiddleware';
+import { loginSchema, parseBody } from '../validation/schemas';
 
 /**
  * Cookie names — short, opaque, not guessable.
@@ -39,11 +40,9 @@ function getAuthClient() {
 export async function authRoutes(app: FastifyInstance) {
   // ─── LOGIN ────────────────────────────────────────────────
   app.post('/api/auth/login', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { email, password } = req.body as any;
-
-    if (!email || !password) {
-      return reply.code(400).send({ error: 'Email and password are required' });
-    }
+    const parsed = parseBody(loginSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const { email, password } = parsed.data;
 
     try {
       const client = getAuthClient();

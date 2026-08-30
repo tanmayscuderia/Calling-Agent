@@ -558,19 +558,50 @@ Get call session details + transcript turns.
 ---
 
 ### POST /api/calls/start-real
-Place a real outbound call via Sarvam voice agents. Requires SARVAM_API_KEY (falls back to browser demo flow if not configured).
+Place a real outbound call via Sarvam voice agents. Requires SARVAM_API_KEY (returns 503 if not configured).
 
 **Request:**
 ```json
 { "leadId": "uuid" }
 ```
 
+**Calling-safety guards (enforced 2026-08-30, before any Sarvam dispatch):**
+1. **Calling hours** — IST window `SARVAM_CALLING_HOURS_START`–`SARVAM_CALLING_HOURS_END` (default 9–21). Outside → `403 { code: 'CALLING_HOURS' }`. Override with `SARVAM_ENFORCE_CALLING_HOURS=false` (testing only).
+2. **Daily limits** — org lock / max-calls-per-day via `checkCallAllowed` → `429 { code: 'DAILY_LIMIT' }`.
+3. **Do-Not-Call** — number listed in `do_not_call` table → `403 { code: 'DNC' }` (fail-open if the table is missing).
+
 **Response:**
 ```json
-{ "callSessionId": "uuid", "attemptId": "att_9f8a...", "status": "initiated" }
+{ "callSessionId": "uuid", "attemptId": "att_9f8a..." }
 ```
 
+**Errors:** `400 VALIDATION` (leadId not a uuid) · `403 CALLING_HOURS | DNC` · `429 DAILY_LIMIT` · `502` (Sarvam dispatch failed) · `503` (Sarvam not configured).
+
 The result arrives asynchronously via the Sarvam webhook; the lead page and Calls page show live status until it completes.
+
+---
+
+### `GET /api/calls`
+List the org's call sessions (newest first). **Paginated (2026-08-30, replaces the old hard 200-row cap).**
+
+**Query:** `limit` (1–500, default 100) · `offset` (default 0)
+
+**Response:**
+```json
+{ "calls": [ ... ], "total": 142, "limit": 100, "offset": 0 }
+```
+
+---
+
+### Do-Not-Call registry (`/api/calls/dnc`)
+
+| Method | Path | Body / Params | Notes |
+|--------|------|---------------|-------|
+| GET | `/api/calls/dnc` | — | List entries (newest first) |
+| POST | `/api/calls/dnc` | `{ "phone": "+9198...", "reason": "asked to stop" }` | Normalized before storing; upsert per (org, phone) |
+| DELETE | `/api/calls/dnc/:phone` | phone in path (URL-encoded) | Removes the entry |
+
+`start-real` refuses numbers on this list with `403 { code: 'DNC' }`. Migration: `supabase/migrations/20260830_0001_do_not_call.sql` — apply with `npm run migrate`.
 
 ---
 

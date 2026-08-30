@@ -1,7 +1,0 @@
-Interaction: 20260824/fcc6da63-13:32:29-6c275fb6
-Phone: bb2dd99e0bb9bc3b3c543bf3b06567ac66c41fed9c4d3d46c8ee14d45b87dfd7  |  Direction: inbound  |  Duration: 11.620952606201172s
-Started: 2026-08-24T08:02:29  |  Ended: 2026-08-24T08:02:40  |  Ended by: USER_ENDS
-Messages: 1  |  Debug: no
-────────────────────────────────────────────────────────────────────────────────
-
-ASSISTANT: नमस्ते, मैं Staffbadhao Testing से शुभ बोल रहा हूँ अरे, है क्या तू?
