@@ -122,19 +122,48 @@ function formatInrRange(min: number, max: number): string {
   return 'price on request';
 }
 
+// ── Snapshot cache (5-min TTL, per org) ──
+// In zero-mid-call-tool mode the snapshot is the agent's ONLY inventory source,
+// fetched by the on_start hook on every call. Inventory doesn't change between
+// calls in a test batch, so a 5-min in-memory cache keeps call-start latency
+// near zero and stops repeat fetches from burning the tunnel request budget.
+interface SnapshotCacheEntry { snap: InventorySnapshot; ts: number; }
+const snapshotCache = new Map<string, SnapshotCacheEntry>();
+const SNAPSHOT_TTL_MS = 5 * 60_000; // 5 minutes
+const SNAPSHOT_CACHE_MAX = 20;      // per-org entries — tiny payloads, generous cap
+
+function snapshotCacheGet(orgId: string): InventorySnapshot | null {
+  const hit = snapshotCache.get(orgId);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > SNAPSHOT_TTL_MS) {
+    snapshotCache.delete(orgId);
+    return null;
+  }
+  return hit.snap;
+}
+
 /**
- * Compact summary of ALL findable inventory (projects LEFT JOIN units — every
- * project appears even with no available units, priced "price on request").
+ * Hard cap on project bullet lines in the snapshot markdown. ~16 tokens per
+ * project → 300 lines ≈ 4.8k tokens, safe for the fast voice models; at real
+ * scale (100–200 projects) this never triggers. Beyond the cap the dump is
+ * silently truncated with a "(+N more — offer callback)" footer.
+ */
+const SNAPSHOT_MAX_PROJECT_LINES = 300;
+
+/**
+ * FULL inventory as MARKDOWN for the Sarvam agent variable `inventory_summary`
+ * (on_start hook — zero-mid-call-tool mode, prompt v7.6):
+ *   # guard header (never-invent), `## City (n)` sections, dash bullets
+ *   `- Name (Sector) — cfg/cfg — 1.2–2.1 cr`, silent 300-line cap with footer.
  * Prices/configs come ONLY from units with availability_status === 'available'
- * so a sold-out project never advertises a price.
- *
- * Purpose: loaded into a Sarvam agent variable at CALL START via the
- * /api/tools/sarvam/inventory-snapshot on_start hook. Resilience: if mid-call
- * tool dispatches die (Sarvam harness bug — see
- * docs/sarvam-tool-failure-evidence.md), the agent still KNOWS the inventory
- * and can answer "पुणे में कुछ है?" without any live dispatch.
+ * so a sold-out project never advertises a price; projects with no available
+ * units still appear as "price on request". Cached 5 min per org —
+ * clearSearchCache() invalidates (called on every inventory CRUD mutation).
  */
 export async function getInventorySnapshot(orgId: string): Promise<InventorySnapshot> {
+  const cached = snapshotCacheGet(orgId);
+  if (cached) return cached;
+
   const { data, error } = await supabaseAdmin()
     .from('real_estate_projects')
     .select(
@@ -174,24 +203,38 @@ export async function getInventorySnapshot(orgId: string): Promise<InventorySnap
   const cities = [...byCity.keys()].sort((a, b) => a.localeCompare(b));
   const total_properties = cities.reduce((n, c) => n + byCity.get(c)!.length, 0);
 
-  const text =
-    cities.length === 0
-      ? ''
-      : `AVAILABLE INVENTORY (only these exist — never invent others): ${cities
-          .map((city) => {
-            const projs = byCity
-              .get(city)!
-              .map((pr) => {
-                const cfg = pr.configs.size > 0 ? ` ${[...pr.configs].slice(0, 4).join('/')}` : '';
-                const sector = pr.sector ? ` (${pr.sector})` : '';
-                return `${pr.name}${sector}${cfg} ${formatInrRange(pr.min, pr.max)}`;
-              })
-              .join('; ');
-            return `${city} — ${projs}`;
-          })
-          .join(' | ')}`;
+  let text = '';
+  if (cities.length > 0) {
+    const lines: string[] = [
+      '# INVENTORY — this list is the ONLY truth. Never invent or guess any property outside it.',
+    ];
+    let shown = 0;
+    for (const city of cities) {
+      if (shown >= SNAPSHOT_MAX_PROJECT_LINES) break;
+      const projs = byCity.get(city)!;
+      lines.push(`## ${city} (${projs.length})`);
+      for (const pr of projs) {
+        if (shown >= SNAPSHOT_MAX_PROJECT_LINES) break;
+        const sector = pr.sector ? ` (${pr.sector})` : '';
+        const cfg = pr.configs.size > 0 ? ` — ${[...pr.configs].slice(0, 4).join('/')}` : '';
+        lines.push(`- ${pr.name}${sector}${cfg} — ${formatInrRange(pr.min, pr.max)}`);
+        shown += 1;
+      }
+    }
+    if (shown < total_properties) {
+      lines.push(`(+${total_properties - shown} more — offer callback)`);
+    }
+    text = lines.join('\n');
+  }
 
-  return { text, cities, total_properties };
+  const snap: InventorySnapshot = { text, cities, total_properties };
+  if (snapshotCache.size >= SNAPSHOT_CACHE_MAX) {
+    // Map preserves insertion order — drop the oldest entry
+    const oldest = snapshotCache.keys().next().value;
+    if (oldest !== undefined) snapshotCache.delete(oldest);
+  }
+  snapshotCache.set(orgId, { snap, ts: Date.now() });
+  return snap;
 }
 
 function norm(s?: string | null): string {
@@ -458,6 +501,9 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
 /** Invalidate cache when inventory changes (upload/edit/delete) */
 export function clearSearchCache(): void {
   searchCache.clear();
+  // The snapshot markdown must refresh after inventory changes too — otherwise
+  // the on_start hook serves a stale list for up to 5 minutes (its cache TTL).
+  snapshotCache.clear();
   // Also clear the AI locations cache so new cities/sectors appear immediately
   try {
     const { clearLocationsCache } = require('../ai/baseAgent');

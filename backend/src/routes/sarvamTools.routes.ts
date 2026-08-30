@@ -26,6 +26,7 @@ import { getAgentConfig } from '../ai/agentConfigService';
 import { searchInventory, InventoryMatch } from '../ai/inventorySearch';
 import { getLeadMessages } from '../crm/leadService';
 import { getInventorySnapshot } from '../crm/propertyService';
+import { leadCacheGet, leadCacheSet } from '../crm/leadContextCache';
 import { parseFreeTextQuery, type ParsedQuery } from '../sarvam/queryParser';
 import type { ExtractedData } from '../ai/agentTypes';
 
@@ -421,6 +422,14 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
 
     const orgId = String(q.orgId ?? config.defaultOrgId);
 
+    // Per-phone 5-min cache: repeat calls skip the DB and keep call-start
+    // snappy. Only found-lead payloads are ever cached (see leadContextCache.ts).
+    const cachedLead = leadCacheGet(orgId, phone);
+    if (cachedLead) {
+      logToolCall({ event: 'lead-context.cache-hit', ms: Date.now() - started });
+      return cachedLead;
+    }
+
     // NEVER fail this hook: a 5xx makes the platform treat the tool as broken.
     // On any error the agent simply starts fresh (unknown caller).
     try {
@@ -453,11 +462,13 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         // messages are optional context — never fail the hook for them
       }
 
-      return {
+      const payload = {
         found: true,
         lead: shapeLead(lead),
         recent_messages: shapeMessages(messages),
       };
+      leadCacheSet(orgId, phone, payload);
+      return payload;
     } catch (err) {
       logger.error({ err: (err as Error).message }, '[SarvamTools] lead lookup failed — starting fresh');
       logToolCall({ event: 'lead-context.fallback', ms: Date.now() - started });
@@ -503,7 +514,7 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         inventory_summary: snap.text,
         available_cities: snap.cities,
         total_properties: snap.total_properties,
-        note: 'Pre-loaded at call start. If live tools fail, answer from inventory_summary. Never invent properties outside this list.',
+        note: 'Pre-loaded at call start via the on_start hook. This markdown list is the ONLY inventory truth — there are NO mid-call tools. Never search live, never invent properties outside this list.',
       };
     } catch (err) {
       logger.error(

@@ -779,10 +779,10 @@ describe('searchProperties', () => {
   });
 });
 
-// ── getInventorySnapshot (Sarvam on_start resilience layer) ──
+// ── getInventorySnapshot (Sarvam on_start — zero-mid-call-tool mode) ──
 // Feeds /api/tools/sarvam/inventory-snapshot → agent variable
-// `inventory_summary`, so the voice agent can answer availability even when
-// mid-call tool dispatches fail (docs/sarvam-tool-failure-evidence.md).
+// `inventory_summary`. In zero-mid-call-tool mode this markdown dump is the
+// agent's ONLY inventory source (prompt v7.6) — there are no mid-call tools.
 
 describe('getInventorySnapshot', () => {
   beforeEach(() => {
@@ -790,7 +790,7 @@ describe('getInventorySnapshot', () => {
     clearSearchCache();
   });
 
-  it('groups projects by city with configs, sector and price range from AVAILABLE units', async () => {
+  it('renders markdown: guard header, ## City (n) sections, dash bullets with configs and price range', async () => {
     mockProjects = [
       makeProject({
         name: 'Central Noida Residency',
@@ -812,11 +812,12 @@ describe('getInventorySnapshot', () => {
 
     expect(snap.total_properties).toBe(2);
     expect(snap.cities).toEqual(['Noida']);
-    expect(snap.text).toContain('Central Noida Residency (Sector 124)');
-    expect(snap.text).toContain('2BHK/3BHK');
-    expect(snap.text).toContain('1.2–2.1 cr');
-    expect(snap.text).toContain('7.5–12 cr');
-    expect(snap.text).toContain('Noida —');
+    const lines = snap.text.split('\n');
+    expect(lines[0]).toContain('# INVENTORY');
+    expect(lines[0]).toContain('Never invent');
+    expect(lines[1]).toBe('## Noida (2)');
+    expect(lines[2]).toBe('- Central Noida Residency (Sector 124) — 2BHK/3BHK — 1.2–2.1 cr');
+    expect(lines[3]).toBe('- ATS Knightsbridge — 4BHK — 7.5–12 cr');
   });
 
   it('lists a sold-out project as "price on request" (never advertises sold prices)', async () => {
@@ -832,8 +833,7 @@ describe('getInventorySnapshot', () => {
 
     expect(snap.total_properties).toBe(1);
     expect(snap.cities).toEqual(['Gurgaon']);
-    expect(snap.text).toContain('Sold Out Tower');
-    expect(snap.text).toContain('price on request');
+    expect(snap.text).toContain('- Sold Out Tower — price on request');
     expect(snap.text).not.toContain('9');
   });
 
@@ -845,5 +845,56 @@ describe('getInventorySnapshot', () => {
     expect(snap.text).toBe('');
     expect(snap.cities).toEqual([]);
     expect(snap.total_properties).toBe(0);
+  });
+
+  it('caches per org for 5 min — stale on repeat calls until clearSearchCache() invalidates', async () => {
+    mockProjects = [
+      makeProject({
+        name: 'Tower A',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '2BHK', priceMin: 5_000_000, priceMax: 6_000_000 })],
+      }),
+    ];
+    const first = await getInventorySnapshot('org-1');
+
+    // Inventory changes in the DB → repeat call must still serve the cached list
+    mockProjects = [
+      makeProject({
+        name: 'Tower B',
+        city: 'Noida',
+        units: [makeUnit({ configuration: '3BHK', priceMin: 7_000_000, priceMax: 8_000_000 })],
+      }),
+    ];
+    const second = await getInventorySnapshot('org-1');
+    expect(second.text).toBe(first.text);
+    expect(second.text).toContain('Tower A');
+
+    // An inventory mutation calls clearSearchCache() — snapshot must refresh
+    clearSearchCache();
+    const third = await getInventorySnapshot('org-1');
+    expect(third.text).toContain('Tower B');
+    expect(third.text).not.toContain('Tower A');
+  });
+
+  it('caps at 300 project lines with a "(+N more — offer callback)" footer (silent truncation)', async () => {
+    mockProjects = [];
+    for (let i = 1; i <= 305; i++) {
+      mockProjects.push(
+        makeProject({
+          name: `Tower ${i}`,
+          city: i % 2 === 0 ? 'Noida' : 'Gurgaon',
+          units: [makeUnit({ configuration: '2BHK', priceMin: 5_000_000, priceMax: 6_000_000 })],
+        })
+      );
+    }
+
+    const snap = await getInventorySnapshot('org-1');
+
+    const bullets = snap.text.split('\n').filter((l) => l.startsWith('- '));
+    expect(bullets.length).toBe(300);
+    expect(snap.text).toContain('(+5 more — offer callback)');
+    // Truth fields stay uncapped — cities/total reflect the full DB
+    expect(snap.total_properties).toBe(305);
+    expect(snap.cities).toEqual(['Gurgaon', 'Noida']);
   });
 });

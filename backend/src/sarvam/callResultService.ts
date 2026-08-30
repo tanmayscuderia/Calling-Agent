@@ -16,6 +16,7 @@ import { findOrCreateLead } from '../crm/leadService';
 import { normalizePhone } from '../utils/phone';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { clearLeadContextCache } from '../crm/leadContextCache';
 
 export interface SarvamWebhookPayload {
   attempt_id: string;
@@ -195,6 +196,11 @@ export async function processCallResultJob(orgId: string, job: CallResultJobPayl
     persistTurns: true,
   });
 
+  // The call may have changed the lead (status/notes/enrichment) — drop any
+  // cached lead-context payload so the NEXT call within the 5-min TTL sees
+  // fresh data, never the pre-call snapshot of this lead.
+  clearLeadContextCache();
+
   // 9. Mark webhook event processed
   await sb.from('sarvam_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', job.webhookEventId);
 
@@ -350,6 +356,10 @@ export async function ingestInboundAttempt(
     extraPatch,
     persistTurns: true,
   });
+
+  // Same staleness rule as the outbound path: this call may have changed the
+  // lead, so cached lead-context must not serve the next call.
+  clearLeadContextCache();
 
   await ackEvent();
   logger.info(

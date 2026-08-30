@@ -67,6 +67,49 @@ during/just before the third dispatch — no request, no error, no retry, no
 \"If it fails\" fallback, force AGENT_ENDS 13s later. All other dispatches in
 the same call succeeded in under 700ms.
 
+## Addendum 3 — single-string-param experiment (added 2026-08-29)
+To rule out payload complexity as the trigger, the mid-call tool schema was
+reduced to the MINIMUM possible: one agent-filled `query` string parameter
+(all static `location` / `budget_min` / `budget_max` / `configuration` rows
+deleted from both `inventory_search` and `inventory_search_backup`). Rationale:
+- The same tool schema succeeded twice in the da9161ed call before the third
+  dispatch died, so a strict-schema validator failure was already unlikely —
+  this experiment removes any remaining doubt.
+- One string param routes every search through queryParser + the hard city
+  gate; the backend continues to accept structured params, so nothing breaks.
+Result: ⏳ PENDING — fill in after the next test batch
+(`npx tsx scripts/exportSarvamTranscripts.ts --days 1`):
+- [ ] dispatch failures ceased → payload shape was a contributing factor
+- [ ] dispatch failures PERSIST with a single string param → conclusively a
+      Sarvam orchestrator bug, not caller-payload complexity.
+
+## Addendum 4 — clean reproduction with infra proven healthy (added 2026-08-29)
+Two calls, 2.5 minutes apart, through the SAME ngrok tunnel, SAME backend
+process, SAME tool. One dispatches fine; the next dies inside Sarvam.
+
+| UTC 2026-08-29 | Interaction | Result |
+|---|---|---|
+| 13:35:14 | `e99ee615-19:05:14-be95ed3d` (17s, USER_ENDS) | Dispatch arrived: `GET /api/tools/sarvam/inventory-search?query=Noida+or+Gurgaon` → **200 in 578ms, count 3** ✅ |
+| 13:37:54 | `04ce7d36-19:07:54-e416ab3a` (37s, 9 msgs, **AGENT_ENDS**) | Transcript: caller "नोएडा" → agent "एक second, मैं check करता हूँ। **अरे, है क्या तू?**" → call dead. **ZERO `inventory-search.request` entries in our backend log for this call.** |
+
+Timeline notes:
+- 13:34 — tunnel was restarted and verified end-to-end (auth'd snapshot 200
+  through the public URL). Backend (tsx, port 4000) continuously healthy.
+- 13:37:22 — separate 11s / 1-message aborted dial (`04ce7d36-19:07:22`),
+  also AGENT_ENDS, no dispatch.
+- The 13:37:54 dispatch would have been a ONE-STRING query payload — so this
+  reproduction also pre-empts any "payload complexity" explanation.
+
+Attempts API for 04ce7d36 (both calls): `ended_by: AGENT_ENDS`,
+`failure_reason: NO_FAILURE_REASON`, `has_log_issues: 0` — Sarvam's own
+telemetry remains blind to the crash AND to the unprofessional remark, while
+Sarvam's auto-eval flagged an earlier identical call ("ended abruptly with an
+unprofessional remark").
+
+Conclusion: the failure is random, infra-independent, payload-independent,
+and repeats. Single root cause candidate left: Sarvam's API-tool executor /
+orchestrator loop.
+
 ## Questions for Sarvam
 1. Is this a known issue with the API-tool executor (dispatch silently dies,
    "If it fails" never triggers, call force-ended with AGENT_ENDS)?
