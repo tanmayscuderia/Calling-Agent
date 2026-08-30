@@ -430,7 +430,7 @@ separate silo.
 | Item | What shipped |
 |------|--------------|
 | **Calling guards enforced** | `start-real` now actually enforces what the README promised: IST calling hours (env-toggleable), daily call limits (`checkCallAllowed` was dead code), and a Do-Not-Call registry (`do_not_call` table + `/api/calls/dnc` CRUD). New module: `backend/src/sarvam/callingGuards.ts`. `recordCall` now increments usage counters. |
-| **CI** | `.github/workflows/ci.yml` — backend typecheck + 290 unit tests (fully mocked, no secrets) + frontend build on every push/PR. |
+| **CI** | `.github/workflows/ci.yml` — backend typecheck + 290 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
 | **Docker** | `backend/Dockerfile` (multi-stage), `frontend/Dockerfile`, `docker-compose.yml` (api + dedicated worker + frontend), `.dockerignore`. |
 | **Migration runner** | `backend/scripts/migrate.ts` + `npm run migrate` — `schema_migrations` table, applies only unapplied files, one transaction each. `--baseline` records legacy files without re-running (protects demo seed from duplication). |
 | **Git hygiene** | `backend/logs/` (Sarvam transcripts with real customer PII) untracked; `.gitignore` covers the whole logs dir. History scrub deferred (security wave). |
