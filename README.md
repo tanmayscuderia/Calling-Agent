@@ -7,10 +7,10 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 1. **Multi-industry AI agents** — 12 industry templates (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
 2. **WhatsApp message monitoring** via WhatsApp Web bridge (Baileys)
 3. **Automatic AI replies** for lead qualification (async queue pipeline)
-4. **AI phone calls via Sarvam** — real outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks. During live calls the agent calls back into our API tools for lead context and inventory search (`GET /api/tools/sarvam/*`)
+4. **AI phone calls via Sarvam** — real inbound + outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks. **Zero-mid-call-tool architecture (v7.6):** two on_start hooks load lead context (including the lead's recent WhatsApp messages) and the full inventory snapshot at CALL START (`GET /api/tools/sarvam/lead-context`, `GET /api/tools/sarvam/inventory-snapshot`) — the LLM never dispatches tools mid-call, which eliminated random dispatch failures. Results return via the on_end webhook (tolerant: field aliases, flat variable chips, empty bodies audited — never 400)
 5. **Config-driven AI** — each org configures its own persona, fields, intents, reply templates
 6. **Inventory upload** (CSV) and structured search
-7. **CRM dashboard** for leads and conversations
+7. **CRM dashboard** for leads and conversations — WhatsApp messages and phone calls merge into a single lead by normalized phone number (unique per org); the voice agent even reads the lead's recent WhatsApp chat before saying hello
 8. **Browser call-agent demo** (speechSynthesis + text input) — no telephony needed
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
@@ -160,6 +160,11 @@ All details are in `docs/`:
 | **[DEEPSEEK_GUIDE.md](./docs/DEEPSEEK_GUIDE.md)** | LLM integration, cost, error handling |
 | **[SARVAM_CALLING_PLAN.md](./docs/SARVAM_CALLING_PLAN.md)** | Sarvam voice-calling agent — architecture, endpoints, webhook flow, rollout status |
 | **[SARVAM_GO_LIVE_CHECKLIST.md](./docs/SARVAM_GO_LIVE_CHECKLIST.md)** | Step-by-step live-call verification checklist (dashboard config, tools, real-call tests) |
+| **[PROJECT_CONTEXT.md](./docs/PROJECT_CONTEXT.md)** | Deep project context — history, decisions, key flows |
+| **[sarvam-zero-tool-runbook.md](./docs/sarvam-zero-tool-runbook.md)** | Operator checklist for the zero-mid-call-tool migration + live status snapshot (2026-08-30) |
+| **[sarvam-dashboard-setup.md](./docs/sarvam-dashboard-setup.md)** | Sarvam dashboard config notes + pending fixes (on_end Body template, phone chip) |
+| **[sarvam-tool-failure-evidence.md](./docs/sarvam-tool-failure-evidence.md)** | Why mid-call tools were removed (live-call evidence) |
+| **[sarvam-call-prompt.txt](./docs/sarvam-call-prompt.txt)** | The v7.6 agent prompt — the ONLY file pasted into dashboard Instructions |
 
 ---
 
@@ -184,7 +189,7 @@ Calling Agent/
 │       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
 │       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
 ├── supabase/migrations/  # 14 SQL migration files
-└── docs/                 # 10 documentation files
+└── docs/                 # 17 documentation files
 ```
 
 ---
@@ -226,6 +231,8 @@ Results with score ≤ 0.1 are filtered out. Top N (default 3) returned, sorted 
 
 ## Production Notes
 
-The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). Future work includes replacing Baileys with Meta Cloud API and WebSocket real-time updates.
+The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). The Sarvam result webhook is **tolerant by design** (2026-08-30): field aliases, flat variable chips, and empty bodies are audited and acked 200 — a config mistake can never trigger a 400 retry storm; every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. The backend runs durably under `nohup` (`backend/logs/server.log`).
+
+**Channel status (2026-08-30):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls; the WhatsApp bridge is fully built and proven (753+ messages) but currently disabled — re-enable via Dashboard → WhatsApp (QR scan). Both channels already write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
 
 See **[ROADMAP.md](./docs/ROADMAP.md)** for full details.

@@ -1,5 +1,12 @@
 # Sarvam Go-Live Checklist (2026-08-20)
 
+> ⚠️ **SUPERSEDED in parts (2026-08-30):** mid-call tools were REMOVED after live
+> calls proved dispatches die randomly inside Sarvam's harness. The agent now uses
+> the ZERO-MID-CALL-TOOL architecture (on_start hooks + on_end webhook). For the
+> current truth use `docs/sarvam-zero-tool-runbook.md` (operator checklist + live
+> status snapshot) and `docs/sarvam-dashboard-setup.md` (dashboard config + pending
+> fixes). Keep this file for history (tunnel setup, guards, early test results).
+
 Everything below is DONE unless marked **[YOU]**.
 
 ## ✅ Completed automatically

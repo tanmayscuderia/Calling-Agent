@@ -577,9 +577,15 @@ The result arrives asynchronously via the Sarvam webhook; the lead page and Call
 ## Sarvam Webhook (internal)
 
 ### POST /webhooks/sarvam/:secret
-Callback from Sarvam when a call completes. **Auth: unguessable secret in the URL path** (must equal `SARVAM_WEBHOOK_SECRET` → 403 otherwise; malformed body → 400 so Sarvam stops retrying; everything else → 200 immediately). Persists the raw payload to `sarvam_webhook_events` for replay/idempotency, and enqueues a `process_call_result` job (org resolved via `webhook_config.metadata.orgId` echoed from the call request).
+Callback from Sarvam when a call completes. **Auth: unguessable secret in the URL path** (must equal `SARVAM_WEBHOOK_SECRET` → 403 otherwise; everything else → 200 — **tolerant since 2026-08-30: no 400s**). Every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. Persists the (normalized) payload to `sarvam_webhook_events` for replay/idempotency, and enqueues a `process_call_result` job (org resolved via `webhook_config.metadata.orgId` echoed from the call request, falling back to `SARVAM_DEFAULT_ORG_ID`).
 
-**Payload (Sarvam-defined):** `attempt_id`, `status` (`connected|no_answer|busy|failed`), `duration`, `interaction_id`, `failure_reason`, `final_agent_variables`, `interaction_transcript`.
+**Payload (canonical):** `attempt_id`, `status` (`connected|no_answer|busy|failed`), `duration`, `interaction_id`, `failure_reason`, `final_agent_variables`, `interaction_transcript`.
+
+**Tolerant normalization (route normalizes before persisting):**
+- Identity aliases: `attempt_id` | `call_id` | `interaction_id` (+ camelCase)
+- Status aliases: `status` | `disposition` | `outcome` | `call_status` (+ camelCase)
+- Variables: `final_agent_variables` | `variables` | `output_variables`, or flat top-level chips (`customer_name`, `city`, `location`, `configuration`, `budget_min`, `budget_max`, `purpose`, `timeline`, `phone`) hoisted automatically
+- Empty/unrecognized body → audited with a `processing_error` note + 200 (never 400 — Sarvam retries 400s forever on config problems)
 
 Processing (in the queue worker):
 1. Correlate `attempt_id` → `call_sessions.external_call_id`
@@ -590,9 +596,9 @@ Processing (in the queue worker):
 
 ---
 
-## Sarvam Live Tools (mid-call API tools)
+## Sarvam HTTP Tools (on_start hooks — zero mid-call tools)
 
-Two read-only HTTP endpoints the Sarvam agent calls DURING a live call via its Tools panel. **Never-5xx by design** — every failure path returns HTTP 200 with a graceful note so a tool error can't kill a live call. All requests logged to `logs/sarvam-tool-calls.log`.
+HTTP endpoints called BY the Sarvam agent at CALL START via its on_start hooks (v7.6 architecture — the LLM never dispatches tools mid-call; mid-call dispatches died randomly in Sarvam's harness, see `docs/sarvam-tool-failure-evidence.md`). **Never-5xx by design** — every failure path returns HTTP 200 with a graceful note so a hook error can't break call start. All requests logged to `logs/sarvam-tool-calls.log`.
 
 **Auth:** one of `X-Tool-Secret: <SARVAM_TOOL_SECRET>` (defaults to `SARVAM_WEBHOOK_SECRET`), `X-API-Key`, or `Authorization: Bearer` — → 401 otherwise. In the Sarvam dashboard set Auth Type = `API Key`, header `X-API-Key`.
 
@@ -602,8 +608,10 @@ Called by the agent's on_start hook to personalize the greeting. `?phone=+91…`
 **Response (known lead):** `{ "found": true, "lead": { name, phone, temperature, source, status }, "recentMessages": [last 3 WhatsApp messages], "note": "…" }`
 **Response (unknown/error):** `{ "found": false, "note": "No prior conversation — start fresh with the greeting." }`
 
-### GET /api/tools/sarvam/inventory-search
-Live inventory search mid-call. **Preferred: one agent-filled `query` param** with the caller's raw spoken demand (English or Hindi), e.g. `?query=gurgaon penthouse 8-10 crore` — parsed server-side by `backend/src/sarvam/queryParser.ts` into city/sector/configuration/budget filters (explicit `location`/`budget_min`/`budget_max`/`configuration` params still work and win over parsed values; multi-config like "3 or 4 BHK" runs one pass per configuration and merges).
+### GET /api/tools/sarvam/inventory-search (LEGACY — not wired to the agent)
+Endpoint retained backend-side but **removed from the agent's dashboard config** on 2026-08-30 (zero-mid-call-tool migration). Legacy docs below for reference.
+
+Live inventory search. **Preferred: one agent-filled `query` param** with the caller's raw spoken demand (English or Hindi), e.g. `?query=gurgaon penthouse 8-10 crore` — parsed server-side by `backend/src/sarvam/queryParser.ts` into city/sector/configuration/budget filters (explicit `location`/`budget_min`/`budget_max`/`configuration` params still work and win over parsed values; multi-config like "3 or 4 BHK" runs one pass per configuration and merges).
 
 **Response:**
 ```json
@@ -618,7 +626,7 @@ Live inventory search mid-call. **Preferred: one agent-filled `query` param** wi
 `filters` echoes what was applied — use it to verify each match. `count: 0` + a `note` (e.g. "ask the caller for their budget") is the graceful no-results/error path.
 
 ### GET /api/tools/sarvam/inventory-snapshot
-Called by a second on_start hook at CALL START. Returns a compact voice-friendly summary of ALL findable inventory (projects LEFT JOIN units; prices/configs from `availability_status = 'available'` units only — sold-out projects show "price on request"). Map reply field `inventory_summary` into an agent variable; prompt v7.5 rule 11(ख) makes the agent answer availability from it when mid-call tool dispatches fail (harness bug — `docs/sarvam-tool-failure-evidence.md`), so availability questions never depend on a live dispatch.
+Called by a second on_start hook at CALL START. Returns a compact voice-friendly summary of ALL findable inventory (projects LEFT JOIN units; prices/configs from `availability_status = 'available'` units only — sold-out projects show "price on request"). Map reply field `inventory_summary` into an agent variable; the v7.6 prompt's inventory rule makes the agent answer availability ONLY from this snapshot, so availability questions never depend on any mid-call dispatch (which were removed entirely — see `docs/sarvam-tool-failure-evidence.md`).
 
 **Response:** `{ "inventory_summary": "AVAILABLE INVENTORY (only these exist — never invent others): Noida — Central Noida Residency (Sector 124) 2BHK/3BHK 1.2–1.5 cr | …", "available_cities": ["Noida"], "total_properties": 3, "note": "…" }` — on internal error: empty summary + `total_properties: 0` (never 5xx).
 

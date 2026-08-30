@@ -538,15 +538,19 @@ Outbound: Lead page → POST /api/calls/start-real
   → sarvamClient.placeCall() (apps.sarvam.ai API)
   → call_session (provider=sarvam, external_call_id=attempt_id, initiated)
 
-Mid-call (agent tools, called BY Sarvam):
-  GET /api/tools/sarvam/lead-context?phone=…      ← on_start personalization
-  GET /api/tools/sarvam/inventory-search?query=…  ← live inventory
-       └─ queryParser.ts parses free text (EN/Hindi) →
-          city / sector / configuration / budget filters
-       └─ never-5xx: any error → HTTP 200 {count:0, note} fallback
-       └─ 8s withTimeout so a hung query can't stall the call
+Mid-call tools REMOVED (2026-08-30) — call start is hook-driven (zero mid-call dispatches):
+  Call start (on_start hooks, called BY Sarvam):
+    GET /api/tools/sarvam/lead-context?phone=…       ← lead + last WhatsApp messages
+    GET /api/tools/sarvam/inventory-snapshot         ← full voice-friendly inventory
+         └─ never-5xx: any error → HTTP 200 graceful fallback
+         └─ 5-min caches (lead context: found leads only; snapshot: per org)
+  (inventory-search endpoint retained backend-side but NOT wired to the agent —
+   mid-call dispatches died randomly in Sarvam's harness; evidence in
+   docs/sarvam-tool-failure-evidence.md)
 
-Completion: POST /webhooks/sarvam/:secret (secret-in-path auth)
+Completion: POST /webhooks/sarvam/:secret (secret-in-path auth, TOLERANT since 2026-08-30)
+  → aliases accepted (call_id/interaction_id, disposition/outcome), flat chips hoisted;
+    empty body → audited + 200 (never 400); raw log: backend/logs/sarvam-webhooks.log
   → sarvam_webhook_events (raw payload, idempotent)
   → job_queue: process_call_result
   → callResultService: map status → transcript turns →

@@ -23,6 +23,49 @@ evidence: docs/sarvam-tool-failure-evidence.md (Addendum 4). The
 snapshot-variable architecture removes the failing component entirely:
 filtering happens in our SQL at call start; the LLM never dispatches anything.
 
+## ⚠️ PENDING FIXES (dashboard-side, 2026-08-30) — do these before Part H
+
+### Fix 1 — on_end webhook Body template (currently sends EMPTY body)
+Tools → your on_end webhook tool → **Body** section → paste this JSON
+(each chip inserted via the variable picker, NOT typed):
+
+```json
+{
+  "attempt_id": "{{attempt_id}}",
+  "status": "{{status}}",
+  "duration": "{{duration}}",
+  "phone": "{{phone}}",
+  "customer_name": "{{customer_name}}",
+  "city": "{{city}}",
+  "location": "{{location}}",
+  "configuration": "{{configuration}}",
+  "budget_min": "{{budget_min}}",
+  "budget_max": "{{budget_max}}",
+  "purpose": "{{purpose}}",
+  "timeline": "{{timeline}}"
+}
+```
+
+Chip names differ per dashboard build — pick the closest variable chip for
+each key (e.g. `interaction_id`/`call_id` for attempt identity,
+`disposition`/`outcome` for status). The backend now accepts aliases and
+flat chips either way. Without ANY body template, calls complete but the
+CRM never receives the result.
+
+### Fix 2 — Hook #1 (lead-context) phone parameter
+The `phone=` query param chip resolves EMPTY on live calls → 400s.
+Re-open the hook config → Parameters → phone → pick the chip that holds
+the CALLER's number (telephony/session caller chip — NOT a static value).
+Verify with one call: `lead-context.request ... phone="+91..."` in
+`logs/sarvam-tool-calls.log`.
+
+### Backend safety net (already shipped 2026-08-30)
+The webhook route no longer 400s on empty/bad bodies — it audits them into
+`sarvam_webhook_events` (`processing_error` explains why) and returns 200,
+and every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. So a
+missing Body template can no longer produce a retry storm — but you still
+lose the call data until Fix 1 is done.
+
 ## PRE-FLIGHT before every test batch
 - `./scripts/sarvam-tunnel.sh status` — if not running:
   `./scripts/sarvam-tunnel.sh start` (ngrok free dies on Mac restart; URL is

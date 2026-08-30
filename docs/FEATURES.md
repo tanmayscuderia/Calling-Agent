@@ -378,9 +378,9 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 | **Result Webhook** | `/webhooks/sarvam/:secret` — unguessable-URL auth (403 on bad secret, 400 malformed, 200 otherwise to stop retries) |
 | **Webhook Audit Trail** | Every raw payload persisted to `sarvam_webhook_events` before processing — replayable + debuggable |
 | **Idempotent Processing** | `process_call_result` queue job correlates Sarvam `attempt_id` → `call_sessions.external_call_id`; terminal-state skip prevents double processing |
-| **Live Mid-Call Tools** | During real calls the Sarvam agent calls our API: `GET /api/tools/sarvam/lead-context?phone=` (lead + recent chat for personalized greeting) and `GET /api/tools/sarvam/inventory-search?query=` (free-text EN/Hindi search) |
-| **Query Parser** | `queryParser.ts` converts free-text queries (`3bhk sector 150 noida 2cr`) into structured city/sector/config/budget filters for inventory search |
-| **Never-5xx Tool Endpoints** | Tool routes auth via `X-Tool-Secret` header and always return 200 with `{ error }` payloads — a failing tool never breaks the live call |
+| **Zero-Mid-Call-Tool Hooks (v7.6)** | The agent's two on_start hooks call our API at CALL START: `GET /api/tools/sarvam/lead-context?phone=` (lead + last WhatsApp messages for a personalized greeting) and `GET /api/tools/sarvam/inventory-snapshot` (full voice-friendly inventory). The LLM never dispatches tools mid-call — mid-call dispatches died randomly inside Sarvam's harness (`docs/sarvam-tool-failure-evidence.md`) |
+| **Tolerant Result Webhook** | `/webhooks/sarvam/:secret` accepts field aliases (`call_id`/`interaction_id` → attempt identity, `disposition`/`outcome` → status), flat variable chips, and empty bodies (audited + 200 — never 400); every POST raw-logged to `logs/sarvam-webhooks.log` |
+| **Never-5xx Tool Endpoints** | Tool routes auth via `X-Tool-Secret`/`X-API-Key` and always return 200 with `{ error }` payloads — a failing hook can never break call start |
 | **LLM Call Summaries** | DeepSeek `summarizeCall()` turns the raw transcript into summary + outcome + lead updates |
 | **Transcript Storage** | Conversation turns saved to `call_session_turns`; full transcript on `call_sessions.transcript` |
 | **Lead Enrichment** | Call results update lead temperature, preferences, and agent variables automatically |
@@ -398,3 +398,29 @@ Real AI phone calls via **Sarvam AI voice agents** — outbound PSTN calls (Hind
 - `backend/src/queue/queueWorker.ts` + `jobHandler.ts` — `process_call_result` job processing
 - `supabase/migrations/20260108_0001_sarvam_calls.sql` + `20260109_0001_sarvam_fixes.sql` — schema + idempotent fixes
 - `backend/tests/unit/callResultService.test.ts` — webhook → CRM writeback unit tests
+
+### Zero-Mid-Call-Tool Production Architecture (2026-08-30)
+Mid-call tools were REMOVED after live calls proved dispatches die randomly
+inside Sarvam's harness ("अरे, है क्या तू" garbage + force-end). Replaced by:
+
+| Piece | Mechanism |
+|-------|-----------|
+| Inventory brain | on_start hook fills `inventory_summary` ONCE per call (`GET /api/tools/sarvam/inventory-snapshot`, 0–3ms cached) |
+| Personalization | on_start hook fills lead context (`GET /api/tools/sarvam/lead-context?phone=` — lead + last 10 WhatsApp messages + call history) |
+| Lead capture | 8 output variables + on_end webhook → `sarvam_webhook_events` audit → `process_call_result` job → LLM summary → CRM writeback |
+| Tolerant webhook | Aliases (`call_id`/`interaction_id`, `disposition`/`outcome`), flat chip bodies, empty body → audited + 200 (never 400); raw log `backend/logs/sarvam-webhooks.log` |
+| Durability | Backend runs under nohup (`logs/server.log`) |
+
+### Channel Unification Status (2026-08-30)
+
+| Channel | Code | Live state | Remaining |
+|---------|------|------------|-----------|
+| Voice (Sarvam) | ✅ | ✅ LIVE — hooks proven 13/13, zero dispatch failures | Dashboard: on_end Body template + Hook #1 phone chip |
+| WhatsApp (Baileys) | ✅ proven (753 msgs) | 🔴 account disabled since 2026-07-24 | Re-enable + QR re-scan on dashboard |
+| Shared CRM | ✅ | ✅ `crm_leads` merges both by normalized phone (unique per org) | Unified timeline UI + Kanban board (Phase U1) |
+
+Both channels share one pipeline: message/call → `job_queue` →
+`findOrCreateLead` (phone match) → AI → reply/result → `computeStatus()`
+auto-progression. The voice agent's lead context already reads the last 10
+WhatsApp messages, so the caller's chat history is spoken context, not a
+separate silo.

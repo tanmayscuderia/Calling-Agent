@@ -393,7 +393,7 @@ Temperature scoring:
 | **GET** | `/api/calls?orgId=` | List call sessions |
 | **POST** | `/webhooks/sarvam/:secret` | Sarvam result webhook (secret in path; idempotent; enqueues `process_call_result`) |
 | **GET** | `/api/tools/sarvam/lead-context?phone=` | Mid-call tool: lead + last 3 messages for greeting personalization (`X-Tool-Secret` auth; never-5xx) |
-| **GET** | `/api/tools/sarvam/inventory-search?query=` | Mid-call tool: free-text (EN/Hindi) inventory search via `queryParser` → city/sector/config/budget filters |
+| **GET** | `/api/tools/sarvam/inventory-search?query=` | LEGACY (not wired to the agent since 2026-08-30): free-text (EN/Hindi) inventory search via `queryParser` → city/sector/config/budget filters |
 | | | |
 | **POST** | `/api/ai/test-extraction` | Test extraction without WhatsApp |
 | **POST** | `/api/ai/test-reply` | Test full AI reply without WhatsApp |
