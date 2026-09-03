@@ -23,7 +23,7 @@ evidence: docs/sarvam-tool-failure-evidence.md (Addendum 4). The
 snapshot-variable architecture removes the failing component entirely:
 filtering happens in our SQL at call start; the LLM never dispatches anything.
 
-## ⚠️ PENDING FIXES (dashboard-side, 2026-08-30) — do these before Part H
+## ⚠️ PENDING FIXES (dashboard-side — STILL OPEN as of 2026-09-03; 3 live calls on Sep 1 all arrived with empty phone + empty webhook body)
 
 ### Fix 1 — on_end webhook Body template (currently sends EMPTY body)
 Tools → your on_end webhook tool → **Body** section → paste this JSON
@@ -52,12 +52,25 @@ each key (e.g. `interaction_id`/`call_id` for attempt identity,
 flat chips either way. Without ANY body template, calls complete but the
 CRM never receives the result.
 
-### Fix 2 — Hook #1 (lead-context) phone parameter
-The `phone=` query param chip resolves EMPTY on live calls → 400s.
-Re-open the hook config → Parameters → phone → pick the chip that holds
-the CALLER's number (telephony/session caller chip — NOT a static value).
-Verify with one call: `lead-context.request ... phone="+91..."` in
-`logs/sarvam-tool-calls.log`.
+### Fix 2 — Hook #1 (lead-context) phone parameter — CONFIRMED STILL BROKEN (3 calls: Sep 1, 09:17 / 18:59 / 19:35 IST, all hit `?phone=` empty)
+The `phone=` query param resolves EMPTY on live calls → 400s.
+
+**Pick exactly this chip: `user_phone_number`** — the PLATFORM's caller-number
+chip (Sarvam docs: "Phone number of the user in E.164 format", populated on
+every attempt).
+
+⚠️ **THE TRAP (this is what went wrong 3 times):** the agent ALSO has an
+output variable named `phone` (created in Part D). At call start it is EMPTY
+— the LLM only fills it mid-call. If the picker shows both, pick the
+platform/telephony one (`user_phone_number`), NOT the agent variable `phone`.
+Symptom of the wrong chip: our log shows `lead-context?phone=` with nothing
+after the `=`.
+
+Steps: Hook #1 (lead-context) → Parameters → phone → delete the wrong chip →
+insert `user_phone_number` via the variable picker (single braces, NOT typed
+`{{...}}`) → Save.
+Verify with one call: `grep lead-context backend/logs/sarvam-tool-calls.log`
+must show `phone=%2B91...` (URL-encoded +91 number) and a 200.
 
 ### Backend safety net (already shipped 2026-08-30)
 The webhook route no longer 400s on empty/bad bodies — it audits them into

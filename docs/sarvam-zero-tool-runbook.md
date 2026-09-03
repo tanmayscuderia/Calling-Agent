@@ -36,8 +36,11 @@
    `status`) plus flat variable chips. **But the real fix is dashboard-side:
    add the Body template (see sarvam-dashboard-setup.md → PENDING FIXES).**
 2. **Hook #1 `phone=` chip resolves empty on live calls** → lead-context
-   returns 400 with empty phone. Pick the correct telephony caller-number
-   chip in the dashboard (sarvam-dashboard-setup.md → PENDING FIXES).
+   returns 400 with empty phone. NOW CONFIRMED ACROSS 3 CALLS (Sep 1). The
+   fix is exact: delete the wrong chip, insert the PLATFORM chip
+   **`user_phone_number`** (E.164 caller number, per Sarvam docs). Do NOT
+   pick the agent's `phone` OUTPUT variable — it is empty at call start;
+   that is the mistake made 3 times (sarvam-dashboard-setup.md → Fix 2).
 3. **Backend ran in a foreground terminal** and died twice (11:30 crash →
    502s → recovered → died again). Now started with nohup
    (`logs/server.log`), survives terminal close.
@@ -117,7 +120,7 @@ unless a field actually mismatches.
 | When should this tool run? | **On start** | REQUIRED |
 | Method | `GET` | verify |
 | URL | `https://<tunnel>/api/tools/sarvam/lead-context` | verify |
-| Query param | `phone` = caller-number variable **chip** (single braces, e.g. `{user_phone_number}`) — inserted via the dashboard variable picker, NOT typed as `{{...}}` | REQUIRED |
+| Query param | `phone` = **`user_phone_number`** — the PLATFORM caller-number chip (single braces), inserted via the dashboard variable picker, NOT typed as `{{...}}`. NOT the agent's `phone` output variable (empty at call start — caused 3 failed calls) | REQUIRED |
 | Auth | API key → header `X-API-Key` → references the stored tool secret (`SARVAM_TOOL_SECRET`, falls back to `SARVAM_WEBHOOK_SECRET` in the backend env) | REQUIRED |
 | Save reply into variables | reply field `found` → `lead_found`, `lead` → `lead_context`, `recent_messages` → `recent_messages` (whatever mapping already exists — keep it) | verify |
 | Response template | leave empty | on_start hooks CANNOT use one (no LLM in the loop) |
