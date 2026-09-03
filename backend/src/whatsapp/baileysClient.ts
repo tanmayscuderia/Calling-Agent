@@ -45,6 +45,22 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   private starting: boolean = false;
   private socketGen: number = 0; // incremented on every start() — stale socket events check this
 
+  // ═══════════════════════════════════════════════════════
+  // ACTIVATION CUTOFF
+  // When the account (re)connects after being offline for a long
+  // time (e.g. account disabled → re-enabled days later), WhatsApp
+  // can replay the offline backlog through messages.upsert — as
+  // 'append' (explicitly processed, see FIX below) and occasionally
+  // 'notify'. Without a cutoff every backlog message runs the full
+  // pipeline: lead creation + AI auto-replies to weeks-old texts.
+  // connectedAtMs is set when the socket opens; messages older than
+  // that (minus a 90s grace for clock skew / delivery latency) are
+  // skipped before any processing.
+  // ═══════════════════════════════════════════════════════
+  private connectedAtMs: number = 0;
+  private backlogSkipped: number = 0;
+  private readonly ACTIVATION_GRACE_MS = 90_000;
+
   // Our own chat tracking — fed by Baileys events
   private chats: Map<string, WhatsAppChat> = new Map();
   private monitoredChatIds: Set<string> = new Set();
@@ -343,9 +359,11 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         if (connection === 'open') {
           this.status = 'connected';
           this.starting = false;
+          this.connectedAtMs = Date.now(); // activation cutoff reference — see field docs
+          this.backlogSkipped = 0;
           const me = this.sock?.user?.id ?? '';
           this.connectedPhone = me;
-          logger.info({ user: me }, 'WhatsApp connected');
+          logger.info({ user: me, connectedAt: new Date(this.connectedAtMs).toISOString() }, 'WhatsApp connected — only messages newer than this timestamp will be processed');
           this.emit('connected', me);
           await setAccountStatus(this.orgId, this.accountId!, 'connected', { phone: me });
 
@@ -423,6 +441,33 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         logger.info({ type, count: messages?.length ?? 0 }, '📨 messages.upsert received');
 
         for (const msg of messages) {
+          // ── ACTIVATION CUTOFF ──
+          // Drop anything sent before this connection was established
+          // (offline backlog replay). Must run BEFORE the decryption /
+          // parse pipeline so old messages never create leads, insert
+          // conversation rows, or trigger AI replies. 90s grace keeps
+          // genuinely-live messages safe from clock skew.
+          const msgTsMs = Number(msg?.messageTimestamp ?? 0) * 1000;
+          if (
+            this.connectedAtMs > 0 &&
+            msgTsMs > 0 &&
+            msgTsMs < this.connectedAtMs - this.ACTIVATION_GRACE_MS
+          ) {
+            this.backlogSkipped++;
+            logger.info(
+              {
+                upsertType: type,
+                jid: msg?.key?.remoteJid,
+                msgId: msg?.key?.id,
+                messageTime: new Date(msgTsMs).toISOString(),
+                connectedAt: new Date(this.connectedAtMs).toISOString(),
+                skippedTotal: this.backlogSkipped,
+              },
+              '⏭️ Skipping pre-activation message (offline backlog) — pipeline not triggered'
+            );
+            continue;
+          }
+
           // ── DECRYPTION FAILURE DETECTION ──
           // When Baileys receives a message but can't decrypt it, msg.key exists
           // but msg.message is null/undefined. This is the REAL signal — not
