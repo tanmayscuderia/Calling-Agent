@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import Link from 'next/link';
 
@@ -43,21 +44,21 @@ function timeAgo(iso?: string) {
 }
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
 
-  const load = () => {
-    setLoading(true);
-    const query: Record<string, string> = {};
-    if (filterStatus) query.status = filterStatus;
-    api('/api/leads', { query })
-      .then((r) => setLeads(r.leads ?? []))
-      .catch(() => setLeads([]))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, [filterStatus]);
+  // React Query (2026-08-30): was manual fetch + useState + useEffect.
+  // Cache keyed by filter → instant switching between status filters,
+  // deduped requests, error state surfaced instead of silently blanking.
+  const leadsQ = useQuery({
+    queryKey: ['leads', filterStatus],
+    queryFn: () => {
+      const query: Record<string, string> = {};
+      if (filterStatus) query.status = filterStatus;
+      return api('/api/leads', { query });
+    },
+  });
+  const leads: any[] = leadsQ.data?.leads ?? [];
+  const loading = leadsQ.isLoading;
 
   return (
     <div style={{ maxWidth: 1200 }}>

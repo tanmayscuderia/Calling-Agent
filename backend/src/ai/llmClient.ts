@@ -15,7 +15,19 @@ const MAX_RETRIES = 5;
 const MIN_DELAY_MS = parseInt(process.env.LLM_MIN_DELAY_MS || '0', 10);
 let lastCallTime = 0;
 
-let activeLlmCalls = 0;
+// ── Concurrency state ──
+// The admission counter lives in the KV layer: in-memory by default (single
+// process — identical to the old counter), Redis when REDIS_URL is set
+// (shared cap across API + worker processes). The local FIFO wait-queue is
+// kept for in-process fairness; cross-process waiters retry the atomic INCR
+// on a jittered poll.
+// LEASE TTL: withConcurrencyLimit holds the slot across ALL retries (30s
+// timeout × 5 retries + backoff ≈ 4 min worst case), so the lease must be
+// generous — it only exists so a CRASHED process's slot self-frees.
+import { getKv } from '../kv';
+const LLM_SEMAPHORE_KEY = 'llm:active';
+const LLM_LEASE_TTL_MS = 10 * 60_000;
+let localActive = 0; // in-process mirror for stats; the KV counter is authoritative
 const llmWaitQueue: Array<() => void> = [];
 
 /** Sleep helper */
@@ -24,15 +36,59 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Wait for a slot: woken when this process releases one (FIFO), or on a
+ * jittered timeout (a REMOTE process released — poll-fallback re-checks KV).
+ */
+function waitForSlotOrTimeout(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const waker = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      const i = llmWaitQueue.indexOf(waker);
+      if (i !== -1) llmWaitQueue.splice(i, 1);
+      resolve();
+    }, ms);
+    llmWaitQueue.push(waker);
+  });
+}
+
+/** Atomic cross-process acquire. Never over-admits; crashed slots expire via lease. */
+async function acquireSlot(): Promise<void> {
+  const kv = await getKv();
+  for (;;) {
+    const n = await kv.incrWithTtl(LLM_SEMAPHORE_KEY, LLM_LEASE_TTL_MS);
+    if (n <= MAX_CONCURRENT_LLM_CALLS) {
+      localActive++;
+      return;
+    }
+    // Over capacity — undo our increment and wait (FIFO wake or jittered poll).
+    await kv.decrFloorZero(LLM_SEMAPHORE_KEY);
+    await waitForSlotOrTimeout(150 + Math.floor(Math.random() * 200));
+  }
+}
+
+async function releaseSlot(): Promise<void> {
+  localActive = Math.max(0, localActive - 1);
+  const kv = await getKv();
+  await kv.decrFloorZero(LLM_SEMAPHORE_KEY);
+  const next = llmWaitQueue.shift();
+  if (next) next();
+}
+
+/**
  * Concurrency limiter — ensures max N parallel LLM calls.
  * Excess callers queue up and are released FIFO.
  * This prevents fan-out 429 errors when many WhatsApp messages arrive at once.
  */
 async function withConcurrencyLimit<T>(fn: () => Promise<T>): Promise<T> {
-  if (activeLlmCalls >= MAX_CONCURRENT_LLM_CALLS) {
-    await new Promise<void>(resolve => llmWaitQueue.push(resolve));
-  }
-  activeLlmCalls++;
+  await acquireSlot();
 
   // Enforce minimum delay between calls (prevents rate-limit bursts during evals)
   if (MIN_DELAY_MS > 0) {
@@ -46,9 +102,7 @@ async function withConcurrencyLimit<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } finally {
-    activeLlmCalls--;
-    const next = llmWaitQueue.shift();
-    if (next) next();
+    await releaseSlot();
   }
 }
 
@@ -96,9 +150,10 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 /** Get current concurrency stats (for monitoring endpoint) */
 export function getLlmStats() {
   return {
-    activeCalls: activeLlmCalls,
+    activeCalls: localActive,
     maxConcurrent: MAX_CONCURRENT_LLM_CALLS,
     queued: llmWaitQueue.length,
+    semaphoreBackend: (process.env.REDIS_URL?.trim() ? 'redis' : 'memory') as 'redis' | 'memory',
   };
 }
 

@@ -189,7 +189,7 @@ INBOUND (Phase 7, later): caller dials Sarvam number → webhook → findOrCreat
 - [ ] New `docs/SARVAM_INTEGRATION.md` (setup, env, variables contract, webhook spec, troubleshooting)
 - [ ] Update `ARCHITECTURE.md` §6 (real + demo flows, webhook diagram)
 - [ ] Update `API_REFERENCE.md`, `PROJECT_CONTEXT.md`, `ROADMAP.md` (Phase F "Real voice calling" → done when shipped), `README.md`
-- [ ] Fix stale test counts across docs while we're in there (README 290 vs ARCHITECTURE 241 vs PROJECT_CONTEXT 269)
+- [x] Fix stale test counts across docs while we're in there — DONE 2026-08-30 (all docs now say 290 unit tests / 17 files + 21 eval blocks / 8 suites)
 
 ---
 

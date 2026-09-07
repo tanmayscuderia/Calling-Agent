@@ -1,7 +1,13 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
+import { getKv } from '../kv';
 
-// ---- In-memory rate limit counters (fast, no DB hit for hot path) ----
+// ---- Rate-limit counters ----
+// Storage moved to the KV layer: in-memory by default (identical to the old
+// Map), Redis-shared when REDIS_URL is set so API + worker agree on usage.
+// The DB (org_usage_daily/org_usage_hourly via atomic RPCs) remains the
+// source of truth — counters are an optimistic hot-path cache re-synced from
+// the DB every 60s, which bounds any cross-process drift to ~1 minute.
 interface OrgCounters {
   tokensToday: number;
   messagesThisHour: number;
@@ -9,21 +15,31 @@ interface OrgCounters {
   callsToday: number;
   lastRefresh: number; // timestamp of last DB sync
 }
-const orgCounters = new Map<string, OrgCounters>();
+const COUNTERS_KEY = (orgId: string) => `rl:${orgId}:counters`;
+const COUNTERS_TTL_MS = 10 * 60_000;
 const SYNC_INTERVAL = 60 * 1000; // sync to DB every 60s
 
 async function getCounters(orgId: string): Promise<OrgCounters> {
-  let c = orgCounters.get(orgId);
+  const kv = await getKv();
+  const key = COUNTERS_KEY(orgId);
+  let c = await kv.getJson<OrgCounters>(key);
   if (!c) {
     c = { tokensToday: 0, messagesThisHour: 0, messagesToday: 0, callsToday: 0, lastRefresh: 0 };
-    orgCounters.set(orgId, c);
+    await kv.setJson(key, c, COUNTERS_TTL_MS);
   }
 
   // Refresh from DB if stale (once per minute)
   if (Date.now() - c.lastRefresh > SYNC_INTERVAL) {
     await refreshFromDB(orgId, c);
+    await kv.setJson(key, c, COUNTERS_TTL_MS);
   }
   return c;
+}
+
+/** Persist counter mutations back to the shared store. */
+async function saveCounters(orgId: string, c: OrgCounters): Promise<void> {
+  const kv = await getKv();
+  await kv.setJson(COUNTERS_KEY(orgId), c, COUNTERS_TTL_MS);
 }
 
 async function refreshFromDB(orgId: string, c: OrgCounters) {
@@ -73,12 +89,26 @@ export interface OrgLimits {
   locked_reason: string | null;
 }
 
-// Cache limits (rarely change)
-const limitsCache = new Map<string, { limits: OrgLimits; expires: number }>();
+// Cache limits (rarely change) — shared via KV, 5-min TTL
+const LIMITS_KEY = (orgId: string) => `rl:${orgId}:limits`;
+const LIMITS_TTL_MS = 5 * 60 * 1000;
+
+const DEFAULT_LIMITS: OrgLimits = {
+  max_tokens_per_day: 500000,
+  max_messages_per_hour: 100,
+  max_messages_per_day: 500,
+  max_calls_per_day: 50,
+  max_ai_replies_per_conversation: 10,
+  max_messages_per_phone_per_day: 20,
+  is_locked: false,
+  locked_reason: null,
+};
 
 export async function getOrgLimits(orgId: string): Promise<OrgLimits> {
-  const cached = limitsCache.get(orgId);
-  if (cached && Date.now() < cached.expires) return cached.limits;
+  const kv = await getKv();
+  const key = LIMITS_KEY(orgId);
+  const cached = await kv.getJson<OrgLimits>(key);
+  if (cached) return cached;
 
   try {
     const sb = supabaseAdmin();
@@ -87,31 +117,13 @@ export async function getOrgLimits(orgId: string): Promise<OrgLimits> {
       .eq('org_id', orgId)
       .maybeSingle();
 
-    const limits: OrgLimits = data || {
-      max_tokens_per_day: 500000,
-      max_messages_per_hour: 100,
-      max_messages_per_day: 500,
-      max_calls_per_day: 50,
-      max_ai_replies_per_conversation: 10,
-      max_messages_per_phone_per_day: 20,
-      is_locked: false,
-      locked_reason: null,
-    };
+    const limits: OrgLimits = data || DEFAULT_LIMITS;
 
-    limitsCache.set(orgId, { limits, expires: Date.now() + 5 * 60 * 1000 });
+    await kv.setJson(key, limits, LIMITS_TTL_MS);
     return limits;
   } catch {
-    // Return defaults on error (fail-open for prototype)
-    return {
-      max_tokens_per_day: 500000,
-      max_messages_per_hour: 100,
-      max_messages_per_day: 500,
-      max_calls_per_day: 50,
-      max_ai_replies_per_conversation: 10,
-      max_messages_per_phone_per_day: 20,
-      is_locked: false,
-      locked_reason: null,
-    };
+    // Return defaults on error (fail-open for prototype) — NOT cached
+    return DEFAULT_LIMITS;
   }
 }
 
@@ -199,6 +211,7 @@ export async function recordTokenUsage(
 ): Promise<void> {
   const c = await getCounters(orgId);
   c.tokensToday += tokensIn + tokensOut;
+  await saveCounters(orgId, c);
 
   // Async DB update (fire-and-forget) via atomic RPC
   setImmediate(async () => {
@@ -224,6 +237,7 @@ export async function recordMessageSent(orgId: string, phone: string): Promise<v
   const c = await getCounters(orgId);
   c.messagesThisHour++;
   c.messagesToday++;
+  await saveCounters(orgId, c);
 
   setImmediate(async () => {
     try {
@@ -261,6 +275,7 @@ export async function recordMessageSent(orgId: string, phone: string): Promise<v
 export async function recordCall(orgId: string): Promise<void> {
   const c = await getCounters(orgId);
   c.callsToday++;
+  await saveCounters(orgId, c);
 
   setImmediate(async () => {
     try {

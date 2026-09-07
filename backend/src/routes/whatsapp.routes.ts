@@ -57,10 +57,31 @@ export async function whatsappRoutes(app: FastifyInstance) {
         adapter = getLocalAdapter();
       }
 
-      adapter.start().catch((e) => logger.error({ e }, 'start failed'));
-      return { ok: true, message: 'WhatsApp bridge starting. Scan QR in the dashboard.' };
+      // AWAIT + retry once: a transient failure (version fetch, DB hiccup)
+      // previously vanished into a fire-and-forget .catch while the route
+      // returned ok:true — the dashboard then sat on "starting" forever.
+      const attempt = async (retriesLeft: number): Promise<void> => {
+        try {
+          await adapter.start();
+        } catch (err) {
+          if (retriesLeft <= 0) throw err;
+          logger.warn({ err: (err as Error)?.message }, '[WA] start failed — retrying once in 2s');
+          await new Promise((r) => setTimeout(r, 2_000));
+          return attempt(retriesLeft - 1);
+        }
+      };
+
+      await Promise.race([
+        attempt(1),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('start timed out after 12s — try again or use Force Reconnect')), 12_000)
+        ),
+      ]);
+
+      return { ok: true, message: 'WhatsApp bridge starting. Scan the QR below.' };
     } catch (e: any) {
-      return reply.code(500).send({ error: e?.message });
+      logger.error({ e: e?.message }, '[WA] /start failed after retry');
+      return reply.code(502).send({ ok: false, error: e?.message ?? 'WhatsApp start failed' });
     }
   });
 

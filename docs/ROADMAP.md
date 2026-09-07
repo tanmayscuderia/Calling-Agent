@@ -78,9 +78,9 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **240 unit tests** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser (16 files)
-- **91 LLM eval tests** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry (8 files)
-- **296 total tests, ALL GREEN**
+- **301 unit tests (18 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser, calling guards, validation
+- **21 LLM eval blocks (8 suites)** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry
+- **301 unit + 21 eval blocks, ALL GREEN (recounted 2026-09-07 — KV layer added 11 tests)**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
@@ -100,7 +100,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Auto follow-ups** — `callback_requested` / `site_visit_requested` / `booking_requested` outcomes create follow-up tasks
 - **Safety guards** — calling hours window (IST), per-org daily cost caps, DNC list, API key presence
 - **Correlation + idempotency** — `call_sessions.external_call_id` ↔ Sarvam `attempt_id`; terminal-state skip prevents double processing
-- **Live mid-call tools** — during real calls the agent calls `GET /api/tools/sarvam/lead-context` + `GET /api/tools/sarvam/inventory-search` (free-text EN/Hindi queries via `queryParser.ts`; never-5xx endpoints) — verified on real calls (see `docs/SARVAM_GO_LIVE_CHECKLIST.md`)
+- **Zero-mid-call-tool architecture (2026-08-30, supersedes mid-call tools)** — two on_start hooks load lead context + the full inventory snapshot at call start; the LLM never dispatches tools mid-call (live calls proved dispatches die randomly in Sarvam's harness — evidence in `docs/sarvam-tool-failure-evidence.md`; current operator checklist in `docs/sarvam-zero-tool-runbook.md`)
 
 ### Phase E3: Generic Inventory System ✅
 - **`generic_inventory_items` table** — single unified inventory table for all non-real-estate industries
@@ -111,6 +111,29 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Generic item CRUD** — `GET/POST/PATCH/DELETE /api/inventory/items` endpoints
 - **Per-industry templates** — Each of the 12 templates now includes `inventory_schema` with `item_label`, `item_label_plural`, `search_fields`
 - **Dashboard label updates** — Dashboard stats card label dynamically changes ("Properties Available" → "Courses Available" → "Services Available")
+
+### Phase U: Unified WhatsApp + Voice Product (started 2026-08-30)
+Single source of truth = `crm_leads` (org+phone unique; WhatsApp + calls both
+write to it — linking already works via normalized phone numbers).
+
+- **U0 — Make the loop provable** (in progress)
+  - [x] Zero-mid-call-tool migration (on_start hooks + on_end webhook) — see `docs/sarvam-zero-tool-runbook.md`
+  - [x] Tolerant webhook route: field aliases, flat variable chips, empty-body audit + 200, raw log `backend/logs/sarvam-webhooks.log`
+  - [x] Backend durability: nohup + `logs/server.log`
+  - [ ] Dashboard: on_end Body template + Hook #1 phone chip (operator)
+  - [ ] Re-enable WhatsApp account (disabled since 2026-07-24; dashboard → WhatsApp → enable + QR)
+  - [ ] Proof batch: 2 test calls + 1 WhatsApp message → one lead, both channels
+- **U1 — Unified lead timeline + Kanban**
+  - [ ] Lead page timeline merging WhatsApp messages + call turns (data already in `customer_messages` + `call_session_turns`)
+  - [ ] Kanban board by `status` (pipeline columns: new → contacted → qualified → site_visit_scheduled → negotiation → won/lost/junk; index `(org_id, status, temperature)` already exists)
+  - [ ] Auto-progression visible: WhatsApp replies + call dispositions both advance status via `computeStatus()`
+- **U2 — Cadence engine + funnel analytics**
+  - [ ] No-answer call → automatic WhatsApp nudge (both channels share the queue)
+  - [ ] Funnel dashboard: contacted → qualified → site visit → won, per org
+- **U3 — Production deploy**
+  - [ ] VPS + domain + TLS (replace laptop + ngrok)
+  - [ ] WhatsApp Cloud API adapter path (Baileys → BSP swap behind `MessagingAdapter`)
+  - [ ] Multi-org onboarding flow
 
 ---
 
@@ -123,9 +146,11 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 | Database | Production-ready | 14 migrations, multi-tenant, idempotent |
 | Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
-| Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery |
-| Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals |
-| Testing | Strong | 296 tests covering unit + LLM quality |
+| Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |
+| CI / Deploys | Production-ready | GitHub Actions (typecheck + 301 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
+| Shared KV | Production-ready | Redis-backed shared state behind `REDIS_URL` (`backend/src/kv/`): rate-limit counters, LLM semaphore, config/lead/snapshot caches; memory fallback when unset — the bridge to split api/worker + multi-replica topologies |
+| Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals; edge auth gate + error boundary + React Query |
+| Testing | Strong | 301 unit tests + 21 LLM eval blocks covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---

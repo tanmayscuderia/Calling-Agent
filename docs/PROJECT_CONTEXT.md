@@ -393,7 +393,7 @@ Temperature scoring:
 | **GET** | `/api/calls?orgId=` | List call sessions |
 | **POST** | `/webhooks/sarvam/:secret` | Sarvam result webhook (secret in path; idempotent; enqueues `process_call_result`) |
 | **GET** | `/api/tools/sarvam/lead-context?phone=` | Mid-call tool: lead + last 3 messages for greeting personalization (`X-Tool-Secret` auth; never-5xx) |
-| **GET** | `/api/tools/sarvam/inventory-search?query=` | Mid-call tool: free-text (EN/Hindi) inventory search via `queryParser` → city/sector/config/budget filters |
+| **GET** | `/api/tools/sarvam/inventory-search?query=` | LEGACY (not wired to the agent since 2026-08-30): free-text (EN/Hindi) inventory search via `queryParser` → city/sector/config/budget filters |
 | | | |
 | **POST** | `/api/ai/test-extraction` | Test extraction without WhatsApp |
 | **POST** | `/api/ai/test-reply` | Test full AI reply without WhatsApp |
@@ -655,4 +655,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: August 2026. Test count: 240 unit + 91 eval = 331 total. All passing. Sarvam real calling live (S1-S6 complete - see docs/SARVAM_CALLING_PLAN.md); live mid-call tools verified on real calls (docs/SARVAM_GO_LIVE_CHECKLIST.md).*
+*Last updated: 2026-09-07. Test count: 301 unit tests (18 files) + 21 LLM eval blocks (8 suites) — all passing. New: shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*

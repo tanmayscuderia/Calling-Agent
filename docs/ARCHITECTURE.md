@@ -1,24 +1,28 @@
 # Architecture — Calling Agent Platform
 
-> **Last Updated:** 2026-07-16
-> **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · Baileys (WhatsApp) · DeepSeek/OpenAI (LLM)
+> **Last Updated:** 2026-09-07
+> **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · Baileys (WhatsApp) · Sarvam (Voice Calling) · DeepSeek/OpenAI (LLM) · Redis (optional shared KV)
 
 ---
 
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)
-2. [WhatsApp Message Lifecycle](#2-whatsapp-message-lifecycle)
-3. [AI Pipeline (Brain)](#3-ai-pipeline-brain)
-4. [Job Queue System](#4-job-queue-system)
-5. [Auth & Multi-Tenancy](#5-auth--multi-tenancy)
-6. [Call Agent Demo](#6-call-agent-demo)
-7. [Frontend Architecture](#7-frontend-architecture)
-8. [Database Layer](#8-database-layer)
-9. [LLM Hardening](#9-llm-hardening)
-10. [Industry-Agnostic Config System](#10-industry-agnostic-config-system)
-11. [Security Model](#11-security-model)
-12. [Testing Architecture](#12-testing-architecture)
+2. [Complete File Map & Module Connections](#complete-file-map--module-connections)
+3. [WhatsApp Message Lifecycle](#2-whatsapp-message-lifecycle)
+4. [AI Pipeline (Brain)](#3-ai-pipeline-brain)
+5. [Job Queue System](#4-job-queue-system)
+6. [Auth & Multi-Tenancy](#5-auth--multi-tenancy)
+7. [Call Agent Demo](#6-call-agent-demo)
+8. [Frontend Architecture](#7-frontend-architecture)
+9. [Database Layer](#8-database-layer)
+10. [LLM Hardening](#9-llm-hardening)
+11. [Industry-Agnostic Config System](#10-industry-agnostic-config-system)
+12. [Security Model](#11-security-model)
+13. [Testing Architecture](#12-testing-architecture)
+14. [Shared KV Layer](#shared-kv-layer-2026-09-07)
+15. [Deployment Topology (Hostinger VPS)](#deployment-topology-hostinger-vps--the-deploy-target)
+16. [API Route Summary](#api-route-summary)
 
 ---
 
@@ -89,6 +93,138 @@
 │  RPCs: dequeue_job(), complete_job(), fail_job(), reclaim_stale()   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Complete File Map & Module Connections
+
+Every file, what it does, and what it connects to. Surveyed 2026-09-07
+(76 backend modules, ~12.9k lines + frontend).
+
+### Entry points & orchestration
+
+| File | Role | Connects to |
+|---|---|---|
+| `backend/src/server.ts` | Fastify app: plugins (cors/cookie/multipart), auth middleware, ALL route registrations, in-process worker + inbound poller (unless `WORKER_IN_PROCESS=false`), KV warm-up, graceful shutdown | every `routes/*`, `queue/queueWorker`, `sarvam/inboundPoller`, `kv`, `whatsapp/connectionManager` |
+| `backend/src/worker.ts` | Standalone queue-worker entry (`npm run worker`): stale-job recovery + poll loop, no HTTP. Use when `WORKER_IN_PROCESS=false` | `queue/staleRecovery`, `queue/queueWorker`, `kv` |
+| `backend/src/config.ts` | Central typed config from root `.env` (Supabase, LLM, Sarvam, WhatsApp, guards, calling hours) | read by nearly everything |
+| `backend/src/db/supabase.ts` | `supabaseAdmin()` singleton (service-role client) | Postgres via Supabase REST/RPC |
+
+### Routes (HTTP layer — thin: validate → delegate → shape)
+
+| File | Endpoints | Delegates to |
+|---|---|---|
+| `routes/health.routes.ts` | `GET /health`, `/api/system/status` | `llmClient.getLlmStats` |
+| `routes/auth.routes.ts` | login / me / logout (Supabase Auth → httpOnly cookie) | `auth/authMiddleware`, supabase |
+| `routes/inventory.routes.ts` | projects/units/items CRUD + search | `crm/propertyService`, `crm/inventoryItemService`, `uploads/csvImportService` |
+| `routes/upload.routes.ts` | CSV uploads (properties/inventory) | `uploads/csvImportService`, `uploads/storageService` |
+| `routes/leads.routes.ts` | leads list/detail/patch/followups | `crm/leadService` |
+| `routes/conversations.routes.ts` | conversations + send/handoff | `crm/conversationService` |
+| `routes/whatsapp.routes.ts` | start/stop/status/chats/toggle/relink/force-reconnect/resync/simulate/send | `whatsapp/connectionManager`, `whatsappService` |
+| `routes/calls.routes.ts` | `start-demo` (browser sim), `start-real` (Sarvam), turn/end, list (paginated), DNC CRUD | `sarvam/callingGuards`, `sarvam/sarvamClient`, `crm/leadService` |
+| `routes/sarvamWebhook.routes.ts` | `POST /webhooks/sarvam/:secret` — on_end results (tolerant: aliases, flat chips, empty-body audit → 200) | `sarvam/callResultService`, queue `process_call_result` |
+| `routes/sarvamTools.routes.ts` | on_start hooks: `lead-context` (5-min cache) + `inventory-snapshot` (markdown, 5-min cache); mid-call `inventory-search` (queryParser) | `crm/leadContextCache`, `crm/propertyService`, `sarvam/queryParser`, `crm/leadService` |
+| `routes/agent.routes.ts` | per-org agent config + industry templates | `ai/agentConfigService` |
+| `routes/ai.routes.ts` | AI playground endpoints | `ai/baseAgent` |
+| `routes/members.routes.ts` | org team members | `crm/memberService` |
+| `routes/system.routes.ts` | queue/LLM/system stats | `queue/*`, `ai/llmClient` |
+
+### WhatsApp bridge (inbound + outbound)
+
+| File | Role | Connects to |
+|---|---|---|
+| `whatsapp/baileysClient.ts` (1.4k lines) | Baileys adapter: QR lifecycle w/ stall watchdog, connection watchdog + heartbeat, **activation cutoff** (drops offline-backlog messages on reconnect), group/DM gating, decryption auto-relink, chat persistence | Baileys WS → emits `qr`/`connected`/`message` |
+| `whatsapp/messageParser.ts` | Raw Baileys payload → `ParsedWhatsAppMessage` (text/media/types) | consumed by baileysClient |
+| `whatsapp/whatsappService.ts` | Message pipeline: lead upsert (phone-merge), conversation insert, AI-reply limit checks, **enqueue `ai_reply` job**, send helpers, DNC of adapter events | `crm/leadService`, `crm/conversationService`, `auth/rateLimiter`, `queue` |
+| `whatsapp/connectionManager.ts` | Multi-account registry; boots `status='connected'` accounts on boot; start/stop/relink per org | `baileysClient`, `whatsappService` |
+
+### AI brain (processes the queue's jobs)
+
+| File | Role | Connects to |
+|---|---|---|
+| `queue/queueWorker.ts` | Poll loop (2s) → `dequeue_job()` RPC (atomic SKIP LOCKED) → dispatch by type → complete/fail | `queue/jobHandler`, Postgres RPCs |
+| `queue/jobHandler.ts` | `ai_reply`: config load → prompt build → grounding search → LLM → CRM writes → send reply; also `process_call_result` | `ai/*`, `crm/*`, `whatsappService`, `sarvam/callFinalizer` |
+| `queue/staleRecovery.ts` | Reclaims jobs stuck in `processing` (crash recovery, 60s) | Postgres RPC `reclaim_stale` |
+| `ai/llmClient.ts` | DeepSeek/OpenAI chat client — concurrency semaphore (KV), retry+backoff, 30s timeout, JSON/thinking modes | `kv`, `ai/usageTracker`, provider HTTP |
+| `ai/baseAgent.ts` | Orchestrates one AI turn: context → prompt → LLM → parse intent → tools (search/inventory/lead update) | `promptEngine`, `inventorySearch`, `llmClient`, `agentConfigService` |
+| `ai/promptEngine.ts` + `ai/prompts.ts` | System/user prompt assembly from org config + lead context + inventory | `agentConfigService` |
+| `ai/agentConfigService.ts` | Per-org config + 12 industry templates (cached 5 min via KV) | supabase (`agent_configs`, `agent_templates`) |
+| `ai/inventorySearch.ts` | Grounded inventory matching (SQL + scoring) for AI replies | `crm/propertyService` |
+| `ai/callAgent.ts` | Browser call-demo turns (no telephony) | `llmClient`, `agentConfigService` |
+| `ai/usageTracker.ts` | Daily LLM budget gate + token recording | `auth/rateLimiter` |
+
+### Sarvam voice calling
+
+| File | Role | Connects to |
+|---|---|---|
+| `sarvam/sarvamClient.ts` | Sarvam API: `start-real` dispatch (+ attempt fetch for inbound poller/transcripts) | Sarvam REST |
+| `sarvam/callingGuards.ts` | Pre-dispatch safety: IST hours, DNC registry, daily limits (fail-open on DNC infra error) | supabase `do_not_call`, `config` |
+| `sarvam/callResultService.ts` | Ingests call results (webhook + poller): lead attribution, session create/finalize, transcript + `final_agent_variables` → CRM; enqueues `process_call_result` | `crm/leadService`, `queue`, `sarvam/callFinalizer` |
+| `sarvam/callFinalizer.ts` | Maps output variables → CRM lead fields, writes transcript files, clears caches | `crm/leadContextCache`, logs |
+| `sarvam/inboundPoller.ts` | Polls Sarvam attempts API (30s) for inbound calls the webhook missed; dedupes on `external_call_id` | `sarvamClient`, `callResultService` |
+| `sarvam/queryParser.ts` | Natural-language query → structured filters (single-string tool param path) | `crm/propertyService` |
+
+### CRM, uploads, KV, validation, utils
+
+| File | Role |
+|---|---|
+| `crm/leadService.ts` | Lead CRUD, phone-normalized merge (WhatsApp + call → ONE lead), followups |
+| `crm/conversationService.ts` | Conversations + messages, read state |
+| `crm/propertyService.ts` | Projects/units queries, grounded search (60s KV cache), inventory snapshot markdown (5-min KV cache), invalidation |
+| `crm/inventoryItemService.ts` | Generic inventory items CRUD/bulk (invalidates caches) |
+| `crm/leadContextCache.ts` | Per-phone lead-context cache, 5-min, version-bump invalidation (worker → API) |
+| `crm/memberService.ts` | Org members lookup |
+| `kv/*` | KV abstraction — `kvStore` (interface) + `memoryKv` (default) + `redisKv` (`REDIS_URL`) + factory; consumers: rate limiter, LLM semaphore, all caches |
+| `validation/schemas.ts` | zod schemas → clean 400 `VALIDATION` on mutating routes |
+| `uploads/csvImportService.ts` + `storageService.ts` | CSV parse/validate/import; media storage |
+| `utils/*` (phone · money · locationAliases · email · logger) | Phone normalize/E.164, INR parsing, city/sector alias expansion, mailer, pino |
+| `auth/authMiddleware.ts` + `auth/types.ts` | Cookie session → org scoping (`getOrgId`), role gate |
+| `scripts/migrate.ts` | Tracked migration runner (`npm run migrate`, `--baseline`) |
+| `scripts/exportSarvamTranscripts.ts` | Transcript export tooling |
+
+### Frontend (`frontend/src`)
+
+| File | Role |
+|---|---|
+| `middleware.ts` | Edge gate: no session cookie → `/dashboard` never renders |
+| `app/layout.tsx` · `providers.tsx` · `error.tsx` | Shell, React Query provider, route error boundary |
+| `lib/api.ts` · `auth.tsx` · `toast.tsx` · `animations.ts` | Fetch wrapper (cookies, BACKEND_UNREACHABLE), auth context, toasts, Framer Motion presets |
+| `app/login` + `app/dashboard/*` (14 pages) | login; dashboard stats; leads (+detail); conversations; calls; whatsapp (QR connect + chats); inventory (+detail/upload); agent-settings; playground; team; followups |
+| `components/CallDemoModal.tsx` | Browser call demo UI |
+
+### The three pipelines, file by file
+
+**1. WhatsApp inbound → AI reply:**
+`baileysClient.messages.upsert` → activation cutoff → `messageParser` →
+`whatsappService` (lead upsert → conversation insert → `checkMessageAllowed`
+→ enqueue) → `job_queue` → `queueWorker.dequeue_job()` →
+`jobHandler.ai_reply` → `baseAgent` (`agentConfigService` → `promptEngine` →
+`inventorySearch` → `llmClient`) → `leadService`/`conversationService` writes
+→ `whatsappService.send`.
+
+**2. Sarvam real call (outbound + inbound):**
+`calls.routes.start-real` → `callingGuards` (hours/DNC/limits) →
+`sarvamClient` dispatch → **call start:** Sarvam → `sarvamTools.routes`
+(`lead-context?phone` → `leadContextCache`/`leadService`;
+`inventory-snapshot` → `propertyService` cache) → **call end:** Sarvam on_end
+webhook → `sarvamWebhook.routes` (secret-in-path, tolerant parse, audit row)
+→ enqueue `process_call_result` →
+`callResultService.ingestInboundAttempt` (lead merge, session finalize) →
+`callFinalizer` (output variables → CRM, transcript, cache invalidation).
+Safety net: `inboundPoller` ingests any attempt the webhook missed.
+
+**3. Dashboard CRUD:** page (React Query) → `middleware.ts` (edge gate) →
+`lib/api.ts` → route (`authMiddleware` → zod `parseBody`) → service →
+supabase → response.
+
+### Supabase tables by domain
+
+- **CRM:** `crm_leads`, `customer_conversations`, `customer_messages`, `phone_message_counters`
+- **Inventory:** `real_estate_projects`, `real_estate_units`, `inventory_items`
+- **Calling:** `call_sessions`, `sarvam_webhook_events`, `do_not_call`
+- **Usage/limits:** `org_usage_daily`, `org_usage_hourly`, `org_usage_limits`
+- **Platform:** `orgs`, `org_members`, `whatsapp_accounts`, `agent_configs`, `agent_templates`, `job_queue`, `schema_migrations`
+- **RPCs:** `dequeue_job`, `complete_job`, `fail_job`, `reclaim_stale`, `increment_usage`, `increment_hourly_messages`, `increment_phone_counter`
 
 ---
 
@@ -538,15 +674,19 @@ Outbound: Lead page → POST /api/calls/start-real
   → sarvamClient.placeCall() (apps.sarvam.ai API)
   → call_session (provider=sarvam, external_call_id=attempt_id, initiated)
 
-Mid-call (agent tools, called BY Sarvam):
-  GET /api/tools/sarvam/lead-context?phone=…      ← on_start personalization
-  GET /api/tools/sarvam/inventory-search?query=…  ← live inventory
-       └─ queryParser.ts parses free text (EN/Hindi) →
-          city / sector / configuration / budget filters
-       └─ never-5xx: any error → HTTP 200 {count:0, note} fallback
-       └─ 8s withTimeout so a hung query can't stall the call
+Mid-call tools REMOVED (2026-08-30) — call start is hook-driven (zero mid-call dispatches):
+  Call start (on_start hooks, called BY Sarvam):
+    GET /api/tools/sarvam/lead-context?phone=…       ← lead + last WhatsApp messages
+    GET /api/tools/sarvam/inventory-snapshot         ← full voice-friendly inventory
+         └─ never-5xx: any error → HTTP 200 graceful fallback
+         └─ 5-min caches (lead context: found leads only; snapshot: per org)
+  (inventory-search endpoint retained backend-side but NOT wired to the agent —
+   mid-call dispatches died randomly in Sarvam's harness; evidence in
+   docs/sarvam-tool-failure-evidence.md)
 
-Completion: POST /webhooks/sarvam/:secret (secret-in-path auth)
+Completion: POST /webhooks/sarvam/:secret (secret-in-path auth, TOLERANT since 2026-08-30)
+  → aliases accepted (call_id/interaction_id, disposition/outcome), flat chips hoisted;
+    empty body → audited + 200 (never 400); raw log: backend/logs/sarvam-webhooks.log
   → sarvam_webhook_events (raw payload, idempotent)
   → job_queue: process_call_result
   → callResultService: map status → transcript turns →
@@ -909,7 +1049,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 150 tests (no LLM, instant)
+├── unit/                          ← 301 tests across 18 files (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing
@@ -922,7 +1062,7 @@ backend/tests/
 │   ├── realEstateAgent.helpers    ← Agent helper functions
 │   └── promptEngine/              ← Prompt building tests
 │
-├── evals/                         ← 91 tests (real LLM calls, ~5min)
+├── evals/                         ← 21 test blocks across 8 suites (real LLM calls, opt-in, ~5min)
 │   ├── eval-harness.ts            ← Test framework
 │   ├── golden-cases.ts            ← Real estate test cases
 │   ├── education-cases.ts         ← Education test cases
@@ -950,7 +1090,51 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 241 tests (150 unit + 91 eval) — ALL GREEN**
+**Total: 301 unit tests (18 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-09-07 after KV layer +11; earlier docs said 241/290/296/331 — all stale)
+
+---
+
+## Shared KV Layer (2026-09-07)
+
+`backend/src/kv/` — one interface (`kvStore.ts`), two backends: **MemoryKv**
+(default, zero deps — identical to the old Map-based behavior) and
+**RedisKv** (`ioredis`, active only when `REDIS_URL` is set; unreachable
+Redis at boot = permanent memory fallback for that process, loud log).
+
+Shared across processes via KV (the reason: cache invalidation written by
+the WORKER must reach the API process in split topologies —
+`WORKER_IN_PROCESS=false`, docker-compose api+worker, 2+ API replicas):
+- Rate-limit counters + org limits cache (`auth/rateLimiter.ts`) — DB stays
+  source of truth via atomic RPCs; 60s re-sync bounds cross-process drift
+- LLM concurrency semaphore (`ai/llmClient.ts`) — atomic `INCR` + `PEXPIRE NX`
+  with a 10-min crash lease (the slot is held across all 5 retries); local
+  FIFO queue keeps in-process fairness, remote waiters poll with jitter
+- Lead-context cache (`crm/leadContextCache.ts`) + property search/snapshot
+  caches (`crm/propertyService.ts`) — version-bump invalidation
+  (`clearLeadContextCache` / `clearSearchCache`), no pub/sub, no key scans
+
+Deliberately NOT moved to Kafka or similar: the Postgres `job_queue` +
+`dequeue_job()` covers the documented scale (hundreds of orgs); the scale
+path is Postgres → Redis → read replicas.
+
+---
+
+## Deployment Topology (Hostinger VPS — the deploy target)
+
+Target machine: **Hostinger KVM, Ubuntu 24.04, 16 GB RAM; stack budget 8 GB.**
+Full runbook: **`docs/DEPLOYMENT.md`**. Shape:
+
+- **Stays managed:** Postgres (Supabase) + Auth — the VPS holds no DB state.
+- **Containers** (compose, memory-capped): backend 1.5 GB · worker 1.5 GB ·
+  frontend 512 MB · redis 512 MB (`maxmemory 448mb allkeys-lru`) → ≈ 4.8 GB
+  committed, ≈ 3.2 GB headroom inside the 8 GB budget.
+- **Host processes:** Caddy (automatic Let's Encrypt for
+  `api.<domain>` → :4000 and `app.<domain>` → :3000). ufw: 22/80/443 only.
+- **No ngrok on the VPS** — public ports + TLS replace the tunnel; set
+  `PUBLIC_BASE_URL=https://api.<domain>` and update the three Sarvam
+  dashboard URLs (Hook #1, Hook #2, on_end webhook) after DNS cutover.
+- **Persistent state:** the `wa-sessions` compose volume (WhatsApp login
+  survives redeploys); everything else is stateless or in Supabase.
 
 ---
 

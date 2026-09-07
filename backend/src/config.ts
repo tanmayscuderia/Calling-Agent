@@ -75,6 +75,10 @@ export const config = {
     // Calling hours guard (IST). Outside this window start-real rejects.
     callingHoursStart: Number(process.env.SARVAM_CALLING_HOURS_START ?? 9),
     callingHoursEnd: Number(process.env.SARVAM_CALLING_HOURS_END ?? 21),
+    // Toggle the calling-hours guard. Default ON — real PSTN calls cost money
+    // and regulators (TRAI-style DND norms) restrict telemarketing hours.
+    // Set SARVAM_ENFORCE_CALLING_HOURS=false ONLY for out-of-hours testing.
+    callingHoursEnforced: (process.env.SARVAM_ENFORCE_CALLING_HOURS ?? 'true').toLowerCase() === 'true',
     // ── Inbound calls (Phase S5) ──
     // Sarvam-approved number customers dial to reach the AI agent.
     // Empty = inbound webhook branch treats payload as outbound-only.
@@ -107,6 +111,11 @@ export const config = {
     // Boot all connected WhatsApp accounts on server start (multi-instance)
     autoBootConnections: (process.env.WHATSAPP_AUTO_BOOT ?? 'true').toLowerCase() === 'true',
   },
+
+  // Process topology: run the job-queue worker inside the API process
+  // (single-container default), or externalized to `src/worker.ts`
+  // (docker-compose / production). See server.ts + worker.ts.
+  workerInProcess: (process.env.WORKER_IN_PROCESS ?? 'true').toLowerCase() !== 'false',
 } as const;
 
 export type AppConfig = typeof config;

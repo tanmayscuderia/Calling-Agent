@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/.env
+**/.env.local
+**/.sessions
+**/logs
+**/*.log
+.git
+.github
+Dockerfile
+docker-compose.yml
+README.md
+docs

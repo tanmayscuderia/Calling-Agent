@@ -1,0 +1,65 @@
+services:
+  # Shared-state backend for the KV layer (rate-limit counters, LLM semaphore,
+  # caches). Optional: without REDIS_URL everything runs in-memory per process.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "448mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # API + WhatsApp bridge + inbound poller (no queue worker — see worker service)
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./.env
+    environment:
+      WORKER_IN_PROCESS: "false"
+      REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=1024"
+    mem_limit: 1536m
+    volumes:
+      # WhatsApp session persists across redeploys — no re-QR after updates
+      - wa-sessions:/app/.sessions
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Dedicated job-queue worker (polls job_queue; SKIP LOCKED makes it
+  # safe to run alongside or scale to N replicas)
+  worker:
+    build: ./backend
+    command: node dist/worker.js
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=1024"
+    mem_limit: 1536m
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}
+    ports:
+      - "3000:3000"
+    mem_limit: 512m
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  wa-sessions:

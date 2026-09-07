@@ -11,6 +11,42 @@
 > - `docs/sarvam-tool-failure-evidence.md` — WHY mid-call tools were removed
 >   (Addendum 4) + Addendum 3 result checkboxes to fill after Part H
 
+## STATUS SNAPSHOT — 2026-08-30 (end of day)
+
+| Part | Status | Evidence |
+|------|--------|----------|
+| B — delete mid-call tools | ✅ DONE | Zero `inventory-search` dispatches all day (was the "hai kya tuh" break) |
+| C — two on_start hooks | ✅ LIVE | 13/13 paired hook hits via ngrok (snapshot + lead-context) |
+| D — 8 output variables | ✅ CREATED | customer_name, city, location, configuration, budget_min, budget_max, purpose, timeline |
+| E — on_end webhook | ⚠️ FIRES, body EMPTY | Every call POSTed with `Content-Length: 0` → 11x 400 "Invalid payload"; `sarvam_webhook_events` still 0 rows |
+| F — paste v7.6 prompt | ❓ CONFIRM on dashboard | Instructions must show the LEAD CONTEXT section (GREETING + inventory rules) |
+| G — backend + tunnel | ✅ (see durability note) | ngrok reserved URL stable; backend crashed twice today — now run under nohup |
+| H — proof batch | ⏳ BLOCKED on E + F | 2 test calls → first `sarvam_webhook_events` row → CRM lead update |
+
+### Root causes found today (ngrok inspector forensics, 53 requests)
+1. **on_end sends an EMPTY body** — the dashboard on_end tool has no Body
+   template configured, so Sarvam POSTs nothing and our old strict route
+   answered 400 (Sarvam retried each time — config problems can't succeed
+   on retry). Fix shipped backend-side: the route is now TOLERANT (see
+   `backend/src/routes/sarvamWebhook.routes.ts`) — every POST is raw-logged
+   to `backend/logs/sarvam-webhooks.log`, empty/unrecognized bodies are
+   audited into `sarvam_webhook_events` with a `processing_error` note and
+   acked 200 (never 400), and real bodies accept field aliases
+   (`call_id|interaction_id` for `attempt_id`, `disposition|outcome` for
+   `status`) plus flat variable chips. **But the real fix is dashboard-side:
+   add the Body template (see sarvam-dashboard-setup.md → PENDING FIXES).**
+2. **Hook #1 `phone=` chip resolves empty on live calls** → lead-context
+   returns 400 with empty phone. NOW CONFIRMED ACROSS 3 CALLS (Sep 1). The
+   fix is exact: delete the wrong chip, insert the PLATFORM chip
+   **`user_phone_number`** (E.164 caller number, per Sarvam docs). Do NOT
+   pick the agent's `phone` OUTPUT variable — it is empty at call start;
+   that is the mistake made 3 times (sarvam-dashboard-setup.md → Fix 2).
+3. **Backend ran in a foreground terminal** and died twice (11:30 crash →
+   502s → recovered → died again). Now started with nohup
+   (`logs/server.log`), survives terminal close.
+
+---
+
 ## TL;DR — what changes vs what stays
 
 | Part | What | Action | Est. |
@@ -84,7 +120,7 @@ unless a field actually mismatches.
 | When should this tool run? | **On start** | REQUIRED |
 | Method | `GET` | verify |
 | URL | `https://<tunnel>/api/tools/sarvam/lead-context` | verify |
-| Query param | `phone` = caller-number variable **chip** (single braces, e.g. `{user_phone_number}`) — inserted via the dashboard variable picker, NOT typed as `{{...}}` | REQUIRED |
+| Query param | `phone` = **`user_phone_number`** — the PLATFORM caller-number chip (single braces), inserted via the dashboard variable picker, NOT typed as `{{...}}`. NOT the agent's `phone` output variable (empty at call start — caused 3 failed calls) | REQUIRED |
 | Auth | API key → header `X-API-Key` → references the stored tool secret (`SARVAM_TOOL_SECRET`, falls back to `SARVAM_WEBHOOK_SECRET` in the backend env) | REQUIRED |
 | Save reply into variables | reply field `found` → `lead_found`, `lead` → `lead_context`, `recent_messages` → `recent_messages` (whatever mapping already exists — keep it) | verify |
 | Response template | leave empty | on_start hooks CANNOT use one (no LLM in the loop) |

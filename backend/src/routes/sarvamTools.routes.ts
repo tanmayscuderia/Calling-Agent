@@ -424,7 +424,7 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
 
     // Per-phone 5-min cache: repeat calls skip the DB and keep call-start
     // snappy. Only found-lead payloads are ever cached (see leadContextCache.ts).
-    const cachedLead = leadCacheGet(orgId, phone);
+    const cachedLead = await leadCacheGet(orgId, phone);
     if (cachedLead) {
       logToolCall({ event: 'lead-context.cache-hit', ms: Date.now() - started });
       return cachedLead;
@@ -467,7 +467,7 @@ export async function sarvamToolsRoutes(app: FastifyInstance) {
         lead: shapeLead(lead),
         recent_messages: shapeMessages(messages),
       };
-      leadCacheSet(orgId, phone, payload);
+      await leadCacheSet(orgId, phone, payload);
       return payload;
     } catch (err) {
       logger.error({ err: (err as Error).message }, '[SarvamTools] lead lookup failed — starting fresh');

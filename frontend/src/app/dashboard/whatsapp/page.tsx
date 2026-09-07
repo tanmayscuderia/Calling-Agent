@@ -82,9 +82,20 @@ export default function WhatsAppPage() {
     setLoading(true);
     // FIX: The /start route returns { ok, message } — not the full status shape.
     // Call fetchStatus() immediately to get the real adapter/account/config.
+    // FIX 2: surface real failures — the route now awaits start() with a retry
+    // and returns ok:false + error instead of always ok:true.
     api('/api/whatsapp/start', { method: 'POST' })
-      .then(() => { setOffline(false); fetchStatus(); })
-      .catch((e) => { if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true); })
+      .then((r) => {
+        if (r && r.ok === false) {
+          toast.error(`WhatsApp start failed: ${r.error || 'unknown error'}`);
+        }
+        setOffline(false);
+        fetchStatus();
+      })
+      .catch((e) => {
+        if (e?.message === 'BACKEND_UNREACHABLE') setOffline(true);
+        else toast.error(`WhatsApp start failed: ${e?.message || e}`);
+      })
       .finally(() => setLoading(false));
   };
   const stop = () => api('/api/whatsapp/stop', { method: 'POST' }).then(() => { fetchStatus(); setChats([]); });

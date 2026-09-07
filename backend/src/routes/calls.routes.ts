@@ -1,12 +1,22 @@
 import { FastifyInstance } from 'fastify';
 import { supabaseAdmin } from '../db/supabase';
 import { getOrgIdFromRequest } from '../auth/authMiddleware';
+import { checkCallAllowed, recordCall } from '../auth/rateLimiter';
 import { getLead } from '../crm/leadService';
 import { generateAgentReply, openingLine, CallTurn } from '../ai/callAgent';
 import { createOutboundCall, isSarvamConfigured, buildWebhookUrl } from '../sarvam/sarvamClient';
+import {
+  isWithinCallingHours,
+  isDncListed,
+  addToDnc,
+  removeFromDnc,
+  listDnc,
+} from '../sarvam/callingGuards';
 import { finalizeCall } from '../sarvam/callFinalizer';
 import { normalizePhone } from '../utils/phone';
+import { config } from '../config';
 import { logger } from '../utils/logger';
+import { startCallSchema, dncAddSchema, parseBody } from '../validation/schemas';
 
 function orgId(req: any): string {
   return getOrgIdFromRequest(req);
@@ -40,30 +50,38 @@ async function addTurn(callSessionId: string, oid: string, speaker: 'agent' | 'c
 }
 
 export async function callsRoutes(app: FastifyInstance) {
-  // List all call sessions for the org (newest first) — single fetch for the Calls page
+  // List call sessions for the org (newest first) — paginated
+  // ?limit (1–500, default 100) & ?offset — response carries `total` for the UI
   app.get('/api/calls', async (req) => {
     const oid = orgId(req);
-    const { data, error } = await supabaseAdmin()
-      .from('call_sessions')
-      .select('*, turns:call_session_turns(*), lead:crm_leads(id, full_name, phone)')
-      .eq('org_id', oid)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (error) return { calls: [], error: error.message };
+    const q = req.query as any;
+    const limit = Math.min(Math.max(Number(q.limit) || 100, 1), 500);
+    const offset = Math.max(Number(q.offset) || 0, 0);
+    const sb = supabaseAdmin();
+    const [{ count }, { data, error }] = await Promise.all([
+      sb.from('call_sessions').select('id', { count: 'exact', head: true }).eq('org_id', oid),
+      sb.from('call_sessions')
+        .select('*, turns:call_session_turns(*), lead:crm_leads(id, full_name, phone)')
+        .eq('org_id', oid)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1),
+    ]);
+    if (error) return { calls: [], total: 0, limit, offset, error: error.message };
     // PostgREST returns an array for FK joins — normalize to the object the UI expects
     const calls = (data ?? []).map((c: any) => ({
       ...c,
       lead: Array.isArray(c.lead) ? c.lead[0] : c.lead,
       turns: [...(c.turns ?? [])].sort((a: any, b: any) => a.sequence_index - b.sequence_index),
     }));
-    return { calls };
+    return { calls, total: count ?? 0, limit, offset };
   });
 
   // Start a browser demo call for a lead
   app.post('/api/calls/start-demo', async (req, reply) => {
-    const { leadId } = req.body as any;
+    const parsed = parseBody(startCallSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const { leadId } = parsed.data;
     const oid = orgId(req);
-    if (!leadId) return reply.code(400).send({ error: 'leadId required' });
 
     const lead = await getLead(oid, leadId);
     if (!lead) return reply.code(404).send({ error: 'lead not found' });
@@ -149,9 +167,10 @@ export async function callsRoutes(app: FastifyInstance) {
   // Start a REAL outbound call via Sarvam Voice Agents
   // Plan: docs/SARVAM_CALLING_PLAN.md (Phase S3)
   app.post('/api/calls/start-real', async (req, reply) => {
-    const { leadId } = req.body as any;
+    const parsed = parseBody(startCallSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const { leadId } = parsed.data;
     const oid = orgId(req);
-    if (!leadId) return reply.code(400).send({ error: 'leadId required' });
 
     // 1. Config guard — clean 503 when Sarvam isn't set up
     if (!isSarvamConfigured()) {
@@ -167,6 +186,27 @@ export async function callsRoutes(app: FastifyInstance) {
     const phone = lead.phone ? normalizePhone(lead.phone) : null;
     if (!phone || !/^\+?[1-9]\d{7,14}$/.test(phone)) {
       return reply.code(400).send({ error: 'lead has no valid phone number', leadPhone: lead.phone });
+    }
+
+    // 2.5 Calling-safety guards — run BEFORE any Sarvam dispatch.
+    //     Real PSTN calls cost money and are hour-regulated; these three
+    //     guards were documented in the README but not enforced until
+    //     2026-08-30 (see callingGuards.ts).
+    if (config.sarvam.callingHoursEnforced) {
+      const hours = isWithinCallingHours();
+      if (!hours.allowed) {
+        return reply.code(403).send({
+          error: `Outside calling hours (IST ${config.sarvam.callingHoursStart}:00–${config.sarvam.callingHoursEnd}:00; current IST hour ${hours.istHour}). Set SARVAM_ENFORCE_CALLING_HOURS=false to override for testing.`,
+          code: 'CALLING_HOURS',
+        });
+      }
+    }
+    const callAllow = await checkCallAllowed(oid);
+    if (!callAllow.allowed) {
+      return reply.code(429).send({ error: callAllow.reason ?? 'Call not allowed', code: 'DAILY_LIMIT' });
+    }
+    if (await isDncListed(oid, phone)) {
+      return reply.code(403).send({ error: 'This phone number is on the Do-Not-Call list', code: 'DNC' });
     }
 
     // 3. Create the call_session row FIRST (status 'ringing') — if Sarvam
@@ -218,7 +258,46 @@ export async function callsRoutes(app: FastifyInstance) {
     }
 
     logger.info({ callSessionId: call.id, attemptId: result.attempt_id }, '[Sarvam] Real call started');
+    // Count the call against the org's daily limits (usage counters + dashboard)
+    recordCall(oid);
     return { callSessionId: call.id, attemptId: result.attempt_id };
+  });
+
+  // ── Do-Not-Call registry management ──────────────────────────────
+  // List entries
+  app.get('/api/calls/dnc', async (req) => {
+    try {
+      return { dnc: await listDnc(orgId(req)) };
+    } catch (err: any) {
+      return { dnc: [], error: err?.message ?? 'DNC list unavailable (migration applied?)' };
+    }
+  });
+
+  // Add a number ({ phone, reason? }) — validated + normalized before storing
+  app.post('/api/calls/dnc', async (req, reply) => {
+    const parsed = parseBody(dncAddSchema, req.body);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error, code: 'VALIDATION' });
+    const { phone, reason } = parsed.data;
+    const normalized = normalizePhone(phone);
+    try {
+      await addToDnc(orgId(req), normalized, reason);
+      return { ok: true, phone: normalized };
+    } catch (err: any) {
+      return reply.code(500).send({ error: err?.message ?? 'Failed to add to DNC' });
+    }
+  });
+
+  // Remove a number
+  app.delete('/api/calls/dnc/:phone', async (req, reply) => {
+    const { phone } = req.params as any;
+    const normalized = normalizePhone(decodeURIComponent(phone));
+    if (!normalized) return reply.code(400).send({ error: 'invalid phone' });
+    try {
+      await removeFromDnc(orgId(req), normalized);
+      return { ok: true, phone: normalized };
+    } catch (err: any) {
+      return reply.code(500).send({ error: err?.message ?? 'Failed to remove from DNC' });
+    }
   });
 
   // Get call details

@@ -354,3 +354,10 @@ Check the dashboard:
 | `SARVAM_WEBHOOK_SECRET` | If calling | — | Secret in webhook URL `/webhooks/sarvam/<secret>` |
 | `SARVAM_TOOL_SECRET` | No | = `SARVAM_WEBHOOK_SECRET` | Shared secret for mid-call tools (`/api/tools/sarvam/*`) — sent as `X-Tool-Secret` / `X-API-Key` / `Authorization: Bearer` |
 | `SARVAM_CALLING_HOURS_START` / `SARVAM_CALLING_HOURS_END` | No | `9` / `21` | IST calling window guard |
+
+## Deploying to a VPS
+
+Local setup above is for development. For production on a VPS (target:
+Hostinger KVM 16 GB, 8 GB stack budget) — Docker Compose with memory caps,
+Redis-backed shared state, Caddy TLS, and the Sarvam URL cutover (no ngrok)
+— follow **`docs/DEPLOYMENT.md`**.

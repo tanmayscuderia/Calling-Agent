@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
+import { Providers } from './providers';
 import { pageVariants } from '@/lib/animations';
 
 const navItems = [
@@ -209,11 +210,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {/* LazyMotion with domAnimation bundle = ~15KB instead of ~50KB */}
         <LazyMotion features={domAnimation} strict>
-          <AuthProvider>
-            <ToastProvider>
-              <AppShell>{children}</AppShell>
-            </ToastProvider>
-          </AuthProvider>
+          <Providers>
+            <AuthProvider>
+              <ToastProvider>
+                <AppShell>{children}</AppShell>
+              </ToastProvider>
+            </AuthProvider>
+          </Providers>
         </LazyMotion>
       </body>
     </html>
