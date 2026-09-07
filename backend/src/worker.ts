@@ -15,9 +15,14 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { startQueueWorker, stopQueueWorker } from './queue/queueWorker';
 import { recoverStaleJobs } from './queue/staleRecovery';
+import { getKv } from './kv';
 
 async function start() {
   logger.info('[Worker] Starting queue worker process');
+
+  // Warm the KV layer (memory default; Redis when REDIS_URL is set) so the
+  // worker's cache invalidations reach the API process in split topologies.
+  await getKv().catch(() => {});
 
   // Recover jobs a crashed worker left in 'processing' (non-fatal on boot)
   await recoverStaleJobs().catch((err: unknown) => {

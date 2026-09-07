@@ -112,7 +112,7 @@ export async function createItem(orgId: string, input: Record<string, any>): Pro
     .select()
     .single();
   if (error) throw error;
-  clearSearchCache();
+  clearSearchCache().catch(() => {});
   return data as InventoryItem;
 }
 
@@ -141,7 +141,7 @@ export async function updateItem(orgId: string, id: string, input: Record<string
     .select()
     .single();
   if (error) throw error;
-  clearSearchCache();
+  clearSearchCache().catch(() => {});
   return data as InventoryItem;
 }
 
@@ -152,7 +152,7 @@ export async function deleteItem(orgId: string, id: string): Promise<void> {
     .eq('org_id', orgId)
     .eq('id', id);
   if (error) throw error;
-  clearSearchCache();
+  clearSearchCache().catch(() => {});
 }
 
 // ── Search ──
@@ -322,6 +322,6 @@ export async function batchCreateItems(orgId: string, items: Record<string, any>
     .select();
 
   if (error) throw error;
-  clearSearchCache();
+  clearSearchCache().catch(() => {});
   return (data ?? []) as InventoryItem[];
 }

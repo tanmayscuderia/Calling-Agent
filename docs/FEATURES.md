@@ -430,7 +430,7 @@ separate silo.
 | Item | What shipped |
 |------|--------------|
 | **Calling guards enforced** | `start-real` now actually enforces what the README promised: IST calling hours (env-toggleable), daily call limits (`checkCallAllowed` was dead code), and a Do-Not-Call registry (`do_not_call` table + `/api/calls/dnc` CRUD). New module: `backend/src/sarvam/callingGuards.ts`. `recordCall` now increments usage counters. |
-| **CI** | `.github/workflows/ci.yml` — backend typecheck + 290 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
+| **CI** | `.github/workflows/ci.yml` — backend typecheck + 301 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
 | **Docker** | `backend/Dockerfile` (multi-stage), `frontend/Dockerfile`, `docker-compose.yml` (api + dedicated worker + frontend), `.dockerignore`. |
 | **Migration runner** | `backend/scripts/migrate.ts` + `npm run migrate` — `schema_migrations` table, applies only unapplied files, one transaction each. `--baseline` records legacy files without re-running (protects demo seed from duplication). |
 | **Git hygiene** | `backend/logs/` (Sarvam transcripts with real customer PII) untracked; `.gitignore` covers the whole logs dir. History scrub deferred (security wave). |
@@ -438,4 +438,4 @@ separate silo.
 | **Calls pagination** | `GET /api/calls?limit=&offset=` (1–500, default 100) + `total` — replaces the silent hard 200-row cap. |
 | **Worker split** | `backend/src/worker.ts` standalone queue-worker process (`npm run worker` / `start:worker`); API keeps in-process worker by default, `WORKER_IN_PROCESS=false` externalizes it (docker-compose runs it as its own service). WhatsApp bridge + inbound poller stay with the API process. |
 | **Frontend** | `src/middleware.ts` edge gate (no session cookie → dashboard HTML never sent), route-level `error.tsx` boundary (no more white-screen on render errors), React Query provider; leads + conversations pages migrated off manual fetch/setInterval to cached, deduped queries (5s polling preserved via `refetchInterval`). |
-| **Docs truth pass** | Test counts recounted: **290 unit (17 files) + 21 eval blocks (8 suites)** — fixed stale 150/241/296/331 figures across README, ARCHITECTURE, ROADMAP, PROJECT_CONTEXT; FEATURES §16 stale "400 malformed webhook" row corrected. |
+| **Docs truth pass** | Test counts recounted: **301 unit (18 files) + 21 eval blocks (8 suites)** — fixed stale 150/241/296/331 figures across README, ARCHITECTURE, ROADMAP, PROJECT_CONTEXT; FEATURES §16 stale "400 malformed webhook" row corrected. |

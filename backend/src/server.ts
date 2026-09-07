@@ -9,6 +9,7 @@ import { waManager } from './whatsapp/connectionManager';
 import { startQueueWorker, stopQueueWorker } from './queue/queueWorker';
 import { startInboundPoller, stopInboundPoller } from './sarvam/inboundPoller';
 import { recoverStaleJobs } from './queue/staleRecovery';
+import { getKv } from './kv';
 
 import { healthRoutes } from './routes/health.routes';
 import { authRoutes } from './routes/auth.routes';
@@ -28,6 +29,10 @@ import systemRoutes from './routes/system.routes';
 async function start() {
   const app = Fastify({ logger: false });
 
+  // Warm the KV layer (memory default; Redis when REDIS_URL is set) so the
+  // first request doesn't pay init cost. Logs the active mode; never blocks
+  // boot — on Redis failure it falls back to memory for this process.
+  await getKv().catch(() => {});
   // Cookie plugin must be registered BEFORE CORS so cookies are parsed
   await app.register(cookie, {
     secret: config.cookieSecret, // signs cookies for tamper protection

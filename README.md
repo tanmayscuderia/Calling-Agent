@@ -15,7 +15,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-12. **290 unit tests + 21 LLM eval blocks, all green** (recounted 2026-08-30)
+12. **301 unit tests + 21 LLM eval blocks, all green** (recounted 2026-08-30)
 13. Clean migration path to Meta Cloud API later
 14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 
@@ -36,7 +36,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (290 unit tests + 21 LLM eval blocks across 8 suites) |
+| **Testing** | Vitest (301 unit tests + 21 LLM eval blocks across 8 suites) |
 
 ---
 
@@ -194,7 +194,7 @@ Calling Agent/
 │   │   ├── whatsapp/     # Baileys bridge + connection manager
 │   │   ├── routes/       # 14 route files (auth, whatsapp, leads, calls, sarvam webhook + tools, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 290 unit tests + 21 LLM eval blocks
+│   └── tests/            # 301 unit tests + 21 LLM eval blocks
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups

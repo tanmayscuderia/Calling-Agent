@@ -199,7 +199,9 @@ export async function processCallResultJob(orgId: string, job: CallResultJobPayl
   // The call may have changed the lead (status/notes/enrichment) — drop any
   // cached lead-context payload so the NEXT call within the 5-min TTL sees
   // fresh data, never the pre-call snapshot of this lead.
-  clearLeadContextCache();
+  clearLeadContextCache().catch((err: any) =>
+    logger.warn({ err: err?.message }, '[KV] lead-context cache invalidation failed')
+  );
 
   // 9. Mark webhook event processed
   await sb.from('sarvam_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', job.webhookEventId);
@@ -359,7 +361,9 @@ export async function ingestInboundAttempt(
 
   // Same staleness rule as the outbound path: this call may have changed the
   // lead, so cached lead-context must not serve the next call.
-  clearLeadContextCache();
+  clearLeadContextCache().catch((err: any) =>
+    logger.warn({ err: err?.message }, '[KV] lead-context cache invalidation failed')
+  );
 
   await ackEvent();
   logger.info(

@@ -913,7 +913,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 290 tests across 17 files (no LLM, instant)
+├── unit/                          ← 301 tests across 18 files (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing
@@ -954,7 +954,32 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 290 unit tests (17 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-08-30; earlier docs said 241/296/331 — all stale)
+**Total: 301 unit tests (18 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-09-07 after KV layer +11; earlier docs said 241/290/296/331 — all stale)
+
+---
+
+## Shared KV Layer (2026-09-07)
+
+`backend/src/kv/` — one interface (`kvStore.ts`), two backends: **MemoryKv**
+(default, zero deps — identical to the old Map-based behavior) and
+**RedisKv** (`ioredis`, active only when `REDIS_URL` is set; unreachable
+Redis at boot = permanent memory fallback for that process, loud log).
+
+Shared across processes via KV (the reason: cache invalidation written by
+the WORKER must reach the API process in split topologies —
+`WORKER_IN_PROCESS=false`, docker-compose api+worker, 2+ API replicas):
+- Rate-limit counters + org limits cache (`auth/rateLimiter.ts`) — DB stays
+  source of truth via atomic RPCs; 60s re-sync bounds cross-process drift
+- LLM concurrency semaphore (`ai/llmClient.ts`) — atomic `INCR` + `PEXPIRE NX`
+  with a 10-min crash lease (the slot is held across all 5 retries); local
+  FIFO queue keeps in-process fairness, remote waiters poll with jitter
+- Lead-context cache (`crm/leadContextCache.ts`) + property search/snapshot
+  caches (`crm/propertyService.ts`) — version-bump invalidation
+  (`clearLeadContextCache` / `clearSearchCache`), no pub/sub, no key scans
+
+Deliberately NOT moved to Kafka or similar: the Postgres `job_queue` +
+`dequeue_job()` covers the documented scale (hundreds of orgs); the scale
+path is Postgres → Redis → read replicas.
 
 ---
 

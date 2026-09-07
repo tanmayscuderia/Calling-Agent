@@ -1,12 +1,17 @@
 import { supabaseAdmin } from '../db/supabase';
 import { logger } from '../utils/logger';
 import { resolveLocations, expandLocationForms } from '../utils/locationAliases';
+import { getKv } from '../kv';
 
-// ── In-memory cache for property search (60s TTL) ──
+// ── Property search cache (60s TTL) ──
 // Avoids hitting DB on every AI reply for the same search params.
-interface CacheEntry { results: PropertyMatch[]; ts: number; }
-const searchCache = new Map<string, CacheEntry>();
+// KV-backed: memory default (single process), Redis-shared when REDIS_URL is
+// set. Invalidation is a version bump (clearSearchCache) — entries embed the
+// version they were written under; a mismatch is a miss.
+interface CacheEntry { ver: number; results: PropertyMatch[]; }
 const CACHE_TTL_MS = 60_000; // 60 seconds
+const PROP_VER_KEY = 'props:ver';
+
 
 export interface PropertySearchParams {
   orgId: string;
@@ -127,20 +132,26 @@ function formatInrRange(min: number, max: number): string {
 // fetched by the on_start hook on every call. Inventory doesn't change between
 // calls in a test batch, so a 5-min in-memory cache keeps call-start latency
 // near zero and stops repeat fetches from burning the tunnel request budget.
-interface SnapshotCacheEntry { snap: InventorySnapshot; ts: number; }
-const snapshotCache = new Map<string, SnapshotCacheEntry>();
+interface SnapshotCacheEntry { ver: number; snap: InventorySnapshot; }
 const SNAPSHOT_TTL_MS = 5 * 60_000; // 5 minutes
-const SNAPSHOT_CACHE_MAX = 20;      // per-org entries — tiny payloads, generous cap
+const SNAPSHOT_KEY = (orgId: string) => `props:snap:${orgId}`;
 
-function snapshotCacheGet(orgId: string): InventorySnapshot | null {
-  const hit = snapshotCache.get(orgId);
-  if (!hit) return null;
-  if (Date.now() - hit.ts > SNAPSHOT_TTL_MS) {
-    snapshotCache.delete(orgId);
-    return null;
-  }
-  return hit.snap;
+async function snapshotCacheGet(orgId: string): Promise<InventorySnapshot | null> {
+  const kv = await getKv();
+  const [ver, entry] = await Promise.all([
+    kv.getVersion(PROP_VER_KEY),
+    kv.getJson<SnapshotCacheEntry>(SNAPSHOT_KEY(orgId)),
+  ]);
+  if (!entry || entry.ver !== ver) return null; // invalidated or expired
+  return entry.snap;
 }
+
+async function snapshotCacheSet(orgId: string, snap: InventorySnapshot): Promise<void> {
+  const kv = await getKv();
+  const ver = await kv.getVersion(PROP_VER_KEY);
+  await kv.setJson(SNAPSHOT_KEY(orgId), { ver, snap }, SNAPSHOT_TTL_MS);
+}
+
 
 /**
  * Hard cap on project bullet lines in the snapshot markdown. ~16 tokens per
@@ -161,7 +172,7 @@ const SNAPSHOT_MAX_PROJECT_LINES = 300;
  * clearSearchCache() invalidates (called on every inventory CRUD mutation).
  */
 export async function getInventorySnapshot(orgId: string): Promise<InventorySnapshot> {
-  const cached = snapshotCacheGet(orgId);
+  const cached = await snapshotCacheGet(orgId);
   if (cached) return cached;
 
   const { data, error } = await supabaseAdmin()
@@ -228,12 +239,7 @@ export async function getInventorySnapshot(orgId: string): Promise<InventorySnap
   }
 
   const snap: InventorySnapshot = { text, cities, total_properties };
-  if (snapshotCache.size >= SNAPSHOT_CACHE_MAX) {
-    // Map preserves insertion order — drop the oldest entry
-    const oldest = snapshotCache.keys().next().value;
-    if (oldest !== undefined) snapshotCache.delete(oldest);
-  }
-  snapshotCache.set(orgId, { snap, ts: Date.now() });
+  await snapshotCacheSet(orgId, snap);
   return snap;
 }
 
@@ -277,8 +283,12 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
   const locResolved = resolved.location;
 
   const cacheKey = JSON.stringify({ orgId, configuration, cityRaw, cityResolved, sectorRaw, sectorResolved, locRaw, locResolved, budgetMin, budgetMax, possessionStatus, limit });
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+  const kv = await getKv();
+  const [ver, cached] = await Promise.all([
+    kv.getVersion(PROP_VER_KEY),
+    kv.getJson<CacheEntry>(`props:search:${cacheKey}`),
+  ]);
+  if (cached && cached.ver === ver) {
     return cached.results;
   }
 
@@ -492,18 +502,19 @@ export async function searchProperties(params: PropertySearchParams): Promise<Pr
   scored.sort((a, b) => b.score - a.score);
   const results = scored.slice(0, limit);
 
-  // Save to cache
-  searchCache.set(cacheKey, { results, ts: Date.now() });
+  // Save to cache (embedded version — clearSearchCache() bumps and stales it)
+  await kv.setJson(`props:search:${cacheKey}`, { ver, results }, CACHE_TTL_MS);
 
   return results;
 }
 
-/** Invalidate cache when inventory changes (upload/edit/delete) */
-export function clearSearchCache(): void {
-  searchCache.clear();
-  // The snapshot markdown must refresh after inventory changes too — otherwise
-  // the on_start hook serves a stale list for up to 5 minutes (its cache TTL).
-  snapshotCache.clear();
+/** Invalidate caches when inventory changes (upload/edit/delete).
+ *  Async now (KV version bump). The bump crosses process boundaries when
+ *  REDIS_URL is set — that is the whole point in split api/worker topologies.
+ *  Callers may await this or fire-and-forget with .catch(). */
+export async function clearSearchCache(): Promise<void> {
+  const kv = await getKv();
+  await kv.bumpVersion(PROP_VER_KEY);
   // Also clear the AI locations cache so new cities/sectors appear immediately
   try {
     const { clearLocationsCache } = require('../ai/baseAgent');
@@ -525,7 +536,7 @@ export async function updateProject(orgId: string, id: string, input: Record<str
     .select()
     .single();
   if (error) throw error;
-  clearSearchCache();
+  await clearSearchCache();
   return data;
 }
 
@@ -536,7 +547,7 @@ export async function deleteProject(orgId: string, id: string) {
     .eq('org_id', orgId)
     .eq('id', id);
   if (error) throw error;
-  clearSearchCache();
+  await clearSearchCache();
   return { success: true };
 }
 
@@ -549,7 +560,7 @@ export async function updateUnit(orgId: string, id: string, input: Record<string
     .select()
     .single();
   if (error) throw error;
-  clearSearchCache();
+  await clearSearchCache();
   return data;
 }
 
@@ -560,7 +571,7 @@ export async function deleteUnit(orgId: string, id: string) {
     .eq('org_id', orgId)
     .eq('id', id);
   if (error) throw error;
-  clearSearchCache();
+  await clearSearchCache();
   return { success: true };
 }
 
