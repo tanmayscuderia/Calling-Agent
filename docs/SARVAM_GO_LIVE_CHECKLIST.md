@@ -145,3 +145,19 @@ The Calls page shows an `↙ Inbound` badge and the caller's number as the title
 
 ### Tunnel diagnosis (2026-08-20 late session)
 Tool calls "broke" after the first 2-3 per call. The backend log proved innocence: 72 events, **zero errors, zero non-200s** — every request that reached Fastify was served in 3-527ms (peak 5 requests/min). The failing requests never arrived → they died at the Cloudflare quick-tunnel edge, which rate-limits ephemeral `trycloudflare.com` tunnels. Shipped: `scripts/sarvam-tunnel.sh` (ngrok static domain = permanent fix, in use) + 60s response cache on `inventory-search` (identical repeat searches served from memory, logged as `inventory-search.cache-hit`). Later, when a real domain is wanted: `cf-setup` commands in the same script (free Cloudflare named tunnel, zero limits).
+
+---
+
+## VPS deployment note (2026-09-07)
+
+When this moves to the Hostinger VPS (see `docs/DEPLOYMENT.md`), every URL in
+this checklist that points at the ngrok tunnel changes host:
+
+- ngrok: `https://pumice-craving-outweigh.ngrok-free.dev`
+- VPS: `https://api.<your-domain>` (Caddy TLS, port 443)
+
+Update ALL THREE Sarvam dashboard URLs after DNS cutover — Hook #1
+(lead-context), Hook #2 (inventory-snapshot), and the on_end webhook — same
+paths and secrets, only the host changes. Also set
+`PUBLIC_BASE_URL=https://api.<your-domain>` in the VPS `.env`. Until the
+cutover, the ngrok URLs remain correct for local development.

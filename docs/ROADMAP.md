@@ -147,7 +147,8 @@ write to it — linking already works via normalized phone numbers).
 | Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |
-| CI / Deploys | Production-ready | GitHub Actions (typecheck + 301 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner |
+| CI / Deploys | Production-ready | GitHub Actions (typecheck + 301 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
+| Shared KV | Production-ready | Redis-backed shared state behind `REDIS_URL` (`backend/src/kv/`): rate-limit counters, LLM semaphore, config/lead/snapshot caches; memory fallback when unset — the bridge to split api/worker + multi-replica topologies |
 | Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals; edge auth gate + error boundary + React Query |
 | Testing | Strong | 301 unit tests + 21 LLM eval blocks covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |

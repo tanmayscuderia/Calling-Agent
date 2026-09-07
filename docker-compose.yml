@@ -3,6 +3,8 @@ services:
   # caches). Optional: without REDIS_URL everything runs in-memory per process.
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "448mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 512m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -20,6 +22,11 @@ services:
     environment:
       WORKER_IN_PROCESS: "false"
       REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=1024"
+    mem_limit: 1536m
+    volumes:
+      # WhatsApp session persists across redeploys — no re-QR after updates
+      - wa-sessions:/app/.sessions
     depends_on:
       redis:
         condition: service_healthy
@@ -34,6 +41,8 @@ services:
       - ./.env
     environment:
       REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=1024"
+    mem_limit: 1536m
     depends_on:
       redis:
         condition: service_healthy
@@ -47,6 +56,10 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}
     ports:
       - "3000:3000"
+    mem_limit: 512m
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  wa-sessions:

@@ -983,6 +983,25 @@ path is Postgres → Redis → read replicas.
 
 ---
 
+## Deployment Topology (Hostinger VPS — the deploy target)
+
+Target machine: **Hostinger KVM, Ubuntu 24.04, 16 GB RAM; stack budget 8 GB.**
+Full runbook: **`docs/DEPLOYMENT.md`**. Shape:
+
+- **Stays managed:** Postgres (Supabase) + Auth — the VPS holds no DB state.
+- **Containers** (compose, memory-capped): backend 1.5 GB · worker 1.5 GB ·
+  frontend 512 MB · redis 512 MB (`maxmemory 448mb allkeys-lru`) → ≈ 4.8 GB
+  committed, ≈ 3.2 GB headroom inside the 8 GB budget.
+- **Host processes:** Caddy (automatic Let's Encrypt for
+  `api.<domain>` → :4000 and `app.<domain>` → :3000). ufw: 22/80/443 only.
+- **No ngrok on the VPS** — public ports + TLS replace the tunnel; set
+  `PUBLIC_BASE_URL=https://api.<domain>` and update the three Sarvam
+  dashboard URLs (Hook #1, Hook #2, on_end webhook) after DNS cutover.
+- **Persistent state:** the `wa-sessions` compose volume (WhatsApp login
+  survives redeploys); everything else is stateless or in Supabase.
+
+---
+
 ## API Route Summary
 
 | Route Group | Endpoints |

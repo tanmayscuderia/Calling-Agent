@@ -17,7 +17,8 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
 12. **301 unit tests + 21 LLM eval blocks, all green** (recounted 2026-08-30)
 13. Clean migration path to Meta Cloud API later
-14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
+14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend / redis), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
+15. **VPS-ready (2026-09-07)** — Redis-backed shared state behind `REDIS_URL` (memory fallback: rate-limit counters, LLM concurrency semaphore, config/lead/snapshot caches), WhatsApp session persistence volume, memory-capped compose services, and a full deployment runbook: **`docs/DEPLOYMENT.md`** (Hostinger 16 GB VPS, 8 GB stack budget)
 
 > **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
 
@@ -37,6 +38,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
 | **Testing** | Vitest (301 unit tests + 21 LLM eval blocks across 8 suites) |
+| **Shared KV (optional)** | Redis via a thin KV abstraction (`backend/src/kv/`) — memory fallback; shares rate-limit counters, LLM semaphore, and caches across processes |
 
 ---
 
@@ -53,6 +55,11 @@ cd backend && npm run migrate
 
 The runner creates a `schema_migrations` table, applies only unapplied files (each
 in a single transaction), and is safe to re-run.
+
+### Deploying?
+
+Full VPS runbook (Hostinger, 16 GB machine / 8 GB stack budget, Docker Compose,
+Caddy TLS, no ngrok): **`docs/DEPLOYMENT.md`**.
 
 > **Already have a live DB (predates the runner)?** Baseline it once so old
 > migrations are recorded without re-running (re-running the seed migration
