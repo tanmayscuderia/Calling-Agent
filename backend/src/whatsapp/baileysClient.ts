@@ -107,6 +107,23 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 45_000; // 45s keepalive ping
 
+  // ═══════════════════════════════════════════════════════
+  // QR LIFECYCLE TRACKING
+  // Baileys re-emits the QR every ~20s (max ~5 attempts) and then closes
+  // the socket — the close handler rebuilds it, so QRs keep cycling until
+  // someone scans. The failure mode this guards: WhatsApp accepts the WS
+  // but NEVER sends a QR event (or the version fetch dies) — the adapter
+  // then sits in 'qr_pending' forever and every dashboard "Connect" click
+  // is a silent no-op. The stall timer tears down a wedged socket so the
+  // close handler can build a fresh one. qrCount/qrLastAt surface freshness
+  // to the dashboard.
+  // ═══════════════════════════════════════════════════════
+  private qrCount = 0;
+  private qrLastAt = 0;
+  private qrStallTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly QR_STALL_TIMEOUT_MS = 90_000; // no login 90s after connect/last QR → recycle
+
+
   constructor(orgId: string, sessionDir?: string) {
     super();
     this.orgId = orgId;
@@ -168,7 +185,24 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       this.status = 'qr_pending'; // ← Set immediately so getStatus() reflects reality before async QR arrives
 
       const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
-      const { version } = await fetchLatestBaileysVersion();
+
+      // fetchLatestBaileysVersion hits web.whatsapp.com — a transient network
+      // blip here used to throw out of start() and leave the dashboard showing
+      // 'qr_pending' with no QR ever arriving. Now: 5s cap + fall back to
+      // Baileys' built-in default version (QR generation works regardless).
+      let version: [number, number, number] | undefined;
+      try {
+        const v = await Promise.race([
+          fetchLatestBaileysVersion(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('version fetch timed out')), 5_000)),
+        ]);
+        version = (v as any)?.version;
+      } catch (err: any) {
+        logger.warn(
+          { err: err?.message },
+          '[WA] Latest WhatsApp version fetch failed — using Baileys built-in default (QR still generated)'
+        );
+      }
 
       this.sock = makeWASocket({
         version,
@@ -194,6 +228,11 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         shouldSyncHistoryMessage: () => false,
         markOnlineOnConnect: false,
       });
+
+      // QR stall watchdog: if no QR arrives (or login never completes) within
+      // 90s of socket creation, recycle the socket — the close handler builds
+      // a fresh one with a fresh QR. Cleared on open/close/each new QR.
+      this.armQrStallTimer(myGen);
 
       this.sock.ev.on('creds.update', saveCreds);
 
@@ -348,22 +387,35 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
+          this.qrCount++;
+          this.qrLastAt = Date.now();
           this.lastQr = qr;
           this.status = 'qr_pending';
           qrcode.generate(qr, { small: true });
-          logger.info('QR code generated. Scan it from WhatsApp → Linked devices.');
+          logger.info(
+            { qrCount: this.qrCount },
+            'QR code generated. Scan it from WhatsApp → Linked devices (expires in ~20s; a fresh one auto-generates).'
+          );
           this.emit('qr', qr);
+          // Re-arm the stall window from THIS QR — Baileys re-emits every ~20s
+          // and old QRs stop working, so freshness is tracked per-QR.
+          this.armQrStallTimer(myGen);
           await setAccountStatus(this.orgId, this.accountId!, 'qr_pending');
         }
 
         if (connection === 'open') {
           this.status = 'connected';
           this.starting = false;
+          this.disarmQrStallTimer();
+          this.lastQr = null; // connected — a stale QR must never render again
           this.connectedAtMs = Date.now(); // activation cutoff reference — see field docs
           this.backlogSkipped = 0;
           const me = this.sock?.user?.id ?? '';
           this.connectedPhone = me;
-          logger.info({ user: me, connectedAt: new Date(this.connectedAtMs).toISOString() }, 'WhatsApp connected — only messages newer than this timestamp will be processed');
+          logger.info(
+            { user: me, connectedAt: new Date(this.connectedAtMs).toISOString(), qrAttempts: this.qrCount },
+            'WhatsApp connected — only messages newer than this timestamp will be processed'
+          );
           this.emit('connected', me);
           await setAccountStatus(this.orgId, this.accountId!, 'connected', { phone: me });
 
@@ -384,6 +436,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             return;
           }
           this.starting = false;
+          this.disarmQrStallTimer();
           const code = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = code !== DisconnectReason.loggedOut;
           logger.warn({ code, shouldReconnect }, 'WhatsApp connection closed');
@@ -631,8 +684,23 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       });
     } catch (err) {
       this.starting = false;
+      // Surface the REAL state: a failed start must not leave the dashboard
+      // (or the DB) showing 'qr_pending' with no QR — that read as
+      // "QR generation failed" with no explanation.
+      this.status = 'error';
+      this.lastQr = null;
+      this.disarmQrStallTimer();
+      if (this.accountId) {
+        setAccountStatus(this.orgId, this.accountId, 'error').catch(() => {});
+      }
       logger.error({ err }, 'Failed to start Baileys socket');
       throw err;
+    } finally {
+      // THE DEADLOCK FIX: 'starting' was previously only cleared on open /
+      // close / throw. A wedged connect (socket up, no events) left it true
+      // forever — every subsequent dashboard "Connect" click hit the
+      // early-return at the top of start() and was silently ignored.
+      this.starting = false;
     }
   }
 
@@ -1195,6 +1263,42 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     }
   }
 
+  // QR STALL WATCHDOG
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * While in 'qr_pending', tear the socket down if no login happens within
+   * QR_STALL_TIMEOUT_MS of connect (or of the latest QR re-emission). The
+   * close handler then rebuilds the socket with a fresh QR — QR generation
+   * can no longer wedge permanently. The zombie watchdog (above) only runs
+   * when status === 'connected', which is why this separate timer exists.
+   */
+  private armQrStallTimer(myGen: number): void {
+    this.disarmQrStallTimer();
+    this.qrStallTimer = setTimeout(() => {
+      if (myGen !== this.socketGen) return; // stale socket generation
+      if (this.status !== 'qr_pending') return; // already open/closed
+      logger.error(
+        { qrCount: this.qrCount, waitedMs: this.QR_STALL_TIMEOUT_MS },
+        '[WA] QR stall detected — no login within the window; recycling socket for a fresh QR'
+      );
+      try {
+        this.sock?.end(new Error('qr-stall-timeout'));
+      } catch (err) {
+        logger.warn({ err }, '[WA] qr-stall teardown failed — forcing null socket');
+        this.sock = null;
+      }
+    }, this.QR_STALL_TIMEOUT_MS);
+  }
+
+  private disarmQrStallTimer(): void {
+    if (this.qrStallTimer) {
+      clearTimeout(this.qrStallTimer);
+      this.qrStallTimer = null;
+    }
+  }
+
+
   // ZOMBIE WATCHDOG IMPLEMENTATION
   // ═══════════════════════════════════════════════════════
 
@@ -1276,9 +1380,12 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     return {
       provider: 'baileys',
       status: this.status,
+      starting: this.starting,
       connectedPhone: this.connectedPhone,
       hasQr: !!this.lastQr,
       qr: this.status === 'qr_pending' ? this.lastQr : null,
+      qrCount: this.qrCount,
+      qrAgeSec: this.qrLastAt ? Math.round((Date.now() - this.qrLastAt) / 1000) : null,
       accountId: this.accountId,
       orgId: this.orgId,
       chatsCount: this.chats.size,
