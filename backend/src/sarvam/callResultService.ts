@@ -14,6 +14,22 @@ import { finalizeCall } from './callFinalizer';
 import { listAttempts, type AttemptRecord } from './sarvamClient';
 import { findOrCreateLead } from '../crm/leadService';
 import { normalizePhone } from '../utils/phone';
+
+/**
+ * Deterministic anonymous-caller phone from a per-call identity string.
+ * '+77' + 10 digits derived from an FNV-1a hash — digits only (survives
+ * normalizePhone unchanged), no leading zeros, unique per interaction,
+ * stable across re-runs so backfills stay idempotent.
+ */
+export function stableAnonPhone(identity: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < identity.length; i++) {
+    h ^= identity.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  const digits = String(h % 10_000_000_000).padStart(10, '0');
+  return `+77${digits}`;
+}
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { clearLeadContextCache } from '../crm/leadContextCache';
@@ -268,36 +284,82 @@ export async function ingestInboundAttempt(
       .eq('id', opts.webhookEventId);
   };
 
-  // 0. Dedupe: unique index on (org_id, external_call_id)
-  const { data: existing } = await sb
-    .from('call_sessions')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('external_call_id', att.attempt_id)
-    .maybeSingle();
-  if (existing) {
-    logger.info({ attemptId: att.attempt_id }, '[Sarvam] Inbound attempt already ingested — skipping');
-    await ackEvent();
-    return 'duplicate';
-  }
-
-  // 1. Caller identity → lead (WhatsApp-inbound parity)
-  const callerPhone = att.user_identifier ? normalizePhone(String(att.user_identifier)) : '';
-  if (!callerPhone) {
-    logger.warn({ attemptId: att.attempt_id }, '[Sarvam] Inbound attempt without user_identifier — cannot attribute');
+  // 0. Unique per-call identity.
+  // Sarvam's attempts API returns the LITERAL STRING 'NO_JOB_ID' as
+  // attempt_id for calls placed from the dashboard/test flow. Every such
+  // call used to collide on the same dedupe key (external_call_id) and get
+  // silently dropped as a "duplicate" of the first one — 11 real calls,
+  // zero sessions. Fall back to the interaction_id, which is unique per call.
+  const rawAttemptId = String(att.attempt_id ?? '').trim();
+  const usableAttemptId =
+    rawAttemptId && rawAttemptId.toUpperCase() !== 'NO_JOB_ID' ? rawAttemptId : null;
+  const interactionId = att.interaction_id
+    ? String(att.interaction_id).trim().replace(/\//g, '_')
+    : null;
+  const externalCallId = usableAttemptId ?? interactionId;
+  if (!externalCallId) {
+    logger.warn(
+      { attemptId: rawAttemptId, interactionId: att.interaction_id },
+      '[Sarvam] Attempt has no usable id (attempt_id + interaction_id both missing) — skipping'
+    );
     await ackEvent();
     return 'no_caller';
   }
 
-  const lead = await findOrCreateLead({
-    orgId,
-    phone: callerPhone,
-    source: 'inbound_call',
-    source_detail: 'Sarvam inbound deployment',
-  }).catch((err) => {
-    logger.error({ err: err?.message, attemptId: att.attempt_id }, '[Sarvam] findOrCreateLead failed for inbound caller');
-    return null;
-  });
+  // Dedupe: unique index on (org_id, external_call_id)
+  const { data: existing } = await sb
+    .from('call_sessions')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('external_call_id', externalCallId)
+    .maybeSingle();
+  if (existing) {
+    logger.info({ externalCallId }, '[Sarvam] Inbound attempt already ingested — skipping');
+    await ackEvent();
+    return 'duplicate';
+  }
+
+  // 1. Caller identity → lead (WhatsApp-inbound parity).
+  // Dashboard/test calls carry a 64-char ANONYMIZATION HASH as
+  // user_identifier instead of a phone — normalizePhone used to turn that
+  // into a 40-digit garbage "phone". Now: a plausible phone (10–13 digits)
+  // takes the normal path; anything else becomes a stable anonymous lead
+  // keyed by the hash (same test caller → same lead), named from the
+  // agent's captured user_name when available.
+  const callerPhone = att.user_identifier ? normalizePhone(String(att.user_identifier)) : '';
+  const callerDigits = callerPhone.replace(/\D/g, '');
+  const isRealPhone = callerDigits.length >= 10 && callerDigits.length <= 13;
+  const agentVars = (att.agent_variables ?? {}) as Record<string, any>;
+  // Anonymous callers get a DETERMINISTIC numeric phone derived from the
+  // interaction id (stable across re-runs, unique per call, survives
+  // findOrCreateLead's normalizePhone — digits only, no leading zeros).
+  const fromNumber = isRealPhone ? callerPhone : stableAnonPhone(externalCallId);
+
+  let lead: any = null;
+  if (isRealPhone) {
+    lead = await findOrCreateLead({
+      orgId,
+      phone: callerPhone,
+      source: 'inbound_call',
+      source_detail: 'Sarvam inbound deployment',
+    }).catch((err) => {
+      logger.error({ err: err?.message, callerPhone }, '[Sarvam] findOrCreateLead failed for inbound caller');
+      return null;
+    });
+  } else {
+    const testName = agentVars.user_name ? String(agentVars.user_name).trim() : '';
+    lead = await findOrCreateLead({
+      orgId,
+      phone: fromNumber,
+      full_name: testName ? `${testName} (test call)` : 'Anonymous caller (test)',
+      source: 'inbound_call',
+      source_detail: 'Sarvam test/dashboard call (anonymized caller — no real phone)',
+    }).catch((err) => {
+      logger.error({ err: err?.message }, '[Sarvam] findOrCreateLead failed for anonymous caller');
+      return null;
+    });
+    logger.info({ anonPhone: fromNumber, testName: testName || null }, '[Sarvam] Anonymous caller attributed to synthetic test lead');
+  }
 
   // 2. Create the inbound session. Unique-violation on insert = another
   //    worker/webhook got there first → duplicate, ack and stop.
@@ -308,12 +370,12 @@ export async function ingestInboundAttempt(
       lead_id: lead?.id ?? null,
       provider: 'sarvam',
       direction: 'inbound',
-      external_call_id: att.attempt_id,
+      external_call_id: externalCallId,
       status: 'in_progress',
-      from_number: callerPhone,
+      from_number: fromNumber,
       to_number: config.sarvam.inboundNumber || null,
       started_at: att.start_datetime ?? null,
-      metadata: { inbound: true, attempt_id: att.attempt_id },
+      metadata: { inbound: true, attempt_id: rawAttemptId || null, interaction_id: att.interaction_id ?? null },
     })
     .select('id, lead_id')
     .single();
@@ -367,7 +429,7 @@ export async function ingestInboundAttempt(
 
   await ackEvent();
   logger.info(
-    { callSessionId: session.id, caller: callerPhone, status: mapStatus(sarvamStatus) },
+    { callSessionId: session.id, caller: fromNumber, status: mapStatus(sarvamStatus) },
     '[Sarvam] Inbound call processed'
   );
   return 'processed';
