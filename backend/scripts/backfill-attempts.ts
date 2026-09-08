@@ -1,11 +1,12 @@
 /**
- * Backfill utility: re-run inbound attempt ingestion over a wider window
- * than the live poller (which only looks back 24h).
+ * Backfill utility: re-run inbound call ingestion over a wider window than
+ * the live poller (which only looks back 24h). Uses the analytics
+ * INTERACTIONS endpoint (raw caller phone via user_contact).
  *
- * Usage: npx tsx scripts/backfill-attempts.ts --days 3
+ * Usage: npx tsx scripts/backfill-attempts.ts --days 8
  * Safe to re-run — ingestInboundAttempt dedupes on (org_id, external_call_id).
  */
-import { listAttempts } from '../src/sarvam/sarvamClient';
+import { listInteractions } from '../src/sarvam/sarvamClient';
 import { ingestInboundAttempt } from '../src/sarvam/callResultService';
 import { config } from '../src/config';
 
@@ -19,7 +20,7 @@ import { config } from '../src/config';
   }
   const now = new Date();
   const start = new Date(now.getTime() - days * 24 * 3600 * 1000);
-  const page = await listAttempts({
+  const page = await listInteractions({
     startDatetime: start.toISOString(),
     endDatetime: now.toISOString(),
     limit: 100,
@@ -28,12 +29,24 @@ import { config } from '../src/config';
     filterConditions: [{ id: '1', field: 'channel_direction', operator: 'equals', value: 'inbound' }],
   });
   const items = (page?.items ?? []) as any[];
-  console.log(`Found ${items.length} inbound attempts in the last ${days} day(s)`);
+  console.log(`Found ${items.length} inbound interactions in the last ${days} day(s)`);
   let ingested = 0, duplicate = 0, skipped = 0, failed = 0;
-  for (const att of items) {
-    const label = att.interaction_id ?? att.attempt_id;
+  for (const it of items) {
+    const label = it.interaction_id;
+    const att = {
+      attempt_id: '',
+      user_identifier: it.user_contact ?? it.user_identifier ?? '',
+      interaction_id: it.interaction_id,
+      connectivity_status: null,
+      duration_in_seconds: it.duration_in_seconds,
+      start_datetime: it.start_datetime,
+      agent_variables: it.agent_variables ?? null,
+      failure_reason: it.failure_reason ?? null,
+      audio_url: it.audio_url ?? null,
+      ended_by: it.ended_by ?? null,
+    };
     try {
-      const r = await ingestInboundAttempt(orgId, att);
+      const r = await ingestInboundAttempt(orgId, att as any);
       if (r === 'processed') { ingested++; console.log('  + ingested:', label); }
       else if (r === 'duplicate') { duplicate++; console.log('  = duplicate:', label); }
       else { skipped++; console.log('  - skipped:', label, `(${r})`); }

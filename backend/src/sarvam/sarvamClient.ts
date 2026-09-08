@@ -206,6 +206,9 @@ export interface InteractionRecord {
   average_user_response_time_in_seconds?: number | null;
   user_contact_masked?: string | null;
   user_contact_hashed?: string | null;
+  /** RAW caller phone (E.164) — present on the interactions endpoint; this is
+   *  the authoritative caller identity for CRM attribution. */
+  user_contact?: string | null;
   channel_direction?: string | null;
   retry_attempt?: number | null;
   campaign_id?: string | null;
