@@ -391,14 +391,31 @@ describe('ingestInboundAttempt — analytics attempt → inbound call_session', 
     expect(mock.updatePatches['sarvam_webhook_events']).toHaveLength(1); // still acked
   });
 
-  it('returns no_caller when analytics record has no user_identifier', async () => {
-    setSequence('call_sessions', null);
+  it('attributes analytics records without user_identifier to an anonymous test lead', async () => {
+    setSequence('call_sessions', null, { id: 'call-in-3', lead_id: 'lead-anon' });
+    summarizeCallMock.mockResolvedValue({
+      data: { summary: 'Test call summary', outcome: 'neutral', lead_temperature: 'cold', updated_preferences: {} },
+    });
 
     const result = await ingestInboundAttempt(ORG, { ...inboundAttempt, user_identifier: null }, { webhookEventId: 'evt-in-3' });
 
-    expect(result).toBe('no_caller');
-    expect(findOrCreateLeadMock).not.toHaveBeenCalled();
-    expect(mock.insertCalls['call_sessions']).toBeUndefined();
+    // Behavior change (2026-09-07): anonymous/test calls (Sarvam returns a
+    // hash or nothing as user_identifier) are NO LONGER skipped — they are
+    // ingested under a deterministic synthetic phone so every call lands in
+    // the CRM and on the Calls page.
+    expect(result).toBe('processed');
+    expect(findOrCreateLeadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: ORG,
+        phone: expect.stringMatching(/^\+77\d{10}$/),
+        source: 'inbound_call',
+        source_detail: expect.stringContaining('anonymized'),
+      })
+    );
+    const row = mock.insertCalls['call_sessions'][0][0];
+    expect(row.from_number).toMatch(/^\+77\d{10}$/);
+    expect(row.external_call_id).toBe('att-in-1');
+    expect(mock.updatePatches['sarvam_webhook_events']).toHaveLength(1);
     expect(mock.updatePatches['sarvam_webhook_events']).toHaveLength(1); // acked so webhook stops retrying
   });
 });

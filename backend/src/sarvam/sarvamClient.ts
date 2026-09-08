@@ -40,7 +40,9 @@ export interface OutboundCallResult {
 
 export interface InteractionDetails {
   interaction_id: string;
-  transcript?: Array<{ role: string; text?: string; content?: string }>;
+  /** Full conversation. NOTE: the analytics endpoint returns this as
+   *  `messages` (role + content), not `transcript`. */
+  messages?: Array<{ turn_id?: number; role: string; content: string; language_name?: string }>;
   recording_url?: string;
   [key: string]: unknown;
 }
@@ -206,6 +208,9 @@ export interface InteractionRecord {
   average_user_response_time_in_seconds?: number | null;
   user_contact_masked?: string | null;
   user_contact_hashed?: string | null;
+  /** RAW caller phone (E.164) — present on the interactions endpoint; this is
+   *  the authoritative caller identity for CRM attribution. */
+  user_contact?: string | null;
   channel_direction?: string | null;
   retry_attempt?: number | null;
   campaign_id?: string | null;

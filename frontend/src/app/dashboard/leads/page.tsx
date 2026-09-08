@@ -122,8 +122,8 @@ export default function LeadsPage() {
                     <div style={{ padding: 48, textAlign: 'center' }}>
                       <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
                       <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>No leads yet</h3>
-                      <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', maxWidth: 400, marginLeft: 'auto', marginRight: 'auto' }}>
-                        Leads are created automatically when customers message on WhatsApp. Connect your WhatsApp bridge and upload inventory first.
+                      <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+                        Leads are created automatically when customers call your AI agent or message on WhatsApp — calls and chats merge into one lead per phone number. Connect WhatsApp or place a test call from the Sarvam dashboard to see it happen.
                       </p>
                       <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                         <Link href="/dashboard/whatsapp" className="btn btn-primary" style={{ textDecoration: 'none' }}>
@@ -146,7 +146,25 @@ export default function LeadsPage() {
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{lead.full_name || 'Unknown'}</div>
-                          <div style={{ fontSize: 12, color: '#94a3b8' }}>{lead.phone || lead.whatsapp_number || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>{lead.phone || lead.whatsapp_number || '—'}</span>
+                            {/* Channel badges — a lead can arrive by call AND continue on WhatsApp */}
+                            {lead.source === 'inbound_call' && (
+                              <span title="Came in via voice call" style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8', borderRadius: 999, padding: '1px 7px' }}>
+                                📞 Call
+                              </span>
+                            )}
+                            {lead.source === 'whatsapp' && (
+                              <span title="Came in via WhatsApp" style={{ fontSize: 11, background: '#ecfdf5', color: '#047857', borderRadius: 999, padding: '1px 7px' }}>
+                                💬 WhatsApp
+                              </span>
+                            )}
+                            {lead.whatsapp_number && lead.source === 'inbound_call' && (
+                              <span title="WhatsApp number on file — chat continues on the same lead" style={{ fontSize: 11, color: '#047857' }}>
+                                +💬
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
