@@ -11,7 +11,7 @@
 
 import { supabaseAdmin } from '../db/supabase';
 import { finalizeCall } from './callFinalizer';
-import { listAttempts, type AttemptRecord } from './sarvamClient';
+import { getInteractionTranscript, listAttempts, type AttemptRecord } from './sarvamClient';
 import { findOrCreateLead } from '../crm/leadService';
 import { normalizePhone } from '../utils/phone';
 
@@ -389,12 +389,36 @@ export async function ingestInboundAttempt(
   }
 
   // 3. Shared finalization. Transcript from the webhook payload when
-  //    available (webhook path); the poller path passes none and the
-  //    analytics fetch below fills the gap.
+  //    available (webhook path). POLLER PATH: no payload — fetch the full
+  //    transcript from Sarvam analytics so finalizeCall can summarize and
+  //    extract lead fields (temperature, budget, city, …) exactly like the
+  //    webhook path always could. Previously poller-path calls finalized
+  //    with NO transcript → hadSummary:false → leads stayed empty.
   const sarvamStatus = opts.payload?.status ?? att.connectivity_status ?? 'connected';
   const transcriptRows = (opts.payload?.interaction_transcript ?? [])
     .filter((t) => t && typeof t.en_text === 'string')
     .map((t) => ({ role: t.role, text: t.en_text }));
+
+  if (transcriptRows.length === 0 && att.interaction_id && sarvamStatus === 'connected') {
+    try {
+      const details = await getInteractionTranscript(String(att.interaction_id));
+      const fetched = ((details as any)?.messages ?? [])
+        .map((t: any) => ({ role: String(t?.role ?? 'user'), text: String(t?.content ?? t?.text ?? '') }))
+        .filter((t: any) => t.text.trim());
+      if (fetched.length > 0) {
+        transcriptRows.push(...fetched);
+        logger.info(
+          { interactionId: att.interaction_id, turns: fetched.length },
+          '[Sarvam] Analytics transcript fetched — poller-path call will be summarized + enriched'
+        );
+      }
+    } catch (err: any) {
+      logger.warn(
+        { interactionId: att.interaction_id, err: err?.message },
+        '[Sarvam] Analytics transcript fetch failed — finalizing without transcript (no enrichment)'
+      );
+    }
+  }
 
   const extraPatch: Record<string, unknown> = { interaction_id: att.interaction_id ?? opts.payload?.interaction_id ?? null };
   if (att.failure_reason || opts.payload?.failure_reason) {

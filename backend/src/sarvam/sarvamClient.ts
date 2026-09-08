@@ -40,7 +40,9 @@ export interface OutboundCallResult {
 
 export interface InteractionDetails {
   interaction_id: string;
-  transcript?: Array<{ role: string; text?: string; content?: string }>;
+  /** Full conversation. NOTE: the analytics endpoint returns this as
+   *  `messages` (role + content), not `transcript`. */
+  messages?: Array<{ turn_id?: number; role: string; content: string; language_name?: string }>;
   recording_url?: string;
   [key: string]: unknown;
 }
