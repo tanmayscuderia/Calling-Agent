@@ -102,6 +102,22 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
   - `npx tsx scripts/cleanup-junk-leads.ts` — deletes status/newsletter junk leads, merges same-phone duplicates (reassigns history to the oldest lead), nulls >15-digit garbage phones
 - **KNOWN RACE**: `findOrCreateLead` is select-then-insert; concurrent first messages can create duplicate leads (happened: 7 leads for one LID chat). The cleanup script merges them. A unique index on `(org_id, phone)` after cleanup is the permanent fix if it recurs.
 - The leads table sorts by `created_at` DESC — a flood of old junk can look like "data is missing." Check the DB before assuming.
+- **WHEN** a conversation "stops replying" but messages still arrive: check `ai_agent_runs` count vs `org_usage_limits.max_ai_replies_per_conversation` (lifetime cap, enforced in `rateLimiter.ts`) and `org_usage_daily` counters BEFORE suspecting the bridge. Silent cap, no error anywhere.
+
+## 8b. Reply batching & spam guard (2026-09-09)
+
+- **Reply batching**: `process_message` jobs are inserted with `next_retry_at = now + 6s` (dequeue filters on `next_retry_at`, so this is the batching window). `enqueueIncomingMessage` SKIPS creating a new job when one is already `pending` for the conversation (`reason: 'batched_with_pending_job'`). The worker loads **all unanswered inbounds since the last outbound reply** (`loadUnansweredInbounds`) and answers them in ONE combined reply. Don't reintroduce per-message jobs.
+- **Spam guard is two-stage**: Stage 1 = free heuristics in `whatsapp/spamGuard.ts` (burst ≥15/5min, daily ≥100/phone, ≥3 of last 4 near-duplicate texts) — liberal thresholds on purpose, real customers are chatty. Stage 2 = DeepSeek referee, ONLY when Stage 1 trips (job payload `needsAbuseCheck`); verdict `genuine/spam/abuse/bot_loop`; non-genuine ≥0.6 confidence → `pending_human`, AI silent.
+- **MUST** keep both stages fail-open: heuristic errors and referee errors default to "genuine/proceed" — an LLM outage must never mute real leads. Cost is already bounded by daily token budgets.
+- **MUST NOT** call the referee on every message (only when Stage 1 trips) — it's an extra LLM call per reply otherwise.
+- Verdicts live in `customer_conversations.metadata.abuse` for the dashboard; humans restore AI via the existing unblock path.
+
+## 8c. Per-number limits (per whatsapp_account)
+
+- An org can run MANY numbers. Org limits bound the whole business; `account_usage_daily` + `getAccountLimits()`/`checkAccountDailyLimit()`/`recordAccountActivity()` (rateLimiter.ts) bound EACH NUMBER (defaults: 300 AI replies/day, 400 messages/day).
+- Optional per-number overrides: `whatsapp_accounts.config.limits = { "max_ai_replies_per_day": 200, "max_messages_per_day": 300 }`.
+- **MUST** fail open — if `account_usage_daily` is missing/unreachable, allow the send (counters are cost control, not security).
+- Enforcement point: `processMessageJob` BEFORE the LLM call (per-number limit → `pending_human`). Increments: inbound at enqueue, `ai_replies` after the reply, `outbound` after the send job.
 
 ## 9. Architecture invariants
 
@@ -113,7 +129,7 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 
 ## 10. Dev workflow
 
-- Gates: `cd backend && npx tsc --noEmit` + `npx vitest run` (337 tests, all green). Frontend: `npx tsc --noEmit` (ignore stale `.next/types` noise).
+- Gates: `cd backend && npx tsc --noEmit` + `npx vitest run` (348 tests, all green). Frontend: `npx tsc --noEmit` (ignore stale `.next/types` noise).
 - **NEVER** run `next build` while `next dev` is running — it wipes `.next` and the dev session 404s every chunk (`main-app.js`, `layout.js` 404s + "stuck on loading"). If it happens: stop dev, `rm -rf frontend/.next`, restart dev, hard refresh.
 - Eval tests (`npm run test:evals`) hit the real LLM — opt-in only, never part of the default gate.
 - Migrations: SQL in `supabase/migrations/`, idempotent (`IF NOT EXISTS`), applied via `npm run migrate`, documented in `docs/DATABASE.md`.
@@ -132,5 +148,6 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 | 2026-09-09 | `getAccountStatus` filtered by global `WHATSAPP_PROVIDER` — Meta accounts invisible | Provider-agnostic latest-account query |
 | 2026-09-09 | Hardcoded `sent_via: 'baileys'` in the reply job | Provider-aware metadata |
 | 2026-09-09 | `next build` run while `next dev` up → all chunks 404, app stuck loading | Rule #17 in CLAUDE.md; validate with tsc only |
+| 2026-09-09 | Sales chat went silent after 10 AI replies — `max_ai_replies_per_conversation=10` is a LIFETIME cap, silently blocks instead of erroring | Org limit raised to 100; consider a rolling window (per-day) instead of lifetime if it recurs. Limits are KV-cached 5 min after changing them |
 | 2026-08-30 | Sarvam webhook returned 400 on empty body → 11× retry storm | Tolerant-by-design webhook (audit + 200) |
 | 2026-08-30 | `human_handoff` silently dropped messages | Only `ai_enabled=false` / `blocked` stop the bot; handoff auto-clears |

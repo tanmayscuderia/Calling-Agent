@@ -66,7 +66,7 @@ ENCRYPTION_KEY=<openssl rand -hex 32>           # encrypts Meta tokens at rest
 
 ```bash
 cd backend
-npm run migrate -- --baseline   # FIRST TIME ONLY: records the 15 legacy files
+npm run migrate -- --baseline   # FIRST TIME ONLY: records the 16 legacy files
 npm run migrate                 # applies anything pending (e.g. do_not_call)
 ```
 

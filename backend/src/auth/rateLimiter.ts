@@ -98,7 +98,9 @@ const DEFAULT_LIMITS: OrgLimits = {
   max_messages_per_hour: 100,
   max_messages_per_day: 500,
   max_calls_per_day: 50,
-  max_ai_replies_per_conversation: 10,
+  // Lifetime cap per conversation. 500 (not 10) — a real sales conversation
+  // spans weeks and dozens of exchanges; a low silent cap kills deals.
+  max_ai_replies_per_conversation: 500,
   max_messages_per_phone_per_day: 20,
   is_locked: false,
   locked_reason: null,
@@ -230,6 +232,131 @@ export async function recordTokenUsage(
       logger.debug({ err }, 'token usage DB update failed');
     }
   });
+}
+
+/** Record an outbound message (increment counters via atomic RPCs) */
+// ============================================================
+// Per-number (per whatsapp_account) daily limits
+// ============================================================
+// An org runs MANY numbers; org-level limits bound the whole business,
+// these bound EACH NUMBER (cost control + anti-ban: Meta quality rating
+// and WhatsApp spam heuristics both watch per-number volume).
+//
+// Limits: whatsapp_accounts.config.limits JSONB (optional) —
+//   { "max_ai_replies_per_day": 200, "max_messages_per_day": 300 }
+// Unset fields fall back to generous defaults. Counters live in
+// account_usage_daily (one row per account per day).
+
+export interface AccountLimits {
+  max_ai_replies_per_day: number;
+  max_messages_per_day: number;
+}
+
+const ACCOUNT_LIMITS_KEY = (accountId: string) => `rl:acc:${accountId}:limits`;
+const ACCOUNT_LIMITS_TTL_MS = 5 * 60 * 1000;
+const ACCOUNT_DEFAULT_LIMITS: AccountLimits = {
+  max_ai_replies_per_day: 300,
+  max_messages_per_day: 400,
+};
+
+export async function getAccountLimits(orgId: string, accountId: string): Promise<AccountLimits> {
+  const kv = await getKv();
+  const key = ACCOUNT_LIMITS_KEY(accountId);
+  const cached = await kv.getJson<AccountLimits>(key);
+  if (cached) return cached;
+
+  try {
+    const sb = supabaseAdmin();
+    const { data } = await sb
+      .from('whatsapp_accounts')
+      .select('config')
+      .eq('id', accountId)
+      .maybeSingle();
+    const cfg = ((data?.config ?? {}) as any).limits ?? {};
+    const limits: AccountLimits = {
+      max_ai_replies_per_day: Number(cfg.max_ai_replies_per_day) || ACCOUNT_DEFAULT_LIMITS.max_ai_replies_per_day,
+      max_messages_per_day: Number(cfg.max_messages_per_day) || ACCOUNT_DEFAULT_LIMITS.max_messages_per_day,
+    };
+    await kv.setJson(key, limits, ACCOUNT_LIMITS_TTL_MS);
+    return limits;
+  } catch {
+    return { ...ACCOUNT_DEFAULT_LIMITS };
+  }
+}
+
+/** Read-or-create today's counter row for an account. Fails open (zeros) if the table is missing. */
+async function getAccountUsage(orgId: string, accountId: string): Promise<{ outbound: number; aiReplies: number }> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabaseAdmin()
+      .from('account_usage_daily')
+      .select('outbound_count, ai_replies')
+      .eq('account_id', accountId)
+      .eq('usage_date', today)
+      .maybeSingle();
+    return { outbound: data?.outbound_count ?? 0, aiReplies: data?.ai_replies ?? 0 };
+  } catch {
+    return { outbound: 0, aiReplies: 0 };
+  }
+}
+
+/** Per-number daily gate — checked before the AI reply is generated. Fails open. */
+export async function checkAccountDailyLimit(orgId: string, accountId: string | null): Promise<RateLimitResult> {
+  if (!accountId) return { allowed: true, reason: null };
+  try {
+    const [limits, usage] = await Promise.all([getAccountLimits(orgId, accountId), getAccountUsage(orgId, accountId)]);
+    if (usage.aiReplies >= limits.max_ai_replies_per_day) {
+      return { allowed: false, reason: `Per-number daily AI reply limit reached (${limits.max_ai_replies_per_day})` };
+    }
+    if (usage.outbound >= limits.max_messages_per_day) {
+      return { allowed: false, reason: `Per-number daily message limit reached (${limits.max_messages_per_day})` };
+    }
+    return { allowed: true, reason: null };
+  } catch {
+    return { allowed: true, reason: null }; // fail open
+  }
+}
+
+/** Fire-and-forget daily activity increment for a number (upsert today's row). */
+export async function recordAccountActivity(
+  orgId: string,
+  accountId: string,
+  delta: { inbound?: number; outbound?: number; ai_replies?: number }
+): Promise<void> {
+  if (!accountId) return;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const sb = supabaseAdmin();
+    const { data: row } = await sb
+      .from('account_usage_daily')
+      .select('id, inbound_count, outbound_count, ai_replies')
+      .eq('account_id', accountId)
+      .eq('usage_date', today)
+      .maybeSingle();
+    if (row) {
+      await sb
+        .from('account_usage_daily')
+        .update({
+          inbound_count: (row.inbound_count ?? 0) + (delta.inbound ?? 0),
+          outbound_count: (row.outbound_count ?? 0) + (delta.outbound ?? 0),
+          ai_replies: (row.ai_replies ?? 0) + (delta.ai_replies ?? 0),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+    } else {
+      await sb.from('account_usage_daily').insert({
+        org_id: orgId,
+        account_id: accountId,
+        usage_date: today,
+        inbound_count: delta.inbound ?? 0,
+        outbound_count: delta.outbound ?? 0,
+        ai_replies: delta.ai_replies ?? 0,
+      });
+    }
+  } catch (err: any) {
+    // Counters must never break the reply pipeline (table may not exist yet).
+    logger.debug({ err: err?.message }, 'account usage increment failed (non-fatal)');
+  }
 }
 
 /** Record an outbound message (increment counters via atomic RPCs) */

@@ -1077,6 +1077,22 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   }
 
   /**
+   * Explicit monitor-state set — the unified AI-toggle sync (Phase 4).
+   * When ai_enabled flips from ANY surface (Conversations page, WhatsApp
+   * page), both stores are written so every view shows one state.
+   */
+  setChatMonitored(chatId: string, monitored: boolean): void {
+    if (monitored) {
+      this.monitoredChatIds.add(chatId);
+    } else {
+      this.monitoredChatIds.delete(chatId);
+    }
+    const c = this.chats.get(chatId);
+    if (c) c.monitored = monitored;
+    this.scheduleSave();
+  }
+
+  /**
    * Bulk toggle monitoring for multiple chats at once.
    * Used by the "Select All / Deselect All" UI feature.
    */

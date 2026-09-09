@@ -269,6 +269,21 @@ class WhatsAppConnectionManager {
   }
 
   /**
+   * Unified AI-toggle sync (Phase 4): when a conversation's ai_enabled
+   * flips from ANY surface, keep the Baileys monitor set in sync so the
+   * WhatsApp page and Conversations page always show one state per number.
+   */
+  async setChatMonitorState(orgId: string, chatId: string, monitored: boolean): Promise<void> {
+    for (const [, adapter] of this.adapters) {
+      const status = adapter.getStatusSync?.();
+      if (status?.orgId !== orgId) continue;
+      if (typeof (adapter as any).setChatMonitored === 'function') {
+        (adapter as any).setChatMonitored(chatId, monitored);
+      }
+    }
+  }
+
+  /**
    * Create a Meta Cloud API account row (credentials already verified
    * and encrypted by the caller — routes/whatsappMeta.routes.ts) and
    * return its id. Unlike createAccount, nothing is booted: Meta

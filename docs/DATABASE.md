@@ -18,6 +18,7 @@ All tables, columns, relationships, and indexes.
 > - `20260108_0001_sarvam_calls.sql` — Sarvam calling: provider CHECK + `interaction_id` + `sarvam_webhook_events` + idempotency index
 > - `20260109_0001_sarvam_fixes.sql` — CHECK value fixes (`job_queue.job_type`, `call_sessions.status/provider`), re-asserts 0008
 > - `20260909_0001_meta_cloud_provider.sql` — Meta Cloud API dual-provider: `whatsapp_accounts.phone_number_id` (partially UNIQUE) + `waba_id` + org/provider index
+> - `20260910_0001_account_usage_daily.sql` — per-number daily counters (`account_usage_daily`, UNIQUE per account+day) for per-number limits
 >
 > **Already have a live DB?** `supabase/run_missing_migrations.sql` replays every missing piece idempotently.
 

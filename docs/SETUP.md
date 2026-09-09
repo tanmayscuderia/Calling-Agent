@@ -54,7 +54,7 @@ Go to **Settings → API**:
 
 ### Run Migrations
 
-Run all 15 migration files in order:
+Run all 16 migration files in order (or use `cd backend && npm run migrate`):
 
 ```bash
 # Option A: via psql
@@ -73,6 +73,7 @@ psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260830_0001_do_not_call.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260909_0001_meta_cloud_provider.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260910_0001_account_usage_daily.sql
 
 # Option B: via Supabase SQL Editor (paste each file and Run)
 # Option C (live DB): paste supabase/run_missing_migrations.sql once —
@@ -98,8 +99,9 @@ psql "$DATABASE_URL" -f supabase/migrations/20260909_0001_meta_cloud_provider.sq
 | `0001_sarvam_fixes` | Idempotent schema alignment (job_type + call status CHECKs) |
 | `0001_do_not_call` | DNC registry + calling-guard enforcement |
 | `0001_meta_cloud_provider` | Dual-provider WhatsApp: `phone_number_id` (UNIQUE) + `waba_id` on whatsapp_accounts |
+| `0001_account_usage_daily` | Per-number daily counters (`account_usage_daily`) for per-number limits |
 
-> **Total: 15 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+> **Total: 16 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
 
 ---
 

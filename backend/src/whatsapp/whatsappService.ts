@@ -2,6 +2,8 @@ import { supabaseAdmin } from '../db/supabase';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ParsedWhatsAppMessage } from './types';
+import { runSpamHeuristics } from './spamGuard';
+import { recordAccountActivity } from '../auth/rateLimiter';
 import { findOrCreateLead, updateLead, computeStatus } from '../crm/leadService';
 import {
   findOrCreateConversation,
@@ -458,6 +460,11 @@ export async function enqueueIncomingMessage(
     rawPayload: parsed.raw,
   });
 
+  // Per-number activity counter (fire-and-forget — must never block inbound)
+  if (resolvedAccountId) {
+    recordAccountActivity(resolvedOrgId, resolvedAccountId, { inbound: 1 }).catch(() => {});
+  }
+
   // 4) guards -- don't even enqueue if AI shouldn't respond
   if (!config.whatsapp.autoReply) {
     return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'auto_reply_disabled' };
@@ -483,8 +490,51 @@ export async function enqueueIncomingMessage(
     });
   }
 
+  // 4b) Reply batching — if a job for this conversation is ALREADY queued,
+  // don't stack another one. The queued job loads ALL unanswered messages
+  // when it runs, so the customer gets ONE combined reply to everything
+  // they asked (how a human salesperson reads a message burst).
+  const { data: pendingJob } = await supabaseAdmin()
+    .from('job_queue')
+    .select('id, payload')
+    .eq('org_id', resolvedOrgId)
+    .eq('job_type', 'process_message')
+    .eq('payload->>conversationId', conversation.id)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle();
+
+  // 4c) Stage 1 spam heuristics (free) — liberal thresholds; tripping only
+  // hands the conversation to the Stage 2 referee in the worker.
+  const spam = await runSpamHeuristics(resolvedOrgId, conversation.id, parsed.senderPhone, parsed.text);
+
+  if (pendingJob) {
+    // Hand the referee flag to the already-queued job so a burst that trips
+    // heuristics mid-batch still gets adjudicated.
+    if (spam.tripped) {
+      const mergedPayload = {
+        ...((pendingJob as any).payload ?? {}),
+        needsAbuseCheck: true,
+        spamSignals: spam.signals,
+      };
+      await supabaseAdmin()
+        .from('job_queue')
+        .update({ payload: mergedPayload })
+        .eq('id', (pendingJob as any).id);
+      logger.warn({ chatId: parsed.chatId, signals: spam.signals }, '[batch] flagged pending job for abuse check');
+    }
+    logger.info(
+      { chatId: parsed.chatId, conversationId: conversation.id },
+      'Pending job exists — message batched into it (no new job)'
+    );
+    return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'batched_with_pending_job' };
+  }
+
   // 5) enqueue processing job
   // NOTE: locked_by / locked_until are set by the dequeue_job() RPC, not here.
+  // next_retry_at doubles as a ~6s BATCHING WINDOW: rapid follow-up messages
+  // within the window coalesce (the job loads all unanswered messages when
+  // it runs, not just the trigger).
   const { error } = await supabaseAdmin().from('job_queue').insert({
     org_id: resolvedOrgId,
     job_type: 'process_message',
@@ -496,10 +546,13 @@ export async function enqueueIncomingMessage(
       chatId: parsed.chatId,
       senderPhone: parsed.senderPhone,
       externalMessageId: parsed.externalMessageId,
+      needsAbuseCheck: spam.tripped,
+      spamSignals: spam.signals,
     },
     status: 'pending',
     priority: 5,
     scheduled_at: new Date().toISOString(),
+    next_retry_at: new Date(Date.now() + 6000).toISOString(),
   });
 
   if (error) {

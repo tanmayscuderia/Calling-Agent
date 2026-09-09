@@ -15,7 +15,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-12. **337 unit tests + 21 LLM eval blocks, all green** (recounted 2026-09-09)
+12. **348 unit tests + 21 LLM eval blocks, all green** (recounted 2026-09-09)
 13. **Dual WhatsApp providers live** — official Meta Cloud API + Baileys QR bridge, chosen per account at connect time (see `docs/META_CLOUD_API.md`)
 14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend / redis), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 15. **VPS-ready (2026-09-07)** — Redis-backed shared state behind `REDIS_URL` (memory fallback: rate-limit counters, LLM concurrency semaphore, config/lead/snapshot caches), WhatsApp session persistence volume, memory-capped compose services, and a full deployment runbook: **`docs/DEPLOYMENT.md`** (Hostinger 16 GB VPS, 8 GB stack budget)
@@ -37,7 +37,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (337 unit tests + 21 LLM eval blocks across 8 suites) |
+| **Testing** | Vitest (348 unit tests + 21 LLM eval blocks across 8 suites) |
 | **Shared KV (optional)** | Redis via a thin KV abstraction (`backend/src/kv/`) — memory fallback; shares rate-limit counters, LLM semaphore, and caches across processes |
 
 ---
@@ -203,13 +203,13 @@ Calling Agent/
 │   │   ├── whatsapp/     # Dual-provider bridge: baileysClient + metaCloudClient + webhook parser + connection manager
 │   │   ├── routes/       # 14 route files (auth, whatsapp, leads, calls, sarvam webhook + tools, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 337 unit tests + 21 LLM eval blocks
+│   └── tests/            # 348 unit tests + 21 LLM eval blocks
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
 │       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
 │       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
-├── supabase/migrations/  # 15 SQL migration files
+├── supabase/migrations/  # 16 SQL migration files
 └── docs/                 # 17 documentation files
 ```
 

@@ -113,7 +113,27 @@ export async function whatsappRoutes(app: FastifyInstance) {
       adapter = getLocalAdapter();
     }
     if (!adapter) return { chats: [] };
-    return { chats: adapter.getChats() };
+    const chats = adapter.getChats();
+    // ── Unified AI state (Phase 4) ──
+    // Merge customer_conversations.ai_enabled into the bridge's monitor
+    // state so both dashboards display ONE toggle per number. A chat with
+    // ai_enabled=false shows OFF everywhere; chats without a conversation
+    // row yet keep the bridge's own monitored flag.
+    let aiMap = new Map<string, boolean>();
+    try {
+      const { data: convs } = await supabaseAdmin()
+        .from('customer_conversations')
+        .select('external_chat_id, ai_enabled')
+        .eq('org_id', orgId)
+        .eq('channel', 'whatsapp');
+      aiMap = new Map((convs ?? []).map((c: any) => [c.external_chat_id, c.ai_enabled !== false]));
+    } catch { /* fall back to adapter state */ }
+    return {
+      chats: chats.map((c) => {
+        const ai = aiMap.get(c.id);
+        return { ...c, aiEnabled: ai ?? null, monitored: ai === false ? false : c.monitored };
+      }),
+    };
   });
 
   app.post('/api/whatsapp/chats/bulk-toggle', async (req, reply) => {

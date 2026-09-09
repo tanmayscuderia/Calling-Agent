@@ -31,7 +31,7 @@
 15. Every table is `org_id`-scoped. Service-role client bypasses RLS — org scoping is OUR job in every query.
 
 ### Dev workflow
-16. Gates before done: `cd backend && npx tsc --noEmit && npx vitest run` (337 tests, all must pass).
+16. Gates before done: `cd backend && npx tsc --noEmit && npx vitest run` (348 tests, all must pass).
 17. **NEVER run `next build` while `next dev` is running** — it wipes `.next` and the dev session 404s on every chunk. Frontend validation = `npx tsc --noEmit` only (stale `.next/types` errors are noise).
 18. Migrations are SQL files in `supabase/migrations/`, idempotent, applied via `npm run migrate`. Update `docs/DATABASE.md` when you add one.
 

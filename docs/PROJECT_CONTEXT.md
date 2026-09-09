@@ -38,7 +38,7 @@
 | **LLM** | DeepSeek V4 (default, `deepseek-v4-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
-| **Testing** | Vitest — 337 unit tests + 21 LLM eval tests |
+| **Testing** | Vitest — 348 unit tests + 21 LLM eval blocks |
 | **Package Manager** | npm (workspace root with `backend/` and `frontend/`) |
 
 ---
@@ -96,7 +96,7 @@ Save outbound customer_messages + ai_agent_runs
 
 ## 4. Database Schema
 
-### 15 Migration Files (run in order)
+### 16 Migration Files (run in order)
 
 ```
 supabase/migrations/
@@ -115,6 +115,7 @@ supabase/migrations/
 ├── 20260109_0001_sarvam_fixes.sql                — Idempotent schema alignment (job_type + call status CHECKs)
 ├── 20260830_0001_do_not_call.sql                 — DNC registry + calling-guard enforcement
 ├── 20260909_0001_meta_cloud_provider.sql         — Meta Cloud API: phone_number_id (UNIQUE) + waba_id on whatsapp_accounts
+├── 20260910_0001_account_usage_daily.sql         — Per-number daily counters (account_usage_daily, UNIQUE per account+day)
 ```
 
 > **Live DB repair:** `supabase/run_missing_migrations.sql` replays everything missing idempotently — paste into the Supabase SQL editor.
@@ -503,7 +504,7 @@ PORT=4000
 
 ### Database
 ```bash
-# Run all 15 migrations in order
+# Run all 16 migrations in order
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0002_demo_seed.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260102_0001_multi_tenant_production.sql
@@ -603,7 +604,7 @@ Calling Agent/
 │   │   ├── utils/               # phone, money, logger, email, locationAliases
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
-│       ├── unit/                # 337 unit tests (22 files)
+│       ├── unit/                # 348 unit tests (23 files)
 │       ├── evals/               # 21 LLM eval blocks (8 files)
 ├── frontend/
 │   └── src/
@@ -614,7 +615,7 @@ Calling Agent/
 │       │   └── globals.css      # Tailwind + custom classes
 │       ├── components/          # CallDemoModal, motion/
 │       └── lib/                 # api.ts, auth.tsx, animations.ts
-├── supabase/migrations/         # 15 SQL migration files
+├── supabase/migrations/         # 16 SQL migration files
 └── docs/                        # 10 documentation files (this one + 9 others)
 ```
 
@@ -661,4 +662,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: 2026-09-09. Test count: 337 unit tests (22 files) + 21 LLM eval blocks (8 suites) — all passing. New: **dual-provider WhatsApp** — official Meta Cloud API (adapter, signed webhook receiver, onboarding routes/UI, 24h-window guard, AES-256-GCM credential storage — `docs/META_CLOUD_API.md`) alongside the Baileys QR bridge; WhatsApp privacy **LID JIDs resolved to real phone numbers** via contact sync (junk rows cleaned via `backend/scripts/fix-lid-phones.ts`). Shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*
+*Last updated: 2026-09-09. Test count: 348 unit tests (23 files) + 21 LLM eval blocks (8 suites) — all passing. New: **dual-provider WhatsApp** — official Meta Cloud API (adapter, signed webhook receiver, onboarding routes/UI, 24h-window guard, AES-256-GCM credential storage — `docs/META_CLOUD_API.md`) alongside the Baileys QR bridge; WhatsApp privacy **LID JIDs resolved to real phone numbers** via contact sync (junk rows cleaned via `backend/scripts/fix-lid-phones.ts`); **reply batching + two-stage spam guard + per-number limits** shipped (see `docs/RULES.md` §8b/8c). Shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*
