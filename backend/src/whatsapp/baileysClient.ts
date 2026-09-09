@@ -123,6 +123,12 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
   private qrStallTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly QR_STALL_TIMEOUT_MS = 90_000; // no login 90s after connect/last QR → recycle
 
+  // Auto-relink cooldown: when a socket closes with loggedOut (401) right
+  // after a relink request, it means stale creds were still on disk. We
+  // auto-clear + restart ONCE (per minute) so the user always gets a QR
+  // instead of a dead 'disabled' state.
+  private lastLoggedOutAutoRelink = 0;
+
 
   constructor(orgId: string, sessionDir?: string) {
     super();
@@ -447,6 +453,22 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             setTimeout(() => this.start().catch(() => {}), 3000);
           } else {
             await setAccountStatus(this.orgId, this.accountId!, 'disabled');
+            // AUTO-RELINK: a loggedOut (401) close right after a relink/start
+            // means the socket restarted with STALE credentials that failed
+            // to clear (EPERM during relink). Without this the user lands in
+            // a dead 'disabled' state with no QR — which read as
+            // "QR generation failed". Auto-clear + restart ONCE per minute
+            // so a fresh QR is always produced.
+            const now = Date.now();
+            if (now - this.lastLoggedOutAutoRelink > 60_000) {
+              this.lastLoggedOutAutoRelink = now;
+              logger.warn('[WA] Logged out (401) — auto-relinking once for a fresh QR');
+              setTimeout(() => {
+                this.relink().catch((e: any) =>
+                  logger.error({ err: e?.message }, '[WA] Auto-relink failed')
+                );
+              }, 1_000);
+            }
           }
         }
       });
@@ -1078,19 +1100,19 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       }
     } catch {}
     this.sock = null;
+    this.disarmQrStallTimer();
+    this.stopHeartbeat();
+    this.stopWatchdog();
+    this.starting = false;
 
-    // 2. Delete the session directory so Baileys starts fresh
-    try {
-      if (fs.existsSync(this.sessionDir)) {
-        const files = fs.readdirSync(this.sessionDir);
-        for (const file of files) {
-          fs.unlinkSync(path.join(this.sessionDir, file));
-        }
-        logger.info({ dir: this.sessionDir, fileCount: files.length }, 'Cleared session files');
-      }
-    } catch (err) {
-      logger.warn({ err }, 'Could not fully clear session dir — continuing anyway');
-    }
+    // 2. Give the OS a beat to release the creds file handles (the old
+    // socket's unlink EPERM happened because deletion raced the closing
+    // socket), then wipe the session dir ROBUSTLY:
+    //   rmSync with retries → verify → if anything survived, rename the
+    //   whole dir to .trash (rename succeeds where unlink of open files
+    //   fails on macOS) and recreate clean.
+    await new Promise((r) => setTimeout(r, 600));
+    this.clearSessionDirRobust();
 
     // 3. Reset internal state — THIS is when we clear chats (new account)
     this.status = 'disconnected';
@@ -1107,6 +1129,47 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     // 4. Start fresh — will generate a new QR code
     await this.start();
     logger.info('Re-link initiated — new QR code should appear shortly');
+  }
+
+  /**
+   * Wipe the Baileys session directory so the next start() generates a QR
+   * instead of replaying a dead session. Three layers of robustness because
+   * this EXACT step is what broke relink repeatedly:
+   *   1. rmSync with retries (handles transient EPERM/EBUSY)
+   *   2. verify — if any file survived, the whole dir is RENAMED to
+   *      `<dir>.trash-<ts>` (rename works even when unlink of open files
+   *      fails on macOS) and a clean dir is created
+   *   3. stale .trash-* dirs from previous attempts are removed best-effort
+   */
+  private clearSessionDirRobust(): void {
+    const dir = this.sessionDir;
+    try {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      }
+    } catch (err) {
+      logger.warn({ err, dir }, '[WA] rmSync on session dir failed — trying rename fallback');
+    }
+    try {
+      if (fs.existsSync(dir) && fs.readdirSync(dir).length > 0) {
+        const trash = `${dir}.trash-${Date.now()}`;
+        fs.renameSync(dir, trash);
+        fs.mkdirSync(dir, { recursive: true });
+        logger.warn({ trash }, '[WA] Session dir renamed to trash (files were locked) — fresh session guaranteed');
+      }
+    } catch (err) {
+      logger.warn({ err, dir }, '[WA] Session-dir fallback cleanup issue — continuing');
+    }
+    // Best-effort: remove .trash-* dirs left by earlier relinks
+    try {
+      const parent = path.dirname(dir);
+      const base = path.basename(dir);
+      for (const f of fs.readdirSync(parent)) {
+        if (f.startsWith(`${base}.trash-`)) {
+          try { fs.rmSync(path.join(parent, f), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
+        }
+      }
+    } catch {}
   }
 
   async sendMessage(chatId: string, text: string): Promise<void> {
@@ -1383,7 +1446,9 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
       starting: this.starting,
       connectedPhone: this.connectedPhone,
       hasQr: !!this.lastQr,
-      qr: this.status === 'qr_pending' ? this.lastQr : null,
+      // Show the QR in every non-connected state — a momentary status flicker
+      // (close → disabled → restart) must never hide a scannable QR mid-cycle.
+      qr: this.status !== 'connected' ? this.lastQr : null,
       qrCount: this.qrCount,
       qrAgeSec: this.qrLastAt ? Math.round((Date.now() - this.qrLastAt) / 1000) : null,
       accountId: this.accountId,

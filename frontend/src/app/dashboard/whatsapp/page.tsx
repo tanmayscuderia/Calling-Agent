@@ -555,7 +555,9 @@ export default function WhatsAppPage() {
       )}
 
       {/* QR Code Section */}
-      {adapterStatus === 'qr_pending' && qrString && (
+      {/* QR: render whenever the backend has one and we're not connected —
+          tolerant of momentary status flickers during QR rotation */}
+      {qrString && adapterStatus !== 'connected' && (
         <div className="card" style={{ padding: 32, marginBottom: 16, textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
             <span style={{ fontSize: 20 }}>📱</span>

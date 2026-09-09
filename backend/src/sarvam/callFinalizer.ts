@@ -256,9 +256,26 @@ export async function finalizeCall(opts: FinalizeCallOptions): Promise<{
       : { ...(summaryData.updated_preferences ?? {}) };
 
     // caller_name → full_name, but ONLY when the lead has no name yet
-    // (never overwrite good CRM data with a transcribed guess). Also merge
-    // metadata with whatever the lead already has (jsonb is replaced, not merged).
-    const wantsName = typeof summaryData.caller_name === 'string' && !!summaryData.caller_name.trim();
+    // (never overwrite good CRM data with a transcribed guess), and NEVER
+    // when the "name" is actually the agent's own persona/business name —
+    // test calls regularly produced caller_name:'Shubh' (the agent), which
+    // leaked the agent's name into real lead rows.
+    const callerNameTrimmed =
+      typeof summaryData.caller_name === 'string' ? summaryData.caller_name.trim() : '';
+    const personaLower = (cfg?.persona_name ?? '').toLowerCase();
+    const businessLower = (cfg as any)?.business_name
+      ? String((cfg as any).business_name).toLowerCase()
+      : '';
+    const looksLikeAgentName =
+      (personaLower && callerNameTrimmed.toLowerCase().includes(personaLower)) ||
+      (businessLower && callerNameTrimmed.toLowerCase().includes(businessLower));
+    const wantsName = !!callerNameTrimmed && !looksLikeAgentName;
+    if (callerNameTrimmed && looksLikeAgentName) {
+      logger.info(
+        { callSessionId, callerName: callerNameTrimmed },
+        '[CallFinalizer] Ignoring caller_name — it matches the agent persona (extraction error)'
+      );
+    }
     if (wantsName || extracted.metadata) {
       const lead = await getLead(orgId, leadId).catch(() => null);
       if (lead) {
