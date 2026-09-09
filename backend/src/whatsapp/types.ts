@@ -18,6 +18,14 @@ export interface ParsedWhatsAppMessage {
 }
 
 export interface MessagingAdapter {
+  /**
+   * Which channel this adapter speaks. 'baileys' (WhatsApp Web bridge)
+   * or 'meta_cloud_api' (official). Optional on the interface for
+   * backward compatibility, but every adapter should set it — the
+   * queue worker and dashboard use it to branch behavior (e.g. the
+   * 24-hour window only applies to meta_cloud_api).
+   */
+  readonly provider?: 'baileys' | 'meta_cloud_api';
   start(): Promise<void>;
   stop(): Promise<void>;
   sendMessage(chatId: string, text: string): Promise<void>;

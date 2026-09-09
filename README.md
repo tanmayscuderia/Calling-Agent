@@ -5,7 +5,7 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 ## What This Platform Does
 
 1. **Multi-industry AI agents** — 12 industry templates (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
-2. **WhatsApp message monitoring** via WhatsApp Web bridge (Baileys)
+2. **WhatsApp messaging — dual provider**: official **Meta Cloud API** (verified, signed webhooks) or the **Baileys QR bridge** (instant demo) — per account, same pipeline
 3. **Automatic AI replies** for lead qualification (async queue pipeline)
 4. **AI phone calls via Sarvam** — real inbound + outbound voice agent (Hindi/English) that calls leads, qualifies them, books site visits, and writes results back to the CRM automatically via webhooks. **Zero-mid-call-tool architecture (v7.6):** two on_start hooks load lead context (including the lead's recent WhatsApp messages) and the full inventory snapshot at CALL START (`GET /api/tools/sarvam/lead-context`, `GET /api/tools/sarvam/inventory-snapshot`) — the LLM never dispatches tools mid-call, which eliminated random dispatch failures. Results return via the on_end webhook (tolerant: field aliases, flat variable chips, empty bodies audited — never 400)
 5. **Config-driven AI** — each org configures its own persona, fields, intents, reply templates
@@ -15,12 +15,12 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 9. **Production-grade reliability** — durable job queue, retry, crash recovery, LLM rate-limit protection, webhook idempotency
 10. **Secure login** — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
-12. **301 unit tests + 21 LLM eval blocks, all green** (recounted 2026-08-30)
-13. Clean migration path to Meta Cloud API later
+12. **337 unit tests + 21 LLM eval blocks, all green** (recounted 2026-09-09)
+13. **Dual WhatsApp providers live** — official Meta Cloud API + Baileys QR bridge, chosen per account at connect time (see `docs/META_CLOUD_API.md`)
 14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend / redis), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 15. **VPS-ready (2026-09-07)** — Redis-backed shared state behind `REDIS_URL` (memory fallback: rate-limit counters, LLM concurrency semaphore, config/lead/snapshot caches), WhatsApp session persistence volume, memory-capped compose services, and a full deployment runbook: **`docs/DEPLOYMENT.md`** (Hostinger 16 GB VPS, 8 GB stack budget)
 
-> **Prototype Note:** This uses a WhatsApp Web bridge for fast demonstration. Production deployment will use Meta Cloud API. The AI, CRM, inventory upload, lead qualification, and calling-agent workflows are the main product and remain the same.
+> **Provider Note:** WhatsApp runs on **two providers**: the official **Meta Cloud API** (recommended for business numbers — verified sends, signed webhooks, free customer-service replies) and the **Baileys WhatsApp Web bridge** (QR scan, instant demo). Both feed the identical AI → CRM → queue pipeline. Details: `docs/META_CLOUD_API.md`.
 
 ---
 
@@ -32,12 +32,12 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 | **Backend** | Node.js + Fastify 4 + TypeScript |
 | **Database** | Supabase Postgres |
 | **Auth** | Supabase Auth + httpOnly cookies (session-based) |
-| **WhatsApp Bridge** | Baileys (WhatsApp Web protocol) |
+| **WhatsApp Bridge** | Baileys (QR demo tier) + Meta Cloud API v21.0 (official) — `MessagingAdapter` |
 | **Voice Calling** | Sarvam AI voice agents (real PSTN calls, webhook-driven results) |
 | **LLM** | DeepSeek V4 (default) / OpenAI (configurable) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion (route transitions, staggered cards, spring hovers, animated modals) |
-| **Testing** | Vitest (301 unit tests + 21 LLM eval blocks across 8 suites) |
+| **Testing** | Vitest (337 unit tests + 21 LLM eval blocks across 8 suites) |
 | **Shared KV (optional)** | Redis via a thin KV abstraction (`backend/src/kv/`) — memory fallback; shares rate-limit counters, LLM semaphore, and caches across processes |
 
 ---
@@ -198,10 +198,10 @@ Calling Agent/
 │   │   ├── crm/          # Lead, conversation, property services
 │   │   ├── queue/        # Postgres-backed job worker + stale recovery
 │   │   ├── sarvam/       # Sarvam API client, call-result service, query parser, inbound poller
-│   │   ├── whatsapp/     # Baileys bridge + connection manager
+│   │   ├── whatsapp/     # Dual-provider bridge: baileysClient + metaCloudClient + webhook parser + connection manager
 │   │   ├── routes/       # 14 route files (auth, whatsapp, leads, calls, sarvam webhook + tools, agent, ai, etc.)
 │   │   └── uploads/      # CSV import + storage
-│   └── tests/            # 301 unit tests + 21 LLM eval blocks
+│   └── tests/            # 337 unit tests + 21 LLM eval blocks
 ├── frontend/             # Next.js dashboard
 │   └── src/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
@@ -252,6 +252,6 @@ Results with score ≤ 0.1 are filtered out. Top N (default 3) returned, sorted 
 
 The platform is production-ready with a durable job queue, retry logic, crash recovery, and LLM rate-limit protection. Real calling is live via Sarvam (guarded by calling hours, call-cost limits, DNC checks, and webhook idempotency). The Sarvam result webhook is **tolerant by design** (2026-08-30): field aliases, flat variable chips, and empty bodies are audited and acked 200 — a config mistake can never trigger a 400 retry storm; every POST is raw-logged to `backend/logs/sarvam-webhooks.log`. Deploy via `docker compose up` (API + dedicated queue worker + frontend) or run single-process (`npm run dev` / nohup) — the worker runs in-process by default and externalizes with `WORKER_IN_PROCESS=false`.
 
-**Channel status (2026-08-30):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls; the WhatsApp bridge is fully built and proven (753+ messages) but currently disabled — re-enable via Dashboard → WhatsApp (QR scan). Both channels already write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
+**Channel status (2026-09-09):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls. WhatsApp is now **dual-provider**: the official **Meta Cloud API** path is fully built (adapter, signed webhook receiver, onboarding UI, 24h-window guard, encrypted credentials — `docs/META_CLOUD_API.md`) alongside the proven Baileys bridge (753+ messages; currently disabled — re-enable via Dashboard → WhatsApp → QR scan). WhatsApp privacy LIDs are resolved to real phone numbers via contact sync (`docs/ARCHITECTURE.md` → message lifecycle). All channels write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
 
 See **[ROADMAP.md](./docs/ROADMAP.md)** for full details.

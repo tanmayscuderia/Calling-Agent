@@ -9,7 +9,7 @@
 **Multi-Industry WhatsApp AI + Calling Agent Platform** — a production-grade system for AI-powered lead qualification via WhatsApp **and real AI phone calls**, with CRM dashboard, configurable multi-industry AI agents, inventory management, a Sarvam AI voice-calling agent, and a browser-based call demo.
 
 **Core capabilities:**
-1. WhatsApp message monitoring via WhatsApp Web bridge (Baileys)
+1. WhatsApp messaging — **dual provider**: official Meta Cloud API (signed webhooks) or Baileys QR bridge, chosen per account
 2. Automatic AI replies for lead qualification (async job queue pipeline)
 3. 12 industry templates — each org configures its own AI agent (Real Estate, Healthcare, Education, Finance, E-Commerce, Travel, Fitness, Restaurant, Legal, Automotive, Salon/Spa, Insurance)
 4. **Real AI phone calls via Sarvam voice agents** — outbound PSTN calls (Hindi/English) that qualify leads, book site visits, and write transcripts/summaries/outcomes back to the CRM via authenticated webhooks
@@ -21,7 +21,7 @@
 10. Secure login — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. Polished animated UI — Framer Motion route transitions, staggered cards, spring hovers
 
-> **Prototype positioning:** WhatsApp bridge uses Baileys (WhatsApp Web protocol) for demo speed. Production will use Meta Cloud API. The AI, CRM, inventory, and calling workflows are the real product and remain unchanged. The `MessagingAdapter` interface ensures a clean swap path.
+> **Provider positioning:** WhatsApp runs on two providers — the official **Meta Cloud API** (business tier: verified sends, signed webhooks, free customer-service replies, 24h-window guard) and the **Baileys WhatsApp Web bridge** (QR scan, instant demo). Both implement the same `MessagingAdapter` interface and feed an identical pipeline. See `docs/META_CLOUD_API.md`.
 
 ---
 
@@ -33,12 +33,12 @@
 | **Backend** | Node.js + Fastify 4 + TypeScript |
 | **Database** | Supabase Postgres |
 | **Auth** | Supabase Auth + httpOnly cookies (session-based, XSS-proof) |
-| **WhatsApp Bridge** | `@whiskeysockets/baileys` (WhatsApp Web protocol) |
+| **WhatsApp Bridge** | `@whiskeysockets/baileys` (QR demo tier) + Meta Cloud API v21.0 (official) |
 | **Voice Calling** | Sarvam AI voice agents (real PSTN calls + webhooks; see `docs/SARVAM_CALLING_PLAN.md`) |
 | **LLM** | DeepSeek V4 (default, `deepseek-v4-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
-| **Testing** | Vitest — 240 unit tests + 91 LLM eval tests |
+| **Testing** | Vitest — 337 unit tests + 21 LLM eval tests |
 | **Package Manager** | npm (workspace root with `backend/` and `frontend/`) |
 
 ---
@@ -50,18 +50,20 @@
 ```
 Customer sends WhatsApp message
     ↓
-Baileys WhatsApp Web Bridge (baileysClient.ts)
-    ↓ messages.upsert event
-parseWhatsAppMessage() — extracts text, media, sender info
-    ↓ ParsedWhatsAppMessage
-whatsappService.handleIncomingMessage()
+[PROVIDER FORK — per whatsapp_accounts.provider]
+  ├── baileys:       Baileys socket (baileysClient.ts) → messages.upsert
+  └── meta_cloud_api: Meta POSTs signed webhook (whatsappWebhook.routes.ts)
+                      → HMAC verify (fail-closed) → metaWebhookParser
+                      [LID JIDs: real phone resolved from contact sync]
+    ↓ both produce the SAME ParsedWhatsAppMessage (JID-canonical chatId)
+whatsappService.enqueueIncomingMessage()
     ↓
 1. Resolve orgId (from connection manager or DEFAULT_ORG_ID)
-2. Find/create whatsapp_accounts record
-3. Find/create crm_leads by phone (ON CONFLICT DO UPDATE for dedup)
+2. Resolve whatsapp_accounts record
+3. Find/create crm_leads by phone (LID chats: matched by source_detail, phone backfilled when resolved)
 4. Find/create customer_conversations by external_chat_id
-5. Insert inbound customer_messages
-6. Safety checks: ai_enabled? human_handoff? blocked? allowlist?
+5. Insert inbound customer_messages (dedup by external_message_id — Baileys replays AND Meta wamids)
+6. Safety checks: ai_enabled? human_handoff? blocked? allowlist? system chats (status/newsletter) skipped?
 7. ENQUEUE job → job_queue table (async, non-blocking)
     ↓
 Queue Worker (queueWorker.ts) polls every 2s
@@ -77,7 +79,9 @@ baseAgent.respondToMessage()
     ↓
 ENQUEUE separate job → send_reply (decoupled delivery)
     ↓
-Baileys sendMessage() — delivers WhatsApp reply
+[PROVIDER JOIN] processSendReplyJob → waManager.resolveAdapter(accountId)
+  ├── baileys:        live socket sendMessage()
+  └── meta_cloud_api: Graph API send (24h window enforced; outside → pending_human)
     ↓
 Save outbound customer_messages + ai_agent_runs
 ```
@@ -597,7 +601,7 @@ Calling Agent/
 │   │   ├── utils/               # phone, money, logger, email, locationAliases
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
-│       ├── unit/                # 240 unit tests (16 files)
+│       ├── unit/                # 337 unit tests (22 files)
 │       └── evals/               # 91 LLM eval tests (8 files)
 ├── frontend/
 │   └── src/
@@ -655,4 +659,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: 2026-09-07. Test count: 301 unit tests (18 files) + 21 LLM eval blocks (8 suites) — all passing. New: shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*
+*Last updated: 2026-09-09. Test count: 337 unit tests (22 files) + 21 LLM eval blocks (8 suites) — all passing. New: **dual-provider WhatsApp** — official Meta Cloud API (adapter, signed webhook receiver, onboarding routes/UI, 24h-window guard, AES-256-GCM credential storage — `docs/META_CLOUD_API.md`) alongside the Baileys QR bridge; WhatsApp privacy **LID JIDs resolved to real phone numbers** via contact sync (junk rows cleaned via `backend/scripts/fix-lid-phones.ts`). Shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*

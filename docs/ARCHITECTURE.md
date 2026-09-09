@@ -1,7 +1,7 @@
 # Architecture — Calling Agent Platform
 
 > **Last Updated:** 2026-09-07
-> **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · Baileys (WhatsApp) · Sarvam (Voice Calling) · DeepSeek/OpenAI (LLM) · Redis (optional shared KV)
+> **Stack:** Next.js (Frontend) · Fastify + Node.js (Backend) · Supabase Postgres (DB) · WhatsApp dual-provider (Baileys QR + Meta Cloud API) · Sarvam (Voice Calling) · DeepSeek/OpenAI (LLM) · Redis (optional shared KV)
 
 ---
 
@@ -121,6 +121,8 @@ Every file, what it does, and what it connects to. Surveyed 2026-09-07
 | `routes/leads.routes.ts` | leads list/detail/patch/followups | `crm/leadService` |
 | `routes/conversations.routes.ts` | conversations + send/handoff | `crm/conversationService` |
 | `routes/whatsapp.routes.ts` | start/stop/status/chats/toggle/relink/force-reconnect/resync/simulate/send | `whatsapp/connectionManager`, `whatsappService` |
+| `routes/whatsappMeta.routes.ts` | Meta Cloud API onboarding: connect (verify→encrypt→register), accounts, verify-registration, disconnect, webhook-info | `whatsapp/metaApi`, `utils/metaEncryption`, `whatsapp/connectionManager` |
+| `routes/whatsappWebhook.routes.ts` | Meta inbound: GET hub.challenge handshake + POST signed delivery (raw-body HMAC) → `enqueueIncomingMessage`; mirrors statuses | `utils/metaWebhookSignature`, `whatsapp/metaWebhookParser`, `whatsappService` |
 | `routes/calls.routes.ts` | `start-demo` (browser sim), `start-real` (Sarvam), turn/end, list (paginated), DNC CRUD | `sarvam/callingGuards`, `sarvam/sarvamClient`, `crm/leadService` |
 | `routes/sarvamWebhook.routes.ts` | `POST /webhooks/sarvam/:secret` — on_end results (tolerant: aliases, flat chips, empty-body audit → 200) | `sarvam/callResultService`, queue `process_call_result` |
 | `routes/sarvamTools.routes.ts` | on_start hooks: `lead-context` (5-min cache) + `inventory-snapshot` (markdown, 5-min cache); mid-call `inventory-search` (queryParser) | `crm/leadContextCache`, `crm/propertyService`, `sarvam/queryParser`, `crm/leadService` |
@@ -136,7 +138,12 @@ Every file, what it does, and what it connects to. Surveyed 2026-09-07
 | `whatsapp/baileysClient.ts` (1.4k lines) | Baileys adapter: QR lifecycle w/ stall watchdog, connection watchdog + heartbeat, **activation cutoff** (drops offline-backlog messages on reconnect), group/DM gating, decryption auto-relink, chat persistence | Baileys WS → emits `qr`/`connected`/`message` |
 | `whatsapp/messageParser.ts` | Raw Baileys payload → `ParsedWhatsAppMessage` (text/media/types) | consumed by baileysClient |
 | `whatsapp/whatsappService.ts` | Message pipeline: lead upsert (phone-merge), conversation insert, AI-reply limit checks, **enqueue `ai_reply` job**, send helpers, DNC of adapter events | `crm/leadService`, `crm/conversationService`, `auth/rateLimiter`, `queue` |
-| `whatsapp/connectionManager.ts` | Multi-account registry; boots `status='connected'` accounts on boot; start/stop/relink per org | `baileysClient`, `whatsappService` |
+| `whatsapp/connectionManager.ts` | Provider-aware multi-account registry: boots connected **Baileys** accounts on boot; `resolveAdapter(accountId)` returns the live Baileys socket OR a stateless `MetaCloudWhatsAppAdapter`; `createMetaAccount` stores encrypted credentials | `baileysClient`, `metaCloudClient`, `whatsappService` |
+| `whatsapp/metaCloudClient.ts` | Meta Cloud API adapter (stateless): credential verification (`verify`→`register`→`subscribe`), Graph API sends, LID→digits conversion, status | implements `MessagingAdapter` |
+| `whatsapp/metaApi.ts` | Graph API client (ported from wacrm): verify/register/subscribe/send text+media+location/read receipts/media URL — named-params style | fetch → `graph.facebook.com/v21.0` |
+| `whatsapp/metaWebhookParser.ts` | Meta webhook payload → `ParsedWhatsAppMessage[]` + status events; emits JID-canonical chatIds so downstream never branches on provider | consumed by webhook route |
+| `utils/metaEncryption.ts` | AES-256-GCM encrypt/decrypt for Meta tokens (legacy-CBC read support) | keyed by `ENCRYPTION_KEY` |
+| `utils/metaWebhookSignature.ts` | `X-Hub-Signature-256` HMAC-SHA256 verification — fail-closed without `META_APP_SECRET` | used by webhook route |
 
 ### AI brain (processes the queue's jobs)
 
@@ -194,13 +201,15 @@ Every file, what it does, and what it connects to. Surveyed 2026-09-07
 
 ### The three pipelines, file by file
 
-**1. WhatsApp inbound → AI reply:**
-`baileysClient.messages.upsert` → activation cutoff → `messageParser` →
+**1. WhatsApp inbound → AI reply (dual provider — fork at entry, join at send):**
+*Baileys:* `baileysClient.messages.upsert` → activation cutoff → `messageParser` →
+*Meta Cloud:* `whatsappWebhook.routes` (HMAC fail-closed) → `metaWebhookParser` (LID→phone resolution) →
+both produce `ParsedWhatsAppMessage` →
 `whatsappService` (lead upsert → conversation insert → `checkMessageAllowed`
 → enqueue) → `job_queue` → `queueWorker.dequeue_job()` →
 `jobHandler.ai_reply` → `baseAgent` (`agentConfigService` → `promptEngine` →
 `inventorySearch` → `llmClient`) → `leadService`/`conversationService` writes
-→ `whatsappService.send`.
+→ `processSendReplyJob` → `waManager.resolveAdapter` (Baileys socket | stateless `MetaCloudWhatsAppAdapter`, 24h window enforced).
 
 **2. Sarvam real call (outbound + inbound):**
 `calls.routes.start-real` → `callingGuards` (hours/DNC/limits) →
@@ -313,7 +322,7 @@ Customer sends WhatsApp message
 │ 2. Save outbound message        │  → customer_messages (direction=outbound)
 │ 3. Save property matches        │  → crm_lead_property_matches
 │ 4. Update lead timestamps       │  → crm_leads
-│ 5. Send reply via Baileys       │  baileysClient.sendMessage()
+│ 5. Send reply via adapter       │  Baileys socket or Meta Graph API (24h window guarded)
 │ 6. complete_job()               │  → job_queue status=completed
 └─────────────────────────────────┘
 ```
@@ -328,6 +337,9 @@ Customer sends WhatsApp message
 | **Lead dedup by phone** | Unique index on `(org_id, phone)` prevents duplicate leads from repeat messages. |
 | **Individual DMs always processed** | No monitoring toggle required for 1:1 chats — only groups need explicit toggle-on. |
 | **Decryption auto-heal** | Signal protocol session desyncs detected and repaired automatically (soft reconnect → full relink). |
+| **Dual WhatsApp providers** | Baileys (QR, stateful socket) and Meta Cloud API (stateless webhook) implement one `MessagingAdapter` — inbound converges on the same `ParsedWhatsAppMessage`; outbound resolves the right adapter per account. |
+| **LID ≠ phone** | WhatsApp privacy Linked IDs (`xxx@lid`) are never stored as phones; real numbers come from contact-sync `phoneNumber` fields and auto-backfill onto leads. `status@broadcast` / `@newsletter` chats never become leads. |
+| **Meta 24h window** | Free-form replies outside the customer-service window are suppressed (`pending_human`) instead of triggering guaranteed Meta rejections (error 131047). |
 
 ### WhatsApp Bridge Resilience (Auto-Heal System)
 
@@ -732,7 +744,7 @@ frontend/src/app/
     │   └── page.tsx            → Call session list
     │
     ├── whatsapp/
-    │   └── page.tsx            → WhatsApp bridge status + QR + controls
+    │   └── page.tsx            → Dual-provider WhatsApp: Meta Cloud API connect panel (accounts + form + webhook helper) + Baileys bridge status/QR/controls
     │
     ├── followups/
     │   └── page.tsx            → Follow-up management (all pending/scheduled)
@@ -1090,7 +1102,7 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 301 unit tests (18 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-09-07 after KV layer +11; earlier docs said 241/290/296/331 — all stale)
+**Total: 337 unit tests (22 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-09-09 after dual-provider WhatsApp +36: metaApi, metaEncryption, metaWebhookSignature, metaWebhookParser; earlier docs said 241/290/296/301/331 — all stale)
 
 ---
 

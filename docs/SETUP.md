@@ -181,6 +181,13 @@ AI_ALLOWED_NUMBERS=
 WHATSAPP_PROVIDER=baileys
 WHATSAPP_SESSION_DIR=.sessions/whatsapp
 
+# ---- WhatsApp Meta Cloud API (official; optional) ----
+# Enables the official provider — chosen per account in Dashboard → WhatsApp.
+#META_APP_SECRET=your-meta-app-secret        # REQUIRED for the webhook (fail-closed HMAC)
+#ENCRYPTION_KEY=64-hex-chars                 # encrypts Meta tokens at rest
+#META_WEBHOOK_VERIFY_TOKEN=long-random-string
+#META_API_VERSION=v21.0
+
 # ---- Auth (REQUIRED) ----
 COOKIE_SECRET=generate-a-random-string-at-least-32-chars
 FRONTEND_ORIGIN=http://localhost:3000
@@ -346,6 +353,10 @@ Check the dashboard:
 | `AI_IGNORE_GROUPS` | No | `true` | Ignore group messages |
 | `AI_ALLOWED_NUMBERS` | No | — | Comma-separated allowlist |
 | `WHATSAPP_SESSION_DIR` | No | `.sessions/whatsapp` | Session storage path |
+| `META_APP_SECRET` | If Meta Cloud API | — | Verifies webhook HMAC signatures — without it every Meta webhook POST is rejected (fail-closed) |
+| `ENCRYPTION_KEY` | If Meta Cloud API | — | 64 hex chars; AES-256-GCM key encrypting Meta access tokens at rest |
+| `META_WEBHOOK_VERIFY_TOKEN` | No | — | Fallback `hub.verify_token` for the Meta webhook GET handshake |
+| `META_API_VERSION` | No | `v21.0` | Graph API version pin |
 | `COOKIE_SECRET` | **Yes** | — | Cookie signing secret (32+ chars) |
 | `FRONTEND_ORIGIN` | **Yes** | `http://localhost:3000` | Frontend URL for CORS |
 | `SARVAM_API_KEY` | No | — | Enables real AI calls (`/api/calls/start-real`); leave empty to disable |

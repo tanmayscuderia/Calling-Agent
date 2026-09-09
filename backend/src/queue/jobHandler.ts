@@ -261,10 +261,34 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
 export async function processSendReplyJob(orgId: string, payload: SendReplyJobPayload): Promise<void> {
   const { accountId, chatId, text } = payload;
 
-  // Use the connection manager to find the live adapter
-  const adapter = waManager.getAdapter(accountId);
+  // Provider-aware lookup: live Baileys socket OR stateless Meta adapter.
+  const adapter = await waManager.resolveAdapter(accountId);
   if (!adapter) {
     throw new Error(`WhatsApp account ${accountId} is not connected (adapter not found)`);
+  }
+  const provider = adapter.provider ?? 'baileys';
+
+  // ── 24-hour customer service window (Meta Cloud API only) ──
+  // Free-form replies are only allowed within 24h of the customer's last
+  // message. Outside the window Meta rejects the send with error 131047;
+  // Baileys has no such restriction. Instead of burning a queue retry on
+  // a guaranteed-failure send, hand the conversation to a human and let
+  // the dashboard show it as pending.
+  if (provider === 'meta_cloud_api') {
+    const withinWindow = await isWithinServiceWindow(orgId, chatId);
+    if (!withinWindow) {
+      logger.warn(
+        { orgId, accountId, chatId },
+        '[Queue] Outside Meta 24h service window — flagging pending_human instead of sending'
+      );
+      await supabaseAdmin()
+        .from('customer_conversations')
+        .update({ status: 'pending_human', human_handoff: true })
+        .eq('org_id', orgId)
+        .eq('channel', 'whatsapp')
+        .eq('external_chat_id', chatId);
+      return;
+    }
   }
 
   try {
@@ -275,7 +299,7 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
       .from('customer_messages')
       .update({
         sent_at: new Date().toISOString(),
-        metadata: { sent: true, sent_via: 'baileys', account_id: accountId },
+        metadata: { sent: true, sent_via: provider, account_id: accountId },
       })
       .eq('org_id', orgId)
       .eq('direction', 'outbound')
@@ -285,11 +309,36 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
       .order('created_at', { ascending: false })
       .limit(1);
 
-    logger.info({ accountId, chatId, textLength: text.length }, '[Queue] Reply sent via WhatsApp');
+    logger.info({ accountId, chatId, provider, textLength: text.length }, '[Queue] Reply sent via WhatsApp');
   } catch (err: any) {
-    logger.error({ err, accountId, chatId }, '[Queue] Failed to send WhatsApp reply');
+    logger.error({ err, accountId, chatId, provider }, '[Queue] Failed to send WhatsApp reply');
     throw err; // let the queue retry
   }
+}
+
+/**
+ * Meta 24-hour customer service window check: has this customer messaged
+ * us in the last 24 hours? Free-form (non-template) sends are only
+ * permitted inside the window.
+ *
+ * Uses the conversation's `last_inbound_at` (maintained by the message
+ * pipeline). A missing conversation or timestamp counts as OUTSIDE —
+ * the safe direction (a human gets flagged rather than an illegal send
+ * being attempted).
+ */
+async function isWithinServiceWindow(orgId: string, chatId: string): Promise<boolean> {
+  const { data: conversation } = await supabaseAdmin()
+    .from('customer_conversations')
+    .select('id, last_inbound_at')
+    .eq('org_id', orgId)
+    .eq('channel', 'whatsapp')
+    .eq('external_chat_id', chatId)
+    .maybeSingle();
+
+  if (!conversation?.last_inbound_at) return false;
+  const lastInbound = new Date(conversation.last_inbound_at).getTime();
+  if (Number.isNaN(lastInbound)) return false;
+  return Date.now() - lastInbound < 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -298,7 +347,8 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
 export async function processSendLocationJob(orgId: string, payload: SendLocationJobPayload): Promise<void> {
   const { accountId, chatId, latitude, longitude, name, address } = payload;
 
-  const adapter = waManager.getAdapter(accountId);
+  // Provider-aware lookup (Baileys socket or stateless Meta adapter).
+  const adapter = await waManager.resolveAdapter(accountId);
   if (!adapter) {
     throw new Error(`WhatsApp account ${accountId} is not connected (adapter not found)`);
   }

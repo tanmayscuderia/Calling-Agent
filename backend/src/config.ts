@@ -112,6 +112,33 @@ export const config = {
     autoBootConnections: (process.env.WHATSAPP_AUTO_BOOT ?? 'true').toLowerCase() === 'true',
   },
 
+  // ── Meta Cloud API (official WhatsApp Business API) ──
+  // Dual-provider support: whatsapp_accounts rows carry provider
+  // 'baileys' (WhatsApp Web bridge) or 'meta_cloud_api' (official).
+  // Meta accounts are stateless — no socket, inbound arrives via
+  // signed webhooks (routes/whatsappWebhook.routes.ts).
+  meta: {
+    // App Secret (Meta → App Settings → Basic). Verifies the
+    // HMAC-SHA256 signature on every webhook POST. REQUIRED for the
+    // webhook: with it missing, every POST is rejected (fail-closed —
+    // ported from wacrm, where falling open was deemed unsafe).
+    appSecret: process.env.META_APP_SECRET ?? '',
+    // Graph API version pin.
+    apiVersion: process.env.META_API_VERSION ?? 'v21.0',
+    // AES-256-GCM key (64 hex chars = 32 bytes) used to encrypt Meta
+    // access tokens / verify tokens at rest in whatsapp_accounts.config.
+    // Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+    // Empty = meta account creation fails with a clear error (tokens
+    // are never stored plaintext).
+    encryptionKey: process.env.ENCRYPTION_KEY ?? '',
+    // Optional fallback verify token for GET webhook subscription
+    // (hub.verify_token) when no account row matches. Handy for
+    // single-number setups where Meta's dashboard wants one token.
+    webhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN ?? '',
+    // Per-call timeout for Graph API requests (ms).
+    requestTimeoutMs: Number(process.env.META_REQUEST_TIMEOUT_MS ?? 30000),
+  },
+
   // Process topology: run the job-queue worker inside the API process
   // (single-container default), or externalized to `src/worker.ts`
   // (docker-compose / production). See server.ts + worker.ts.

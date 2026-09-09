@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { jidDomain } from '../utils/phone';
 import { MessagingAdapter, ParsedWhatsAppMessage } from './types';
 import { parseWhatsAppMessage } from './messageParser';
 import { resolveAccountId, setAccountStatus } from './whatsappService';
@@ -67,6 +68,11 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
 
   // Contact name lookup — populated from contacts.upsert / history sync
   private contactNames: Map<string, string> = new Map();
+
+  // LID → real phone mapping — populated from contact sync events
+  // (`phoneNumber` field). WhatsApp privacy Linked IDs (xxx@lid) are NOT
+  // phone numbers; this map is how the real one gets resolved.
+  private contactPhones: Map<string, string> = new Map();
 
   // Debounced save timer for persistence
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -152,7 +158,8 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         if (data.chats) for (const c of data.chats) this.chats.set(c.id, c);
         if (data.monitoredChatIds) for (const id of data.monitoredChatIds) this.monitoredChatIds.add(id);
         if (data.contactNames) for (const [id, name] of Object.entries(data.contactNames)) this.contactNames.set(id, name as string);
-        logger.info({ chats: this.chats.size, monitored: this.monitoredChatIds.size }, 'Restored chat data from disk');
+        if (data.contactPhones) for (const [id, phone] of Object.entries(data.contactPhones)) this.contactPhones.set(id, phone as string);
+        logger.info({ chats: this.chats.size, monitored: this.monitoredChatIds.size, phones: this.contactPhones.size }, 'Restored chat data from disk');
       }
     } catch (err) {
       logger.warn({ err }, 'Could not load chat-store.json — starting fresh');
@@ -172,6 +179,7 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
         chats: Array.from(this.chats.values()),
         monitoredChatIds: Array.from(this.monitoredChatIds),
         contactNames: Object.fromEntries(this.contactNames),
+        contactPhones: Object.fromEntries(this.contactPhones),
         savedAt: new Date().toISOString(),
       };
       fs.writeFileSync(this.storePath, JSON.stringify(data, null, 2));
@@ -272,6 +280,12 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
           if (!id) continue;
           const name = contact?.name || contact?.notify || contact?.verifiedName;
           if (name) this.contactNames.set(id, name);
+          // LID→phone resolution: the real number travels in `phoneNumber`
+          const pn = contact?.phoneNumber ?? contact?.phone_number;
+          if (pn) {
+            const digits = String(pn).replace(/[^\d]/g, '');
+            if (digits) this.contactPhones.set(id, `+${digits}`);
+          }
         }
 
         // Process all chats from history sync — includes individuals!
@@ -342,6 +356,14 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
           const name = contact.name || contact.notify || contact.verifiedName;
           if (name) this.contactNames.set(id, name);
 
+          // LID→phone resolution: WhatsApp privacy Linked IDs (xxx@lid)
+          // are not phone numbers — the real one arrives in `phoneNumber`.
+          const pn = contact.phoneNumber ?? (contact as any).phone_number;
+          if (pn) {
+            const digits = String(pn).replace(/[^\d]/g, '');
+            if (digits) this.contactPhones.set(id, `+${digits}`);
+          }
+
           // KEY FIX: For individual contacts, CREATE a chat entry even without
           // message history. This is what makes individual chats appear!
           if (id.endsWith('@s.whatsapp.net') && id !== this.connectedPhone) {
@@ -373,6 +395,12 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             } else if (c.id.endsWith('@s.whatsapp.net') && c.id !== this.connectedPhone) {
               this.upsertChat({ id: c.id, name, unreadCount: 0 });
             }
+          }
+          // LID→phone resolution (same as contacts.upsert)
+          const pn = c.phoneNumber ?? (c as any).phone_number;
+          if (c.id && pn) {
+            const digits = String(pn).replace(/[^\d]/g, '');
+            if (digits) this.contactPhones.set(c.id, `+${digits}`);
           }
         }
         this.scheduleSave();
@@ -672,6 +700,23 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
             this.contactNames.get(parsed.senderId) ??
             null;
 
+          // ── LID → real phone resolution ──
+          // WhatsApp privacy Linked IDs (xxx@lid) are NOT phone numbers.
+          // Resolve the real number from contact sync when known; otherwise
+          // leave senderPhone empty — a missing phone beats a fake one
+          // (fake phones created junk leads and would break Sarvam calls).
+          if (!parsed.senderPhone && !parsed.isGroup && parsed.chatId.endsWith('@lid')) {
+            const resolved =
+              this.contactPhones.get(parsed.chatId) ??
+              this.contactPhones.get(parsed.senderId) ??
+              null;
+            if (resolved) {
+              parsed.senderPhone = resolved;
+              logger.info({ chatId: parsed.chatId, phone: resolved }, '📞 Resolved LID to real phone');
+              this.scheduleSave();
+            }
+          }
+
           // ── ROOT CAUSE FIX ──
           // For GROUPS: only process chats that are toggled ON in the dashboard.
           // For individual DMs: ALWAYS process — no manual toggle required.
@@ -835,9 +880,13 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     if (id === this.connectedPhone) return;
 
     const isGroup = id.endsWith('@g.us');
-    const phone = !isGroup ? id.split('@')[0] : undefined;
+    // Only 1:1 WhatsApp JIDs carry a real phone. LID/newsletter digits are
+    // NOT phone numbers — resolve via contactPhones, else leave undefined.
+    const isIndividual = jidDomain(id) === 's.whatsapp.net';
+    const lidResolved = this.contactPhones.get(id);
+    const phone = isIndividual ? id.split('@')[0] : lidResolved ? lidResolved.replace('+', '') : undefined;
     const contactName = this.contactNames.get(id);
-    const name = c.name || c.subject || c.notify || contactName || (isGroup ? 'Group' : phone || 'Unknown');
+    const name = c.name || c.subject || c.notify || contactName || (isGroup ? 'Group' : contactName ? contactName : phone || 'Unknown');
     const existing = this.chats.get(id);
 
     // Default: individuals monitored, groups not
@@ -985,12 +1034,12 @@ export class BaileysWhatsAppAdapter extends EventEmitter implements MessagingAda
     }
 
     const contactName = this.contactNames.get(parsed.chatId);
-    const name = existing?.name ?? contactName ?? (isGroup ? 'Group' : parsed.senderPhone ?? 'Unknown');
+    const name = existing?.name ?? contactName ?? (isGroup ? 'Group' : parsed.senderPhone || 'Unknown');
     this.chats.set(parsed.chatId, {
       id: parsed.chatId,
       name,
       isGroup,
-      phone: !isGroup ? parsed.senderPhone ?? undefined : undefined,
+      phone: !isGroup && parsed.senderPhone ? parsed.senderPhone : undefined,
       lastMessage: parsed.text.slice(0, 80),
       lastMessageAt: new Date().toISOString(),
       monitored: this.monitoredChatIds.has(parsed.chatId),

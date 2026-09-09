@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { api } from '@/lib/api';
 import { useToast } from '@/lib/toast';
+import MetaCloudConnect from '@/components/MetaCloudConnect';
 
 interface ChatInfo {
   id: string;
@@ -272,8 +273,10 @@ export default function WhatsAppPage() {
   return (
     <div style={{ maxWidth: 920 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>WhatsApp Bridge</h1>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>Monitor chats, manage AI auto-reply, and connect via Baileys (prototype)</p>
+        <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>WhatsApp</h1>
+        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>
+          Connect numbers two ways: the official Meta Cloud API (recommended) or the quick Baileys QR bridge. Both feed the same AI + CRM pipeline.
+        </p>
       </div>
 
       {/* Backend Offline Banner */}
@@ -290,6 +293,25 @@ export default function WhatsAppPage() {
           </div>
         </div>
       )}
+
+      {/* Official Meta Cloud API — connect + manage (recommended path) */}
+      <MetaCloudConnect />
+
+      {/* Baileys section label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 12px' }}>
+        <span style={{ fontSize: 18 }}>📱</span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
+            WhatsApp Web bridge (Baileys)
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '3px 8px', borderRadius: 12, verticalAlign: 'middle', marginLeft: 6 }}>
+              QUICK / DEMO
+            </span>
+          </div>
+          <div style={{ fontSize: 12.5, color: '#64748b' }}>
+            Scan a QR and you're live in seconds — unofficial, so keep volumes low and prefer the official API for real business numbers.
+          </div>
+        </div>
+      </div>
 
       {/* Hero Status Banner */}
       <div
@@ -942,9 +964,12 @@ export default function WhatsAppPage() {
         </div>
       </div>
 
-      {/* Production Note */}
+      {/* Provider note */}
       <div style={{ padding: 16, borderRadius: 12, background: '#eff6ff', fontSize: 13, color: '#1e40af', lineHeight: 1.6 }}>
-        <strong>Production Note:</strong> This prototype uses a WhatsApp Web bridge for fast demo. Production will use Meta Cloud API. The AI, CRM, and inventory workflows remain the same.
+        <strong>Two providers, one pipeline:</strong> messages from Baileys (QR) and Meta Cloud API
+        numbers land in the same leads, conversations, and AI brain — merged by phone number, alongside
+        Sarvam voice calls. Official API numbers reply free within the 24-hour customer-service window;
+        outside it the AI hands off to a human instead of sending.
       </div>
     </div>
   );

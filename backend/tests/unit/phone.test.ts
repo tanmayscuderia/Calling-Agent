@@ -21,6 +21,17 @@ describe('jidToPhone', () => {
   it('returns raw for non-digit base', () => {
     expect(jidToPhone('abc@s.whatsapp.net')).toBe('abc');
   });
+
+  it('returns EMPTY for privacy LID JIDs — the digits are NOT a phone', () => {
+    expect(jidToPhone('275101262078103@lid')).toBe('');
+    expect(jidToPhone('252780317024353@lid')).toBe('');
+  });
+
+  it('returns EMPTY for newsletters, status broadcasts and groups', () => {
+    expect(jidToPhone('120363168402828787@newsletter')).toBe('');
+    expect(jidToPhone('status@broadcast')).toBe('');
+    expect(jidToPhone('120363419202785729@g.us')).toBe('');
+  });
 });
 
 describe('normalizePhone', () => {

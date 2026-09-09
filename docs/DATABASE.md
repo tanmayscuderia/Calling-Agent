@@ -17,6 +17,7 @@ All tables, columns, relationships, and indexes.
 > - `20260107_0001_location_features.sql` — Location features + aliases support
 > - `20260108_0001_sarvam_calls.sql` — Sarvam calling: provider CHECK + `interaction_id` + `sarvam_webhook_events` + idempotency index
 > - `20260109_0001_sarvam_fixes.sql` — CHECK value fixes (`job_queue.job_type`, `call_sessions.status/provider`), re-asserts 0008
+> - `20260909_0001_meta_cloud_provider.sql` — Meta Cloud API dual-provider: `whatsapp_accounts.phone_number_id` (partially UNIQUE) + `waba_id` + org/provider index
 >
 > **Already have a live DB?** `supabase/run_missing_migrations.sql` replays every missing piece idempotently.
 
@@ -298,7 +299,7 @@ Scheduled follow-up tasks.
 
 ### `whatsapp_accounts`
 
-WhatsApp connection accounts (Baileys sessions).
+WhatsApp connection accounts — **one row per number, per provider** (`baileys` QR bridge or `meta_cloud_api` official). An org can connect both; one Meta phone number can only be claimed by one row.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -308,10 +309,12 @@ WhatsApp connection accounts (Baileys sessions).
 | `phone_number` | text | Connected phone |
 | `provider` | text | `baileys`, `meta_cloud_api`, `gupshup`, `wati`, `twilio`, `other` |
 | `status` | text | `connected`, `disconnected`, `qr_pending`, `error`, `disabled` |
-| `session_ref` | text | Session identifier |
+| `phone_number_id` | text | Meta Phone Number ID (`meta_cloud_api` rows); **UNIQUE where not null** (migration `20260909_0001`) |
+| `waba_id` | text | WhatsApp Business Account ID (`meta_cloud_api` rows) |
+| `session_ref` | text | Session identifier (Baileys) |
 | `last_connected_at` | timestamptz | |
 | `last_error` | text | |
-| `config` | jsonb | |
+| `config` | jsonb | Baileys: auto-reply flags. Meta: `phoneNumberId`, `accessToken` + `verifyToken` + `pin` (**AES-256-GCM encrypted**, `ENCRYPTION_KEY`) |
 | `metadata` | jsonb | |
 | `created_at` | timestamptz | Default `now()` |
 | `updated_at` | timestamptz | Auto-updated |

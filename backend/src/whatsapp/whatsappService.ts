@@ -90,11 +90,12 @@ export async function setAccountStatus(
 
 export async function getAccountStatus(orgId: string) {
   const sb = supabaseAdmin();
+  // NOTE: no provider filter — an org can run baileys AND meta_cloud_api
+  // accounts side by side; the dashboard shows the newest of either.
   const { data } = await sb
     .from('whatsapp_accounts')
     .select('*')
     .eq('org_id', orgId)
-    .eq('provider', config.whatsapp.provider)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -135,20 +136,36 @@ export async function handleIncomingMessage(
   const orgId = options?.orgId ?? config.defaultOrgId;
   const accountId = options?.accountId ?? (await resolveAccountId(orgId));
 
+  // System chats are never leads (status updates, channels, broadcast lists)
+  const chatDomain = parsed.chatId.split('@')[1] ?? '';
+  if (parsed.chatId === 'status@broadcast' || chatDomain === 'newsletter' || chatDomain === 'broadcast') {
+    return { reply: '', leadId: '', conversationId: '' };
+  }
+
   // 3) lead
+  // senderPhone is '' for privacy-LID chats — lead identity comes from
+  // source_detail (chatId) until contact sync resolves the real number.
   const lead = await findOrCreateLead({
     orgId,
-    phone: parsed.senderPhone,
-    whatsappNumber: parsed.senderPhone,
+    phone: parsed.senderPhone || null,
+    whatsappNumber: parsed.senderPhone || null,
     full_name: parsed.senderName ?? undefined,
     source: 'whatsapp',
     source_detail: parsed.chatId,
   });
 
-  // Backfill name if lead was created earlier without one
+  // Backfill name AND phone if lead was created earlier without them
   if (parsed.senderName && !lead.full_name) {
     await updateLead(orgId, lead.id, { full_name: parsed.senderName }).catch(() => {});
     lead.full_name = parsed.senderName;
+  }
+  if (parsed.senderPhone && (!lead.phone || !lead.whatsapp_number)) {
+    await updateLead(orgId, lead.id, {
+      phone: parsed.senderPhone,
+      whatsapp_number: parsed.senderPhone,
+    }).catch(() => {});
+    lead.phone = lead.phone || parsed.senderPhone;
+    lead.whatsapp_number = lead.whatsapp_number || parsed.senderPhone;
   }
 
   // 4) conversation
@@ -375,20 +392,40 @@ export async function enqueueIncomingMessage(
   const resolvedOrgId = orgId ?? config.defaultOrgId;
   const resolvedAccountId = accountId ?? (await resolveAccountId(resolvedOrgId));
 
+  // ── System chats are never leads ──
+  // status@broadcast (your own status updates), @newsletter channels and
+  // @broadcast lists previously became junk "leads" with garbage phones.
+  const chatDomain = parsed.chatId.split('@')[1] ?? '';
+  if (parsed.chatId === 'status@broadcast' || chatDomain === 'newsletter' || chatDomain === 'broadcast') {
+    return { leadId: '', conversationId: '', enqueued: false, reason: 'system_chat' };
+  }
+
   // 1) find/create lead
+  // NOTE: senderPhone is '' for privacy-LID chats (xxx@lid) — those digits
+  // are NOT a phone number. The lead is matched by source_detail (chatId)
+  // instead, and the real phone is backfilled once contact sync resolves it.
   const lead = await findOrCreateLead({
     orgId: resolvedOrgId,
-    phone: parsed.senderPhone,
-    whatsappNumber: parsed.senderPhone,
+    phone: parsed.senderPhone || null,
+    whatsappNumber: parsed.senderPhone || null,
     full_name: parsed.senderName ?? undefined,
     source: 'whatsapp',
     source_detail: parsed.chatId,
   });
 
-  // Backfill name if lead was created earlier without one
+  // Backfill name AND phone when the lead was created earlier without them
+  // (e.g. a LID chat whose real number just got resolved via contact sync).
   if (parsed.senderName && !lead.full_name) {
     await updateLead(resolvedOrgId, lead.id, { full_name: parsed.senderName }).catch(() => {});
     lead.full_name = parsed.senderName;
+  }
+  if (parsed.senderPhone && (!lead.phone || !lead.whatsapp_number)) {
+    await updateLead(resolvedOrgId, lead.id, {
+      phone: parsed.senderPhone,
+      whatsapp_number: parsed.senderPhone,
+    }).catch(() => {});
+    lead.phone = lead.phone || parsed.senderPhone;
+    lead.whatsapp_number = lead.whatsapp_number || parsed.senderPhone;
   }
 
   // 2) find/create conversation
