@@ -13,6 +13,8 @@ import { getAgentConfig } from '../ai/agentConfigService';
 import { llm } from '../ai/llmClient';
 import { resolveAccountId } from '../whatsapp/whatsappService';
 import { waManager } from '../whatsapp/connectionManager';
+import { classifyWithReferee } from '../whatsapp/spamGuard';
+import { checkAccountDailyLimit, recordAccountActivity } from '../auth/rateLimiter';
 
 // ============================================================
 // Job Handlers — executed by the queue worker
@@ -27,6 +29,9 @@ export interface MessageJobPayload {
   chatId: string;
   senderPhone: string | null;
   externalMessageId?: string;
+  /** Stage 1 spam heuristics tripped at enqueue → run the Stage 2 referee before replying. */
+  needsAbuseCheck?: boolean;
+  spamSignals?: string[];
 }
 
 export interface SendReplyJobPayload {
@@ -118,6 +123,59 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
       .eq('org_id', orgId);
   }
 
+  // 2b. Per-number daily gate (Phase 3) — the conversation carries the
+  // whatsapp_account_id, so a number's volume is bounded even when the org
+  // runs several numbers. Fails open when the counters table is missing.
+  const accountId: string | null = (conversation as any).whatsapp_account_id ?? null;
+  const accountCheck = await checkAccountDailyLimit(orgId, accountId);
+  if (!accountCheck.allowed) {
+    logger.warn({ orgId, accountId, reason: accountCheck.reason }, '[Queue] Per-number limit hit — flagging pending_human');
+    await updateConversation(orgId, conversationId, { human_handoff: true, status: 'pending_human' });
+    return;
+  }
+
+  // 2c. Load ALL unanswered inbound messages since the last AI reply.
+  // This is what makes reply BATCHING work: rapid follow-up questions
+  // coalesce (enqueue skips stacking jobs; the ~6s window passes; this
+  // job answers everything in one combined reply).
+  const unanswered = await loadUnansweredInbounds(orgId, conversationId);
+  const effectiveInbound =
+    unanswered.length > 0
+      ? unanswered.map((m) => m.body).filter(Boolean).join('\n')
+      : inboundText;
+
+  // 2d. Stage 2 spam referee (DeepSeek) — ONLY when Stage 1 heuristics
+  // tripped at enqueue. Genuine → reply normally. Spam/abuse → AI goes
+  // silent (pending_human) and the verdict is stored for the dashboard.
+  // Fail-open: referee errors never mute a real lead.
+  if (payload.needsAbuseCheck) {
+    const refereeTexts =
+      unanswered.length > 0 ? unanswered.map((m) => m.body) : [inboundText];
+    const verdict = await classifyWithReferee(refereeTexts.filter(Boolean));
+    const prevMeta = (conversation.metadata ?? {}) as Record<string, any>;
+    const abuseMeta = {
+      label: verdict.label,
+      confidence: verdict.confidence,
+      signals: payload.spamSignals ?? [],
+      checked_at: new Date().toISOString(),
+    };
+    await supabaseAdmin()
+      .from('customer_conversations')
+      .update({ metadata: { ...prevMeta, abuse: abuseMeta } })
+      .eq('org_id', orgId)
+      .eq('id', conversationId);
+
+    if (verdict.label !== 'genuine' && verdict.confidence >= 0.6) {
+      logger.warn(
+        { conversationId, verdict: verdict.label, confidence: verdict.confidence },
+        '[Queue] Spam referee: non-genuine — silencing AI for this conversation'
+      );
+      await updateConversation(orgId, conversationId, { human_handoff: true, status: 'pending_human' });
+      return;
+    }
+    logger.info({ conversationId, verdict: verdict.label }, '[Queue] Spam referee: genuine — proceeding');
+  }
+
   // 3. Load recent message history for context
   const recent = await recentMessagesForAgent(orgId, conversationId, 8);
 
@@ -126,7 +184,7 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
     orgId,
     lead,
     conversation,
-    inboundText,
+    inboundText: effectiveInbound,
     recentMessages: recent,
   });
 
@@ -145,7 +203,7 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
       lead_id: leadId,
       agent_type: agentType,
       model: result.model,
-      input_text: inboundText,
+      input_text: effectiveInbound,
       output_text: result.reply,
       extracted_intent: result.extractedIntent,
       extracted_data: result.extractedData as any,
@@ -170,13 +228,17 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
   });
 
   // 7. Enqueue the actual WhatsApp send (decouples LLM from network)
-  const accountId = await resolveAccountId(orgId);
+  // Per-number AI reply counter (fire-and-forget) — accountId from 2b.
+  if (accountId) {
+    recordAccountActivity(orgId, accountId, { ai_replies: 1 }).catch(() => {});
+  }
+  const sendAccountId: string = accountId ?? (await resolveAccountId(orgId));
   await supabaseAdmin().from('job_queue').insert({
     org_id: orgId,
     job_type: 'send_reply',
     payload: {
       orgId,
-      accountId,
+      accountId: sendAccountId,
       chatId,
       text: result.reply,
     } satisfies SendReplyJobPayload,
@@ -196,7 +258,7 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
         job_type: 'send_location',
         payload: {
           orgId,
-          accountId,
+          accountId: sendAccountId,
           chatId,
           latitude: lat,
           longitude: lng,
@@ -256,15 +318,73 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
 }
 
 /**
+ * Load ALL inbound messages since the last outbound (AI/human) reply —
+ * the batching primitive. The trigger message's payload only knows about
+ * ONE text; this returns everything the customer asked in the burst so
+ * the AI answers it all in one reply.
+ */
+async function loadUnansweredInbounds(
+  orgId: string,
+  conversationId: string
+): Promise<{ body: string; created_at: string }[]> {
+  const sb = supabaseAdmin();
+  const { data: lastOut } = await sb
+    .from('customer_messages')
+    .select('created_at')
+    .eq('org_id', orgId)
+    .eq('conversation_id', conversationId)
+    .eq('direction', 'outbound')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let query = sb
+    .from('customer_messages')
+    .select('body, created_at')
+    .eq('conversation_id', conversationId)
+    .eq('direction', 'inbound')
+    .order('created_at', { ascending: false })
+    .limit(8);
+  if (lastOut?.created_at) query = query.gt('created_at', lastOut.created_at);
+
+  const { data } = await query;
+  return ((data ?? []) as any[]).reverse();
+}
+
+/**
  * Send a WhatsApp reply via the active Baileys connection.
  */
 export async function processSendReplyJob(orgId: string, payload: SendReplyJobPayload): Promise<void> {
   const { accountId, chatId, text } = payload;
 
-  // Use the connection manager to find the live adapter
-  const adapter = waManager.getAdapter(accountId);
+  // Provider-aware lookup: live Baileys socket OR stateless Meta adapter.
+  const adapter = await waManager.resolveAdapter(accountId);
   if (!adapter) {
     throw new Error(`WhatsApp account ${accountId} is not connected (adapter not found)`);
+  }
+  const provider = adapter.provider ?? 'baileys';
+
+  // ── 24-hour customer service window (Meta Cloud API only) ──
+  // Free-form replies are only allowed within 24h of the customer's last
+  // message. Outside the window Meta rejects the send with error 131047;
+  // Baileys has no such restriction. Instead of burning a queue retry on
+  // a guaranteed-failure send, hand the conversation to a human and let
+  // the dashboard show it as pending.
+  if (provider === 'meta_cloud_api') {
+    const withinWindow = await isWithinServiceWindow(orgId, chatId);
+    if (!withinWindow) {
+      logger.warn(
+        { orgId, accountId, chatId },
+        '[Queue] Outside Meta 24h service window — flagging pending_human instead of sending'
+      );
+      await supabaseAdmin()
+        .from('customer_conversations')
+        .update({ status: 'pending_human', human_handoff: true })
+        .eq('org_id', orgId)
+        .eq('channel', 'whatsapp')
+        .eq('external_chat_id', chatId);
+      return;
+    }
   }
 
   try {
@@ -275,7 +395,7 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
       .from('customer_messages')
       .update({
         sent_at: new Date().toISOString(),
-        metadata: { sent: true, sent_via: 'baileys', account_id: accountId },
+        metadata: { sent: true, sent_via: provider, account_id: accountId },
       })
       .eq('org_id', orgId)
       .eq('direction', 'outbound')
@@ -285,11 +405,40 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
       .order('created_at', { ascending: false })
       .limit(1);
 
-    logger.info({ accountId, chatId, textLength: text.length }, '[Queue] Reply sent via WhatsApp');
+    logger.info({ accountId, chatId, provider, textLength: text.length }, '[Queue] Reply sent via WhatsApp');
+    // Per-number outbound counter (fire-and-forget)
+    if (accountId) {
+      recordAccountActivity(orgId, accountId, { outbound: 1 }).catch(() => {});
+    }
   } catch (err: any) {
-    logger.error({ err, accountId, chatId }, '[Queue] Failed to send WhatsApp reply');
+    logger.error({ err, accountId, chatId, provider }, '[Queue] Failed to send WhatsApp reply');
     throw err; // let the queue retry
   }
+}
+
+/**
+ * Meta 24-hour customer service window check: has this customer messaged
+ * us in the last 24 hours? Free-form (non-template) sends are only
+ * permitted inside the window.
+ *
+ * Uses the conversation's `last_inbound_at` (maintained by the message
+ * pipeline). A missing conversation or timestamp counts as OUTSIDE —
+ * the safe direction (a human gets flagged rather than an illegal send
+ * being attempted).
+ */
+async function isWithinServiceWindow(orgId: string, chatId: string): Promise<boolean> {
+  const { data: conversation } = await supabaseAdmin()
+    .from('customer_conversations')
+    .select('id, last_inbound_at')
+    .eq('org_id', orgId)
+    .eq('channel', 'whatsapp')
+    .eq('external_chat_id', chatId)
+    .maybeSingle();
+
+  if (!conversation?.last_inbound_at) return false;
+  const lastInbound = new Date(conversation.last_inbound_at).getTime();
+  if (Number.isNaN(lastInbound)) return false;
+  return Date.now() - lastInbound < 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -298,7 +447,8 @@ export async function processSendReplyJob(orgId: string, payload: SendReplyJobPa
 export async function processSendLocationJob(orgId: string, payload: SendLocationJobPayload): Promise<void> {
   const { accountId, chatId, latitude, longitude, name, address } = payload;
 
-  const adapter = waManager.getAdapter(accountId);
+  // Provider-aware lookup (Baileys socket or stateless Meta adapter).
+  const adapter = await waManager.resolveAdapter(accountId);
   if (!adapter) {
     throw new Error(`WhatsApp account ${accountId} is not connected (adapter not found)`);
   }

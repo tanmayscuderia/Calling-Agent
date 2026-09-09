@@ -222,17 +222,17 @@ describe('rateLimiter', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('blocks at max_ai_replies_per_conversation (default 10)', async () => {
+    it('blocks at max_ai_replies_per_conversation (default 500)', async () => {
       const org = freshOrg();
-      const result = await checkConversationAILimit(org, 10);
+      const result = await checkConversationAILimit(org, 500);
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain('Conversation AI reply limit');
       expect(result.fallbackMessage).toContain('connecting you with our team');
     });
 
-    it('allows at 9 (just under limit)', async () => {
+    it('allows at 499 (just under limit)', async () => {
       const org = freshOrg();
-      const result = await checkConversationAILimit(org, 9);
+      const result = await checkConversationAILimit(org, 499);
       expect(result.allowed).toBe(true);
     });
 

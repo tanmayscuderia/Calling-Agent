@@ -54,7 +54,7 @@ Go to **Settings → API**:
 
 ### Run Migrations
 
-Run all 14 migration files in order:
+Run all 16 migration files in order (or use `cd backend && npm run migrate`):
 
 ```bash
 # Option A: via psql
@@ -71,10 +71,14 @@ psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_item
 psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260830_0001_do_not_call.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260909_0001_meta_cloud_provider.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260910_0001_account_usage_daily.sql
 
 # Option B: via Supabase SQL Editor (paste each file and Run)
 # Option C (live DB): paste supabase/run_missing_migrations.sql once —
 #          it replays every missing migration idempotently
+# Option D (recommended): cd backend && npm run migrate — tracked in schema_migrations
 ```
 
 **What they create:**
@@ -93,8 +97,11 @@ psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 | `0001_location_features` | Location aliases + features for smarter search matching |
 | `0001_sarvam_calls` | Sarvam calling: provider CHECK, correlation columns, webhook audit table |
 | `0001_sarvam_fixes` | Idempotent schema alignment (job_type + call status CHECKs) |
+| `0001_do_not_call` | DNC registry + calling-guard enforcement |
+| `0001_meta_cloud_provider` | Dual-provider WhatsApp: `phone_number_id` (UNIQUE) + `waba_id` on whatsapp_accounts |
+| `0001_account_usage_daily` | Per-number daily counters (`account_usage_daily`) for per-number limits |
 
-> **Total: 14 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+> **Total: 16 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
 
 ---
 
@@ -180,6 +187,13 @@ AI_ALLOWED_NUMBERS=
 # ---- WhatsApp Bridge ----
 WHATSAPP_PROVIDER=baileys
 WHATSAPP_SESSION_DIR=.sessions/whatsapp
+
+# ---- WhatsApp Meta Cloud API (official; optional) ----
+# Enables the official provider — chosen per account in Dashboard → WhatsApp.
+#META_APP_SECRET=your-meta-app-secret        # REQUIRED for the webhook (fail-closed HMAC)
+#ENCRYPTION_KEY=64-hex-chars                 # encrypts Meta tokens at rest
+#META_WEBHOOK_VERIFY_TOKEN=long-random-string
+#META_API_VERSION=v21.0
 
 # ---- Auth (REQUIRED) ----
 COOKIE_SECRET=generate-a-random-string-at-least-32-chars
@@ -346,6 +360,10 @@ Check the dashboard:
 | `AI_IGNORE_GROUPS` | No | `true` | Ignore group messages |
 | `AI_ALLOWED_NUMBERS` | No | — | Comma-separated allowlist |
 | `WHATSAPP_SESSION_DIR` | No | `.sessions/whatsapp` | Session storage path |
+| `META_APP_SECRET` | If Meta Cloud API | — | Verifies webhook HMAC signatures — without it every Meta webhook POST is rejected (fail-closed) |
+| `ENCRYPTION_KEY` | If Meta Cloud API | — | 64 hex chars; AES-256-GCM key encrypting Meta access tokens at rest |
+| `META_WEBHOOK_VERIFY_TOKEN` | No | — | Fallback `hub.verify_token` for the Meta webhook GET handshake |
+| `META_API_VERSION` | No | `v21.0` | Graph API version pin |
 | `COOKIE_SECRET` | **Yes** | — | Cookie signing secret (32+ chars) |
 | `FRONTEND_ORIGIN` | **Yes** | `http://localhost:3000` | Frontend URL for CORS |
 | `SARVAM_API_KEY` | No | — | Enables real AI calls (`/api/calls/start-real`); leave empty to disable |

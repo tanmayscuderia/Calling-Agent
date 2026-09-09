@@ -21,7 +21,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - All tables multi-tenant (`org_id` → `organizations`)
 - Auto-updating `updated_at` triggers
 - Lead deduplication unique indexes
-- 14 migrations, all idempotent (`IF NOT EXISTS`)
+- 16 migrations, all idempotent (`IF NOT EXISTS`)
 
 ### Phase A: Multi-Tenant Auth ✅
 - Supabase Auth with httpOnly cookies (access + refresh tokens)
@@ -78,9 +78,9 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **301 unit tests (18 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser, calling guards, validation
+- **348 unit tests (23 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser, calling guards, validation, metaApi + metaEncryption + metaWebhookSignature + metaWebhookParser, spamGuard
 - **21 LLM eval blocks (8 suites)** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry
-- **301 unit + 21 eval blocks, ALL GREEN (recounted 2026-09-07 — KV layer added 11 tests)**
+- **348 unit + 21 eval blocks, ALL GREEN (recounted 2026-09-09 — dual-provider WhatsApp + LID fix +36, spam guard +11)**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
@@ -132,7 +132,7 @@ write to it — linking already works via normalized phone numbers).
   - [ ] Funnel dashboard: contacted → qualified → site visit → won, per org
 - **U3 — Production deploy**
   - [ ] VPS + domain + TLS (replace laptop + ngrok)
-  - [ ] WhatsApp Cloud API adapter path (Baileys → BSP swap behind `MessagingAdapter`)
+  - [x] WhatsApp Cloud API adapter path — **DONE (2026-09-09)**: `MetaCloudWhatsAppAdapter` + signed webhook receiver behind `MessagingAdapter` (see `docs/META_CLOUD_API.md`)
   - [ ] Multi-org onboarding flow
 
 ---
@@ -141,16 +141,16 @@ write to it — linking already works via normalized phone numbers).
 
 | Layer | Status | Notes |
 |-------|--------|-------|
-| WhatsApp Bridge | Production-ready for BSP swap | Baileys now, Meta Cloud API later via `MessagingAdapter` interface |
+| WhatsApp Bridge | **Production-ready (dual provider)** | Baileys (QR demo tier) **and** official Meta Cloud API live — per-account `provider` choice, same pipeline, 24h-window guard on Meta sends |
 | AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search |
-| Database | Production-ready | 14 migrations, multi-tenant, idempotent |
+| Database | Production-ready | 16 migrations, multi-tenant, idempotent |
 | Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |
-| CI / Deploys | Production-ready | GitHub Actions (typecheck + 301 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
+| CI / Deploys | Production-ready | GitHub Actions (typecheck + 348 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
 | Shared KV | Production-ready | Redis-backed shared state behind `REDIS_URL` (`backend/src/kv/`): rate-limit counters, LLM semaphore, config/lead/snapshot caches; memory fallback when unset — the bridge to split api/worker + multi-replica topologies |
 | Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals; edge auth gate + error boundary + React Query |
-| Testing | Strong | 301 unit tests + 21 LLM eval blocks covering unit + LLM quality |
+| Testing | Strong | 348 unit tests + 21 LLM eval blocks covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---
@@ -168,7 +168,8 @@ write to it — linking already works via normalized phone numbers).
 ## Future Phases
 
 ### Phase F: Production Polish (Next)
-- [ ] Meta Cloud API WhatsApp adapter (replace Baileys for production)
+- [x] Meta Cloud API WhatsApp adapter — **DONE (2026-09-09)**: official provider live alongside Baileys (adapter + signed webhook + onboarding UI + 24h-window guard + AES-256-GCM credential storage; `docs/META_CLOUD_API.md`). Baileys remains as the instant-demo tier
+- [x] WhatsApp LID phone resolution — **DONE (2026-09-09)**: privacy `@lid` JIDs no longer stored as fake phone numbers; real numbers resolved from contact sync and auto-backfilled (legacy junk rows cleaned via `backend/scripts/fix-lid-phones.ts`)
 - [x] Real voice calling integration — **DONE via Sarvam AI voice agents** (see `docs/SARVAM_CALLING_PLAN.md`): outbound PSTN calls, webhook result processing, LLM call summaries, lead enrichment, auto follow-ups
 - [ ] Frontend redesign — full production design system
 - [ ] WebSocket real-time message updates (no polling)

@@ -83,6 +83,32 @@ export async function findOrCreateLead(input: LeadInput) {
     }
   }
 
+  // 3.5) No stable identifier (privacy LID chats: xxx@lid) — reuse the
+  // lead already tied to THIS chat via source_detail, so every message
+  // doesn't spawn a brand-new anonymous lead. The real phone gets
+  // backfilled onto this lead once contact sync resolves it.
+  if (input.source_detail) {
+    const { data } = await sb
+      .from('crm_leads')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('source_detail', input.source_detail)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      // Backfill phone/whatsapp if the LID just resolved to a real number
+      const updates: Record<string, any> = {};
+      if (phone && !data.phone) updates.phone = phone;
+      if (wa && !data.whatsapp_number) updates.whatsapp_number = wa;
+      if (Object.keys(updates).length > 0) {
+        await sb.from('crm_leads').update(updates).eq('id', data.id);
+        Object.assign(data, updates);
+      }
+      return data;
+    }
+  }
+
   // 4) Create new lead with all available identifiers
   const { data: created, error } = await sb
     .from('crm_leads')

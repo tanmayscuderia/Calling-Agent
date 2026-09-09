@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { listConversations, getConversation, listMessages, insertMessage, updateConversation } from '../crm/conversationService';
 import { config } from '../config';
+import { logger } from '../utils/logger';
+import { waManager } from '../whatsapp/connectionManager';
 
 function orgId(req: any): string {
   return (req.query as any).orgId || config.defaultOrgId;
@@ -22,7 +24,16 @@ export async function conversationsRoutes(app: FastifyInstance) {
 
   app.patch('/api/conversations/:id', async (req) => {
     const { id } = req.params as any;
-    const conversation = await updateConversation(orgId(req), id, req.body as any);
+    const body = (req.body ?? {}) as any;
+    const conversation = await updateConversation(orgId(req), id, body) as any;
+    // ── Unified AI-toggle sync (Phase 4) ──
+    // ai_enabled flipped from the Conversations page → mirror it into the
+    // Baileys bridge monitor set so the WhatsApp page shows the same state.
+    if (conversation?.external_chat_id && typeof body.ai_enabled === 'boolean') {
+      await waManager
+        .setChatMonitorState(orgId(req), conversation.external_chat_id, body.ai_enabled)
+        .catch((e) => logger.warn({ e: e?.message, chatId: conversation.external_chat_id }, '[conv-toggle] bridge sync failed'));
+    }
     return { conversation };
   });
 

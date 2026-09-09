@@ -198,6 +198,63 @@ Send a message to a specific chat.
 
 ---
 
+## Meta Cloud API (Official WhatsApp Business)
+
+> Full setup guide: `docs/META_CLOUD_API.md`. Credentials are stored AES-256-GCM encrypted; Meta errors are surfaced verbatim.
+
+### `POST /api/whatsapp/meta/connect`
+Connect an official Meta Cloud API number: verifies credentials against Meta, registers the number for this app's webhook (needs the 2FA PIN), subscribes the WABA, encrypts secrets, inserts the account.
+
+**Request:**
+```json
+{
+  "phoneNumberId": "123456789012345",
+  "wabaId": "987654321098765",
+  "accessToken": "EAAG…",
+  "verifyToken": "any-long-random-string",
+  "pin": "123456",
+  "label": "Sales line"
+}
+```
+Only `phoneNumberId` + `accessToken` are required. `409` if the number is already claimed (by any org). Meta rejections (wrong PIN / expired token) return `400` verbatim.
+
+**Response:**
+```json
+{ "ok": true, "accountId": "uuid", "provider": "meta_cloud_api", "phone": "+919999999999", "message": "…" }
+```
+
+---
+
+### `GET /api/whatsapp/meta/accounts`
+List the org's Meta accounts (secrets redacted).
+
+---
+
+### `POST /api/whatsapp/meta/verify-registration`
+Diagnostic — lists the WABA's subscribed apps so you can confirm our app receives webhooks. Body: `{ "accountId": "uuid" }`.
+
+---
+
+### `POST /api/whatsapp/meta/disconnect`
+Set the account `status='disconnected'` (webhook events for it are ignored). Body: `{ "accountId": "uuid" }`.
+
+---
+
+### `GET /api/whatsapp/meta/webhook-info`
+Returns `{ webhookUrl, signatureVerification, accounts, instructions }` — everything the Meta App Dashboard setup needs.
+
+---
+
+### `GET /webhooks/whatsapp` (Meta subscription handshake)
+Echoes `hub.challenge` when `hub.verify_token` matches a stored account token (or `META_WEBHOOK_VERIFY_TOKEN`).
+
+---
+
+### `POST /webhooks/whatsapp` (signed event delivery)
+Verifies `x-hub-signature-256` (HMAC-SHA256 of the raw body with `META_APP_SECRET` — fail-closed), then routes messages into the standard pipeline (dedup by wamid) and mirrors `statuses` (sent/delivered/read/failed) onto `customer_messages`. Always 200 after signature OK — Meta retries must never be triggered by processing errors.
+
+---
+
 ## Inventory
 
 ### `GET /api/inventory/projects`

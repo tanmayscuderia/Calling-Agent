@@ -53,8 +53,10 @@ cp .env.example .env                            # then edit (next step)
 `.env` on the VPS — same values as local, EXCEPT:
 
 ```bash
-PUBLIC_BASE_URL=https://api.<your-domain>       # no ngrok anymore
+PUBLIC_BASE_URL=https://api.<your-domain>       # no ngrok anymore — also the Meta webhook base URL
 REDIS_URL=                                      # leave unset — compose injects it
+META_APP_SECRET=<from Meta App Settings>        # enables the official Cloud API webhook
+ENCRYPTION_KEY=<openssl rand -hex 32>           # encrypts Meta tokens at rest
 ```
 
 ## Migrations (once, then per release)
@@ -64,7 +66,7 @@ REDIS_URL=                                      # leave unset — compose inject
 
 ```bash
 cd backend
-npm run migrate -- --baseline   # FIRST TIME ONLY: records the 14 legacy files
+npm run migrate -- --baseline   # FIRST TIME ONLY: records the 16 legacy files
 npm run migrate                 # applies anything pending (e.g. do_not_call)
 ```
 

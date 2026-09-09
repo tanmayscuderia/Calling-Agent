@@ -30,8 +30,23 @@ Complete list of every capability the app has, organized by module.
 
 ---
 
-## 1. WhatsApp Bridge (Baileys)
+## 1. WhatsApp Bridge — Dual Provider
 
+WhatsApp runs on **two providers, chosen per account** in Dashboard → WhatsApp. Both feed the identical lead → conversation → queue → AI pipeline and merge by phone number with Sarvam calls.
+
+### Provider A: Official Meta Cloud API (`provider='meta_cloud_api'`) — recommended
+| Feature | Description |
+|---------|-------------|
+| **Credential Connect** | Paste Phone Number ID + access token (+ WABA ID, verify token, 6-digit 2FA PIN) — verified against Meta before storage |
+| **Encrypted Credentials** | Access token / verify token / PIN stored AES-256-GCM encrypted (`ENCRYPTION_KEY`) — never plaintext, never echoed to the UI |
+| **Signed Webhook Receiver** | `POST /webhooks/whatsapp` verifies `X-Hub-Signature-256` HMAC (fail-closed without `META_APP_SECRET`); always 200 after signature OK (no retry storms) |
+| **Number Registration** | Connect flow calls `/register` (claims inbound webhooks for this app) + `/subscribed_apps` (WABA subscription), both idempotent |
+| **24-Hour Window Guard** | Free-form replies only inside the customer-service window — outside it the job flags `pending_human` instead of a guaranteed-failure send |
+| **Delivery Receipts** | `statuses` webhooks mirror sent/delivered/read/failed onto `customer_messages` |
+| **Read Receipts** | Inbound messages can be blue-ticked via the Graph API |
+| **Idempotent Inbound** | wamid deduplication (same mechanism as Baileys replay protection) |
+
+### Provider B: Baileys WhatsApp Web bridge (`provider='baileys'`) — instant demo
 | Feature | Description |
 |---------|-------------|
 | **QR Login** | Scan QR code from WhatsApp → Linked Devices to connect |
@@ -44,7 +59,6 @@ Complete list of every capability the app has, organized by module.
 | **Allowlist** | Only respond to numbers in `AI_ALLOWED_NUMBERS` env var |
 | **Own Message Filter** | Ignores messages sent by the bot itself (`key.fromMe`) |
 | **Multi-format Parsing** | Handles text, image, audio, video, document, location messages |
-| **MessagingAdapter Interface** | Clean interface so Baileys can be swapped for Meta Cloud API later |
 | **Individual DMs Always On** | 1:1 chats are always monitored — no manual toggle needed (groups still need toggle) |
 | **Decryption Auto-Heal** | Detects signal session desyncs and repairs them automatically (soft reconnect → full relink) |
 | **Non-Text Message Handling** | Voice notes, images, documents get synthesized placeholder text so they're not dropped |
@@ -52,6 +66,13 @@ Complete list of every capability the app has, organized by module.
 | **Contact Name Enrichment** | Chat list enriched with saved contact names from WhatsApp sync events |
 | **Chat Persistence** | Chat list + monitoring toggles persisted to disk — survives server restarts |
 | **Bulk Toggle** | "Select All / Deselect All" for group monitoring from the dashboard |
+
+### Shared WhatsApp intelligence (both providers)
+| Feature | Description |
+|---------|-------------|
+| **MessagingAdapter Interface** | `BaileysWhatsAppAdapter` (stateful socket) and `MetaCloudWhatsAppAdapter` (stateless) implement the same contract — the queue, AI, and CRM never branch on provider |
+| **LID → Real Phone Resolution** | WhatsApp privacy Linked IDs (`xxx@lid`) are **not** phone numbers — real numbers are resolved from contact-sync `phoneNumber` fields and auto-backfilled onto leads; `status@broadcast` / `@newsletter` chats never become leads |
+| **JID-Canonical IDs** | Both providers emit the same chat ID format, so conversations, lead merge, and history survive a provider migration on the same number |
 
 ---
 
@@ -430,7 +451,7 @@ separate silo.
 | Item | What shipped |
 |------|--------------|
 | **Calling guards enforced** | `start-real` now actually enforces what the README promised: IST calling hours (env-toggleable), daily call limits (`checkCallAllowed` was dead code), and a Do-Not-Call registry (`do_not_call` table + `/api/calls/dnc` CRUD). New module: `backend/src/sarvam/callingGuards.ts`. `recordCall` now increments usage counters. |
-| **CI** | `.github/workflows/ci.yml` — backend typecheck + 301 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
+| **CI** | `.github/workflows/ci.yml` — backend typecheck + 348 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
 | **Docker** | `backend/Dockerfile` (multi-stage), `frontend/Dockerfile`, `docker-compose.yml` (api + dedicated worker + frontend), `.dockerignore`. |
 | **Migration runner** | `backend/scripts/migrate.ts` + `npm run migrate` — `schema_migrations` table, applies only unapplied files, one transaction each. `--baseline` records legacy files without re-running (protects demo seed from duplication). |
 | **Git hygiene** | `backend/logs/` (Sarvam transcripts with real customer PII) untracked; `.gitignore` covers the whole logs dir. History scrub deferred (security wave). |
@@ -439,5 +460,6 @@ separate silo.
 | **Worker split** | `backend/src/worker.ts` standalone queue-worker process (`npm run worker` / `start:worker`); API keeps in-process worker by default, `WORKER_IN_PROCESS=false` externalizes it (docker-compose runs it as its own service). WhatsApp bridge + inbound poller stay with the API process. |
 | **Frontend** | `src/middleware.ts` edge gate (no session cookie → dashboard HTML never sent), route-level `error.tsx` boundary (no more white-screen on render errors), React Query provider; leads + conversations pages migrated off manual fetch/setInterval to cached, deduped queries (5s polling preserved via `refetchInterval`). |
 | **Docs truth pass** | Test counts recounted: **301 unit (18 files) + 21 eval blocks (8 suites)** — fixed stale 150/241/296/331 figures across README, ARCHITECTURE, ROADMAP, PROJECT_CONTEXT; FEATURES §16 stale "400 malformed webhook" row corrected. |
+| **Dual-provider WhatsApp + LID fix (2026-09-09)** | Official Meta Cloud API provider live (adapter, signed webhook, onboarding UI, 24h-window guard, AES-256-GCM credentials — `docs/META_CLOUD_API.md`); WhatsApp LID JIDs no longer stored as fake phones (contact-sync resolution + auto-backfill; legacy rows cleaned via `backend/scripts/fix-lid-phones.ts`); test counts now **348 unit (23 files)**. |
 | **Shared KV layer (2026-09-07)** | `backend/src/kv/` — Redis backend (ioredis) behind `REDIS_URL` for rate-limit counters, LLM concurrency semaphore (10-min crash lease), and lead/snapshot/config caches (version-bump invalidation); permanent memory fallback when unset. The WORKER's cache invalidation now reaches the API process in split topologies. Kafka deliberately rejected — Postgres `job_queue` covers documented scale. |
 | **VPS deployment (2026-09-07)** | Target locked: Hostinger KVM 16 GB (8 GB stack budget). Runbook `docs/DEPLOYMENT.md`: compose memory caps (backend/worker 1.5 GB, frontend 512 MB, redis 512 MB), `wa-sessions` volume (WhatsApp survives redeploys), Caddy TLS, ngrok dropped on VPS. |

@@ -18,6 +18,8 @@ import { uploadRoutes } from './routes/upload.routes';
 import { leadsRoutes } from './routes/leads.routes';
 import { conversationsRoutes } from './routes/conversations.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
+import { whatsappMetaRoutes } from './routes/whatsappMeta.routes';
+import { whatsappWebhookRoutes } from './routes/whatsappWebhook.routes';
 import { callsRoutes } from './routes/calls.routes';
 import { sarvamWebhookRoutes } from './routes/sarvamWebhook.routes';
 import { sarvamToolsRoutes } from './routes/sarvamTools.routes';
@@ -57,6 +59,8 @@ async function start() {
   await app.register(leadsRoutes);
   await app.register(conversationsRoutes);
   await app.register(whatsappRoutes);
+  await app.register(whatsappMetaRoutes);
+  await app.register(whatsappWebhookRoutes);
   await app.register(callsRoutes);
   await app.register(sarvamWebhookRoutes);
   await app.register(sarvamToolsRoutes);

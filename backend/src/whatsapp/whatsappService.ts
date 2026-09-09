@@ -2,6 +2,8 @@ import { supabaseAdmin } from '../db/supabase';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ParsedWhatsAppMessage } from './types';
+import { runSpamHeuristics } from './spamGuard';
+import { recordAccountActivity } from '../auth/rateLimiter';
 import { findOrCreateLead, updateLead, computeStatus } from '../crm/leadService';
 import {
   findOrCreateConversation,
@@ -90,11 +92,12 @@ export async function setAccountStatus(
 
 export async function getAccountStatus(orgId: string) {
   const sb = supabaseAdmin();
+  // NOTE: no provider filter — an org can run baileys AND meta_cloud_api
+  // accounts side by side; the dashboard shows the newest of either.
   const { data } = await sb
     .from('whatsapp_accounts')
     .select('*')
     .eq('org_id', orgId)
-    .eq('provider', config.whatsapp.provider)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -135,20 +138,36 @@ export async function handleIncomingMessage(
   const orgId = options?.orgId ?? config.defaultOrgId;
   const accountId = options?.accountId ?? (await resolveAccountId(orgId));
 
+  // System chats are never leads (status updates, channels, broadcast lists)
+  const chatDomain = parsed.chatId.split('@')[1] ?? '';
+  if (parsed.chatId === 'status@broadcast' || chatDomain === 'newsletter' || chatDomain === 'broadcast') {
+    return { reply: '', leadId: '', conversationId: '' };
+  }
+
   // 3) lead
+  // senderPhone is '' for privacy-LID chats — lead identity comes from
+  // source_detail (chatId) until contact sync resolves the real number.
   const lead = await findOrCreateLead({
     orgId,
-    phone: parsed.senderPhone,
-    whatsappNumber: parsed.senderPhone,
+    phone: parsed.senderPhone || null,
+    whatsappNumber: parsed.senderPhone || null,
     full_name: parsed.senderName ?? undefined,
     source: 'whatsapp',
     source_detail: parsed.chatId,
   });
 
-  // Backfill name if lead was created earlier without one
+  // Backfill name AND phone if lead was created earlier without them
   if (parsed.senderName && !lead.full_name) {
     await updateLead(orgId, lead.id, { full_name: parsed.senderName }).catch(() => {});
     lead.full_name = parsed.senderName;
+  }
+  if (parsed.senderPhone && (!lead.phone || !lead.whatsapp_number)) {
+    await updateLead(orgId, lead.id, {
+      phone: parsed.senderPhone,
+      whatsapp_number: parsed.senderPhone,
+    }).catch(() => {});
+    lead.phone = lead.phone || parsed.senderPhone;
+    lead.whatsapp_number = lead.whatsapp_number || parsed.senderPhone;
   }
 
   // 4) conversation
@@ -375,20 +394,40 @@ export async function enqueueIncomingMessage(
   const resolvedOrgId = orgId ?? config.defaultOrgId;
   const resolvedAccountId = accountId ?? (await resolveAccountId(resolvedOrgId));
 
+  // ── System chats are never leads ──
+  // status@broadcast (your own status updates), @newsletter channels and
+  // @broadcast lists previously became junk "leads" with garbage phones.
+  const chatDomain = parsed.chatId.split('@')[1] ?? '';
+  if (parsed.chatId === 'status@broadcast' || chatDomain === 'newsletter' || chatDomain === 'broadcast') {
+    return { leadId: '', conversationId: '', enqueued: false, reason: 'system_chat' };
+  }
+
   // 1) find/create lead
+  // NOTE: senderPhone is '' for privacy-LID chats (xxx@lid) — those digits
+  // are NOT a phone number. The lead is matched by source_detail (chatId)
+  // instead, and the real phone is backfilled once contact sync resolves it.
   const lead = await findOrCreateLead({
     orgId: resolvedOrgId,
-    phone: parsed.senderPhone,
-    whatsappNumber: parsed.senderPhone,
+    phone: parsed.senderPhone || null,
+    whatsappNumber: parsed.senderPhone || null,
     full_name: parsed.senderName ?? undefined,
     source: 'whatsapp',
     source_detail: parsed.chatId,
   });
 
-  // Backfill name if lead was created earlier without one
+  // Backfill name AND phone when the lead was created earlier without them
+  // (e.g. a LID chat whose real number just got resolved via contact sync).
   if (parsed.senderName && !lead.full_name) {
     await updateLead(resolvedOrgId, lead.id, { full_name: parsed.senderName }).catch(() => {});
     lead.full_name = parsed.senderName;
+  }
+  if (parsed.senderPhone && (!lead.phone || !lead.whatsapp_number)) {
+    await updateLead(resolvedOrgId, lead.id, {
+      phone: parsed.senderPhone,
+      whatsapp_number: parsed.senderPhone,
+    }).catch(() => {});
+    lead.phone = lead.phone || parsed.senderPhone;
+    lead.whatsapp_number = lead.whatsapp_number || parsed.senderPhone;
   }
 
   // 2) find/create conversation
@@ -421,6 +460,11 @@ export async function enqueueIncomingMessage(
     rawPayload: parsed.raw,
   });
 
+  // Per-number activity counter (fire-and-forget — must never block inbound)
+  if (resolvedAccountId) {
+    recordAccountActivity(resolvedOrgId, resolvedAccountId, { inbound: 1 }).catch(() => {});
+  }
+
   // 4) guards -- don't even enqueue if AI shouldn't respond
   if (!config.whatsapp.autoReply) {
     return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'auto_reply_disabled' };
@@ -446,8 +490,51 @@ export async function enqueueIncomingMessage(
     });
   }
 
+  // 4b) Reply batching — if a job for this conversation is ALREADY queued,
+  // don't stack another one. The queued job loads ALL unanswered messages
+  // when it runs, so the customer gets ONE combined reply to everything
+  // they asked (how a human salesperson reads a message burst).
+  const { data: pendingJob } = await supabaseAdmin()
+    .from('job_queue')
+    .select('id, payload')
+    .eq('org_id', resolvedOrgId)
+    .eq('job_type', 'process_message')
+    .eq('payload->>conversationId', conversation.id)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle();
+
+  // 4c) Stage 1 spam heuristics (free) — liberal thresholds; tripping only
+  // hands the conversation to the Stage 2 referee in the worker.
+  const spam = await runSpamHeuristics(resolvedOrgId, conversation.id, parsed.senderPhone, parsed.text);
+
+  if (pendingJob) {
+    // Hand the referee flag to the already-queued job so a burst that trips
+    // heuristics mid-batch still gets adjudicated.
+    if (spam.tripped) {
+      const mergedPayload = {
+        ...((pendingJob as any).payload ?? {}),
+        needsAbuseCheck: true,
+        spamSignals: spam.signals,
+      };
+      await supabaseAdmin()
+        .from('job_queue')
+        .update({ payload: mergedPayload })
+        .eq('id', (pendingJob as any).id);
+      logger.warn({ chatId: parsed.chatId, signals: spam.signals }, '[batch] flagged pending job for abuse check');
+    }
+    logger.info(
+      { chatId: parsed.chatId, conversationId: conversation.id },
+      'Pending job exists — message batched into it (no new job)'
+    );
+    return { leadId: lead.id, conversationId: conversation.id, enqueued: false, reason: 'batched_with_pending_job' };
+  }
+
   // 5) enqueue processing job
   // NOTE: locked_by / locked_until are set by the dequeue_job() RPC, not here.
+  // next_retry_at doubles as a ~6s BATCHING WINDOW: rapid follow-up messages
+  // within the window coalesce (the job loads all unanswered messages when
+  // it runs, not just the trigger).
   const { error } = await supabaseAdmin().from('job_queue').insert({
     org_id: resolvedOrgId,
     job_type: 'process_message',
@@ -459,10 +546,13 @@ export async function enqueueIncomingMessage(
       chatId: parsed.chatId,
       senderPhone: parsed.senderPhone,
       externalMessageId: parsed.externalMessageId,
+      needsAbuseCheck: spam.tripped,
+      spamSignals: spam.signals,
     },
     status: 'pending',
     priority: 5,
     scheduled_at: new Date().toISOString(),
+    next_retry_at: new Date(Date.now() + 6000).toISOString(),
   });
 
   if (error) {
