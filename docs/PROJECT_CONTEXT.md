@@ -96,7 +96,7 @@ Save outbound customer_messages + ai_agent_runs
 
 ## 4. Database Schema
 
-### 14 Migration Files (run in order)
+### 15 Migration Files (run in order)
 
 ```
 supabase/migrations/
@@ -113,6 +113,8 @@ supabase/migrations/
 ├── 20260107_0001_location_features.sql           — Location aliases for search matching
 ├── 20260108_0001_sarvam_calls.sql                — Sarvam: provider CHECK, correlation columns, webhook audit table
 ├── 20260109_0001_sarvam_fixes.sql                — Idempotent schema alignment (job_type + call status CHECKs)
+├── 20260830_0001_do_not_call.sql                 — DNC registry + calling-guard enforcement
+├── 20260909_0001_meta_cloud_provider.sql         — Meta Cloud API: phone_number_id (UNIQUE) + waba_id on whatsapp_accounts
 ```
 
 > **Live DB repair:** `supabase/run_missing_migrations.sql` replays everything missing idempotently — paste into the Supabase SQL editor.
@@ -501,7 +503,7 @@ PORT=4000
 
 ### Database
 ```bash
-# Run all 14 migrations in order
+# Run all 15 migrations in order
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0001_real_estate_ai_prototype.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260101_0002_demo_seed.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260102_0001_multi_tenant_production.sql
@@ -602,7 +604,7 @@ Calling Agent/
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
 │       ├── unit/                # 337 unit tests (22 files)
-│       └── evals/               # 91 LLM eval tests (8 files)
+│       ├── evals/               # 21 LLM eval blocks (8 files)
 ├── frontend/
 │   └── src/
 │       ├── app/
@@ -612,7 +614,7 @@ Calling Agent/
 │       │   └── globals.css      # Tailwind + custom classes
 │       ├── components/          # CallDemoModal, motion/
 │       └── lib/                 # api.ts, auth.tsx, animations.ts
-├── supabase/migrations/         # 14 SQL migration files
+├── supabase/migrations/         # 15 SQL migration files
 └── docs/                        # 10 documentation files (this one + 9 others)
 ```
 

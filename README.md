@@ -169,8 +169,10 @@ All details are in `docs/`:
 
 | Doc | What's Inside |
 |-----|---------------|
+| **[RULES.md](./docs/RULES.md)** | ⚡ **Engineering guardrails** — MUST/NEVER rules for WhatsApp (both providers), LID ≠ phone, Sarvam, data hygiene + mistakes-we-made. Read first |
 | **[SETUP.md](./docs/SETUP.md)** | Step-by-step setup, user creation, org linking, troubleshooting |
 | **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** | System design, data flow diagrams, queue pipeline, security model |
+| **[META_CLOUD_API.md](./docs/META_CLOUD_API.md)** | Official WhatsApp Cloud API provider — setup, architecture, 24h-window behavior |
 | **[API_REFERENCE.md](./docs/API_REFERENCE.md)** | Every endpoint documented with request/response examples |
 | **[FEATURES.md](./docs/FEATURES.md)** | Complete feature list across all phases |
 | **[DATABASE.md](./docs/DATABASE.md)** | All table schemas, indexes, triggers |
@@ -207,7 +209,7 @@ Calling Agent/
 │       ├── app/dashboard/  # leads, conversations, inventory, calls, agent-settings, playground, followups
 │       ├── components/     # CallDemoModal, motion/ (MotionPage, MotionCard, etc.)
 │       └── lib/            # api.ts, auth.tsx, animations.ts (shared motion variants)
-├── supabase/migrations/  # 14 SQL migration files
+├── supabase/migrations/  # 15 SQL migration files
 └── docs/                 # 17 documentation files
 ```
 

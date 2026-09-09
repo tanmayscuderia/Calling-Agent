@@ -21,7 +21,7 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - All tables multi-tenant (`org_id` → `organizations`)
 - Auto-updating `updated_at` triggers
 - Lead deduplication unique indexes
-- 14 migrations, all idempotent (`IF NOT EXISTS`)
+- 15 migrations, all idempotent (`IF NOT EXISTS`)
 
 ### Phase A: Multi-Tenant Auth ✅
 - Supabase Auth with httpOnly cookies (access + refresh tokens)
@@ -143,7 +143,7 @@ write to it — linking already works via normalized phone numbers).
 |-------|--------|-------|
 | WhatsApp Bridge | **Production-ready (dual provider)** | Baileys (QR demo tier) **and** official Meta Cloud API live — per-account `provider` choice, same pipeline, 24h-window guard on Meta sends |
 | AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search |
-| Database | Production-ready | 14 migrations, multi-tenant, idempotent |
+| Database | Production-ready | 15 migrations, multi-tenant, idempotent |
 | Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |

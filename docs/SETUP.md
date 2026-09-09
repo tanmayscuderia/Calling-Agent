@@ -54,7 +54,7 @@ Go to **Settings → API**:
 
 ### Run Migrations
 
-Run all 14 migration files in order:
+Run all 15 migration files in order:
 
 ```bash
 # Option A: via psql
@@ -71,10 +71,13 @@ psql "$DATABASE_URL" -f supabase/migrations/20260106_0001_generic_inventory_item
 psql "$DATABASE_URL" -f supabase/migrations/20260107_0001_location_features.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260108_0001_sarvam_calls.sql
 psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260830_0001_do_not_call.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260909_0001_meta_cloud_provider.sql
 
 # Option B: via Supabase SQL Editor (paste each file and Run)
 # Option C (live DB): paste supabase/run_missing_migrations.sql once —
 #          it replays every missing migration idempotently
+# Option D (recommended): cd backend && npm run migrate — tracked in schema_migrations
 ```
 
 **What they create:**
@@ -93,8 +96,10 @@ psql "$DATABASE_URL" -f supabase/migrations/20260109_0001_sarvam_fixes.sql
 | `0001_location_features` | Location aliases + features for smarter search matching |
 | `0001_sarvam_calls` | Sarvam calling: provider CHECK, correlation columns, webhook audit table |
 | `0001_sarvam_fixes` | Idempotent schema alignment (job_type + call status CHECKs) |
+| `0001_do_not_call` | DNC registry + calling-guard enforcement |
+| `0001_meta_cloud_provider` | Dual-provider WhatsApp: `phone_number_id` (UNIQUE) + `waba_id` on whatsapp_accounts |
 
-> **Total: 14 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
+> **Total: 15 migrations.** All are idempotent (`CREATE TABLE IF NOT EXISTS`) — safe to re-run.
 
 ---
 

@@ -99,7 +99,7 @@
 ## Complete File Map & Module Connections
 
 Every file, what it does, and what it connects to. Surveyed 2026-09-07
-(76 backend modules, ~12.9k lines + frontend).
+(83 backend modules, ~15k lines + frontend — grew 2026-09-09 with the dual-provider WhatsApp layer).
 
 ### Entry points & orchestration
 
@@ -1061,7 +1061,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 301 tests across 18 files (no LLM, instant)
+├── unit/                          ← 337 tests across 22 files (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing

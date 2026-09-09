@@ -73,7 +73,7 @@ Step-by-step walkthrough to demonstrate the full product to a client.
 3. On your phone: WhatsApp → Settings → Linked Devices → Link a Device
 4. Scan the QR code
 
-**Say:** "The bridge connects via WhatsApp Web. This is for prototype speed — production uses Meta Cloud API."
+**Say:** "We have two ways to connect — the official Meta Cloud API (recommended, zero ban risk, what we just added) and this WhatsApp Web bridge for instant demos. Both feed the exact same AI and CRM."
 
 **Status changes to:** `connected`
 
