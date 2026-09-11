@@ -42,7 +42,7 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
   // 2. LLM Extraction
   const extractionUserPrompt = buildExtractionUserPrompt(inboundText, lead, recentMessages);
   const extractionPrompt = buildExtractionPrompt(cfg);
-  const { data: extracted, model: extractModel } = await llm.generateJson(
+  const { data: extracted, model: extractModel, tokensIn: exIn, tokensOut: exOut, costUsd: exCost } = await llm.generateJson(
     extractionUserPrompt,
     extractionPrompt
   );
@@ -70,7 +70,7 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
     extractedData: ex,
   });
   const systemPrompt = buildSystemPrompt(cfg, templateCtx);
-  const { text: reply, model: replyModel } = await llm.generateText(
+  const { text: reply, model: replyModel, tokensIn: repIn, tokensOut: repOut, costUsd: repCost } = await llm.generateText(
     replyUserPrompt,
     systemPrompt,
     { temperature: 0.7, maxTokens: wantsAllOptions ? 800 : 550 }
@@ -107,6 +107,10 @@ export async function respondToMessage(input: BaseAgentInput): Promise<GenericAg
     shouldHandoff,
     model: `${extractModel}+${replyModel}`,
     latencyMs: Date.now() - start,
+    // Token/cost accounting (extraction call + reply call, incl. retries)
+    tokensIn: (exIn ?? 0) + (repIn ?? 0),
+    tokensOut: (exOut ?? 0) + (repOut ?? 0),
+    costUsd: (exCost ?? 0) + (repCost ?? 0),
     mediaToSend: null,
     quickReplies,
   };

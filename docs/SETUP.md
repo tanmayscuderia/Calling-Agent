@@ -364,6 +364,9 @@ Check the dashboard:
 | `ENCRYPTION_KEY` | If Meta Cloud API | — | 64 hex chars; AES-256-GCM key encrypting Meta access tokens at rest |
 | `META_WEBHOOK_VERIFY_TOKEN` | No | — | Fallback `hub.verify_token` for the Meta webhook GET handshake |
 | `META_API_VERSION` | No | `v21.0` | Graph API version pin |
+| `LLM_INPUT_COST_PER_1M` | No | `0.27` | DeepSeek input price (USD/1M tok) for the Usage & Cost page |
+| `LLM_OUTPUT_COST_PER_1M` | No | `1.10` | DeepSeek output price (USD/1M tok) |
+| `SARVAM_COST_PER_MINUTE` | No | `0` | Sarvam call rate (INR/min) — cost shown on Usage page when set |
 | `COOKIE_SECRET` | **Yes** | — | Cookie signing secret (32+ chars) |
 | `FRONTEND_ORIGIN` | **Yes** | `http://localhost:3000` | Frontend URL for CORS |
 | `SARVAM_API_KEY` | No | — | Enables real AI calls (`/api/calls/start-real`); leave empty to disable |

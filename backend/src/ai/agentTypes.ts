@@ -131,6 +131,10 @@ export interface GenericAgentResult {
   shouldHandoff: boolean;
   model: string;
   latencyMs: number;
+  /** Token/cost accounting (extraction + reply calls, incl. retries). */
+  tokensIn?: number;
+  tokensOut?: number;
+  costUsd?: number;
   mediaToSend?: { url: string; fileName?: string; caption?: string; mimeType?: string } | null;
   quickReplies?: string[];
 }

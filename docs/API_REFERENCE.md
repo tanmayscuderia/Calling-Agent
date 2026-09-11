@@ -255,6 +255,29 @@ Verifies `x-hub-signature-256` (HMAC-SHA256 of the raw body with `META_APP_SECRE
 
 ---
 
+## Usage & Cost
+
+### `GET /api/usage/summary?days=7`
+Usage + cost dashboard feed. `days` = lookback (1–90, default 7).
+
+**Response:**
+```json
+{
+  "ok": true,
+  "period": { "days": 7, "from": "…", "to": "…" },
+  "pricing": { "llmInputCostPer1M": 0.27, "llmOutputCostPer1M": 1.1, "sarvamCostPerMinuteInr": 0 },
+  "daily": [{ "date": "2026-09-09", "aiRuns": 42, "tokensIn": 81000, "tokensOut": 21000, "messagesSent": 40, "costUsd": 0.045 }],
+  "totals": { "aiRuns": 210, "tokensIn": 401000, "tokensOut": 96000, "messagesSent": 190, "llmCostUsd": 0.213 },
+  "accounts": [{ "id": "uuid", "label": "Sales line", "provider": "meta_cloud_api", "todayInbound": 12, "todayOutbound": 10, "todayAiReplies": 9, "limits": { "max_ai_replies_per_day": null, "max_messages_per_day": null }, "aiCost7dUsd": 0.031 }],
+  "sarvam": { "calls": 6, "completed": 5, "totalMinutes": 9.4, "inbound": 2, "outbound": 4, "costInr": null },
+  "topConversations": [{ "conversationId": "uuid", "aiReplies": 38, "limit": 500, "customerName": "Ravi", "customerPhone": "+91999…" }],
+  "limits": { "…org_usage_limits row…" }
+}
+```
+> LLM `cost_usd` is recorded per AI run since 2026-09-09 (older runs show 0). Sarvam cost is computed at read time from call minutes × `SARVAM_COST_PER_MINUTE` — `null` when the rate is unset.
+
+---
+
 ## Inventory
 
 ### `GET /api/inventory/projects`

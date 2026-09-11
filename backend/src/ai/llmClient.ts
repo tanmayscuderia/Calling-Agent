@@ -170,6 +170,11 @@ export interface LlmResponse {
   text: string;
   model: string;
   latencyMs: number;
+  /** Tokens consumed (from provider usage stats; 0 when unavailable). */
+  tokensIn: number;
+  tokensOut: number;
+  /** Estimated USD cost via config.llm.pricing rates. */
+  costUsd: number;
 }
 
 export interface ChatOptions {
@@ -242,6 +247,9 @@ class LlmClient {
         text: 'Thank you for your message. Our team will get back to you shortly.',
         model: 'fallback',
         latencyMs: Date.now() - start,
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: 0,
       };
     }
 
@@ -253,6 +261,9 @@ class LlmClient {
         text: 'Thank you for your message. Our team will get back to you shortly.',
         model: 'budget_exhausted',
         latencyMs: Date.now() - start,
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: 0,
       };
     }
 
@@ -284,6 +295,11 @@ class LlmClient {
     logger.debug({ provider: config.llm.provider, model, jsonMode: opts.jsonMode, thinking: opts.thinking }, 'LLM chat request');
 
     // Wrapped: concurrency limit → retry with backoff → timeout
+    // Token/cost accounting — accumulated across retry attempts so the
+    // usage dashboard reflects what the provider actually charged.
+    let tokensIn = 0;
+    let tokensOut = 0;
+
     const text = await withConcurrencyLimit(async () => {
       return withRetry(async () => {
         const controller = new AbortController();
@@ -325,8 +341,11 @@ class LlmClient {
             throw error;
           }
 
-          // Log usage if available (DeepSeek returns usage stats)
+          // Capture usage if available (DeepSeek returns usage stats).
+          // Retries also consume tokens — accumulate, don't overwrite.
           if (json?.usage) {
+            tokensIn += Number(json.usage.prompt_tokens ?? 0);
+            tokensOut += Number(json.usage.completion_tokens ?? 0);
             logger.debug(
               {
                 promptTokens: json.usage.prompt_tokens,
@@ -352,7 +371,12 @@ class LlmClient {
       });
     });
 
-    return { text, model, latencyMs: Date.now() - start };
+    // Defensive: mocked/partial configs may lack pricing → cost 0 (never crash)
+    const pricing = (config.llm as any).pricing ?? {};
+    const costUsd =
+      (tokensIn / 1_000_000) * (pricing.inputCostPer1M ?? 0) +
+      (tokensOut / 1_000_000) * (pricing.outputCostPer1M ?? 0);
+    return { text, model, latencyMs: Date.now() - start, tokensIn, tokensOut, costUsd };
   }
 
   /** Generate text from a single user prompt + optional system prompt. */
@@ -376,7 +400,7 @@ class LlmClient {
     userPrompt: string,
     systemPrompt?: string,
     opts?: { temperature?: number; thinking?: boolean }
-  ): Promise<{ data: any; raw: string; model: string; latencyMs: number }> {
+  ): Promise<{ data: any; raw: string; model: string; latencyMs: number; tokensIn: number; tokensOut: number; costUsd: number }> {
     const res = await this.generateText(userPrompt, systemPrompt, {
       temperature: opts?.temperature ?? 0.1,
       jsonMode: true, // Enable native JSON mode
@@ -399,19 +423,30 @@ class LlmClient {
       res.text = fallbackRes.text;
       res.model = fallbackRes.model;
       res.latencyMs += fallbackRes.latencyMs;
+      res.tokensIn += fallbackRes.tokensIn;
+      res.tokensOut += fallbackRes.tokensOut;
+      res.costUsd += fallbackRes.costUsd;
     }
 
     const cleaned = stripJsonFences(res.text);
+    const usage = {
+      raw: res.text,
+      model: res.model,
+      latencyMs: res.latencyMs,
+      tokensIn: res.tokensIn,
+      tokensOut: res.tokensOut,
+      costUsd: res.costUsd,
+    };
     try {
-      return { data: JSON.parse(cleaned), raw: res.text, model: res.model, latencyMs: res.latencyMs };
+      return { data: JSON.parse(cleaned), ...usage };
     } catch (e) {
       logger.warn({ raw: res.text }, 'LLM JSON parse failed, attempting extraction');
       const extracted = extractJsonObject(cleaned);
       try {
-        return { data: JSON.parse(extracted), raw: res.text, model: res.model, latencyMs: res.latencyMs };
+        return { data: JSON.parse(extracted), ...usage };
       } catch {
         logger.error({ raw: res.text }, 'LLM JSON parse failed completely');
-        return { data: {}, raw: res.text, model: res.model, latencyMs: res.latencyMs };
+        return { data: {}, ...usage };
       }
     }
   }

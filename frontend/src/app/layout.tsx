@@ -14,6 +14,7 @@ const navItems = [
   { href: '/dashboard', label: 'Overview', icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
   { href: '/dashboard/playground', label: 'AI Playground', icon: 'M9 2v6l-4 8a2 2 0 002 3h10a2 2 0 002-3l-4-8V2M9 2h6M9 14h6' },
   { href: '/dashboard/whatsapp', label: 'WhatsApp', icon: 'M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z' },
+  { href: '/dashboard/usage', label: 'Usage', icon: 'M3 3v18h18M9 17V9m4 8V5m4 12v-6' },
   { href: '/dashboard/conversations', label: 'Conversations', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
   { href: '/dashboard/leads', label: 'Leads', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75' },
   { href: '/dashboard/followups', label: 'Follow-ups', icon: 'M9 11l3 3l8-8M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11' },
