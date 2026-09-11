@@ -65,12 +65,44 @@ function maskHeaders(headers: Record<string, unknown> | undefined): Record<strin
 const FLAT_VARIABLE_KEYS = new Set([
   'customer_name', 'city', 'location', 'configuration',
   'budget_min', 'budget_max', 'budget', 'purpose', 'timeline', 'phone',
+  'caller_phone', // Sarvam "caller_phone" chip (on_end Body template)
 ]);
+
+/**
+ * Parse a raw `call_transcript` STRING (the "Call transcript" chip emits
+ * plain text, not the [{role,en_text}] array of interaction_transcript)
+ * into turn rows. Recognizes "AI:"/"Agent:" and "User:"/"Customer:" line
+ * prefixes; unlabelled lines are appended to the previous turn.
+ */
+function parseTranscriptString(raw: string): Array<{ role: string; en_text: string }> {
+  const rows: Array<{ role: string; en_text: string }> = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const m = trimmed.match(/^(AI|Agent|Bot|User|Customer|Human)\s*[:：]\s*(.*)$/i);
+    if (m) {
+      const role = /^(ai|agent|bot)$/i.test(m[1]) ? 'ai' : 'user';
+      rows.push({ role, en_text: m[2] });
+    } else if (rows.length > 0) {
+      rows[rows.length - 1].en_text += ` ${trimmed}`;
+    } else {
+      rows.push({ role: 'user', en_text: trimmed });
+    }
+  }
+  return rows;
+}
 
 function pickString(body: Record<string, unknown>, keys: string[]): string | undefined {
   for (const k of keys) {
     const v = body[k];
-    if (typeof v === 'string' && v.trim() !== '') return v.trim();
+    if (typeof v === 'string') {
+      const t = v.trim();
+      // Empty or unresolved Body-template placeholder (the picker has no
+      // "status" chip, so {{status}} can interpolate to its own literal) —
+      // treat as absent so status inference / attempt-id fallback kick in.
+      if (t === '' || /^\{\{.*\}\}$/.test(t)) continue;
+      return t;
+    }
     if (typeof v === 'number') return String(v);
   }
   return undefined;
@@ -109,7 +141,13 @@ export function normalizeSarvamPayload(
   }
   const flat: Record<string, unknown> = {};
   for (const k of FLAT_VARIABLE_KEYS) {
-    if (body[k] !== undefined && body[k] !== null && body[k] !== '') flat[k] = body[k];
+    const v = body[k];
+    if (v === undefined || v === null || v === '') continue;
+    // Unresolved Body-template placeholders (dashboard "Send" test fires the
+    // raw template; an unset output var can interpolate to its own name) —
+    // never patch "{{city}}" into a lead.
+    if (typeof v === 'string' && /^\{\{.*\}\}$/.test(v.trim())) continue;
+    flat[k] = v;
   }
   if (Object.keys(flat).length > 0) {
     variables = { ...(variables ?? {}), ...flat };
@@ -118,19 +156,51 @@ export function normalizeSarvamPayload(
   if (!body.attempt_id) notes.push(`attempt_id aliased from ${attemptId ? 'call/interaction id field' : 'generated'}`);
   if (!body.status) notes.push('status aliased from disposition/outcome field');
 
+  // Transcript: prefer the canonical interaction_transcript array; fall back
+  // to the raw call_transcript STRING (Sarvam "Call transcript" chip) parsed
+  // into turn rows.
+  let transcript = (body.interaction_transcript as SarvamWebhookPayload['interaction_transcript']) ?? null;
+  if (!transcript && typeof body.call_transcript === 'string' && body.call_transcript.trim()) {
+    transcript = parseTranscriptString(body.call_transcript);
+    notes.push('call_transcript string parsed into interaction_transcript turns');
+  }
+
+  // Status inference: dashboard Body templates often omit a status chip
+  // (Sarvam exposes no "status" chip in the on_end editor). When the body
+  // carries evidence a real conversation happened — non-zero duration or a
+  // non-empty transcript — treat it as connected instead of the safe
+  // 'unknown' (which mapStatus turns into 'failed' and kills the summary).
+  let effectiveStatus = status;
+  if (!effectiveStatus) {
+    const durationNum = typeof body.duration === 'number' ? body.duration : Number(body.duration);
+    const hasCall = (Number.isFinite(durationNum) && durationNum > 0) ||
+      (transcript && transcript.length > 0);
+    effectiveStatus = hasCall ? 'connected' : 'unknown';
+    if (hasCall) notes.push('status inferred as connected (duration/transcript present, no status chip)');
+  }
+
+  // Duration: Body templates mark fields "Text", so Sarvam may interpolate
+  // the number as a STRING ("94") — coerce numeric strings, else undefined
+  // (finalizeCall falls back to computing from started_at).
+  let duration: number | undefined;
+  if (typeof body.duration === 'number') duration = body.duration;
+  else if (typeof body.duration === 'string' && body.duration.trim() !== '') {
+    const n = Number(body.duration.trim());
+    if (Number.isFinite(n)) duration = n;
+  }
+
   return {
     notes,
     payload: {
       attempt_id: attemptId ?? `unknown-${Date.now()}`,
-      status: (status ?? 'unknown').toLowerCase() as SarvamWebhookPayload['status'],
+      status: (effectiveStatus ?? 'unknown').toLowerCase() as SarvamWebhookPayload['status'],
       channel_info: (body.channel_info as SarvamWebhookPayload['channel_info']) ?? undefined,
-      duration: typeof body.duration === 'number' ? body.duration : undefined,
+      duration,
       interaction_id: (typeof body.interaction_id === 'string' ? body.interaction_id : null) ?? null,
       failure_reason: typeof body.failure_reason === 'string' ? body.failure_reason : null,
       final_agent_variables: variables ?? null,
       webhook_config: (body.webhook_config as SarvamWebhookPayload['webhook_config']) ?? null,
-      interaction_transcript:
-        (body.interaction_transcript as SarvamWebhookPayload['interaction_transcript']) ?? null,
+      interaction_transcript: transcript,
     },
   };
 }

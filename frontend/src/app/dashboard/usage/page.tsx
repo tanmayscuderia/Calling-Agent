@@ -42,7 +42,7 @@ const statLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <div className="card" style={{ padding: 18, borderTop: `3px solid ${accent}` }}>
+    <div className="card" style={{ padding: 18 }}>
       <div style={statLabel}>{label}</div>
       <div style={{ ...statValue, marginTop: 6 }}>{value}</div>
       {sub && <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>{sub}</div>}

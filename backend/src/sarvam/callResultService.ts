@@ -78,6 +78,7 @@ const VARIABLE_ALIASES: Record<string, string> = {
   city: 'preferred_city',
   location: 'preferred_location',
   budget: 'budget_max',
+  caller_phone: 'phone', // Sarvam on_end "caller_phone" chip
 };
 
 /**
