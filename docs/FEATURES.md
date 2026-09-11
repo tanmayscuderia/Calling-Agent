@@ -434,6 +434,48 @@ inside Sarvam's harness ("अरे, है क्या तू" garbage + force
 
 ### Channel Unification Status (2026-08-30)
 
+---
+
+## 17. Usage & Cost Dashboard ✅ COMPLETE (2026-09-09)
+
+| Feature | Description |
+|---------|-------------|
+| **LLM Cost Tracking** | Every AI reply captures real token usage from DeepSeek's API response; cost computed from env-configured rates (`LLM_INPUT_COST_PER_1M` / `LLM_OUTPUT_COST_PER_1M`), persisted per run |
+| **Sarvam Cost** | Call minutes × `SARVAM_COST_PER_MINUTE` (INR) computed at read time; hidden until rate is set |
+| **Per-Number Usage** | `account_usage_daily` tracks inbound/outbound/AI replies per connected number (UNIQUE per account+day) |
+| **Per-Number Limits** | Each number gets its own daily caps via `whatsapp_accounts.config.limits` JSONB — defaults 300 AI replies / 400 messages per day; enforcement fails open |
+| **Usage Page** | `/dashboard/usage` — 7/30/90-day switcher, stat cards, daily bar chart, per-number table with provider badges and 7d cost, top conversations vs cap, rate footnote |
+| **24-Hour Window Guard** | Meta Cloud API replies outside the customer-service window flag `pending_human` instead of attempting a doomed send |
+
+---
+
+## 18. Reply Batching + Spam Guard ✅ COMPLETE (2026-09-09)
+
+| Feature | Description |
+|---------|-------------|
+| **Reply Batching** | Rapid follow-up questions coalesce into ONE combined AI reply (6s window via `next_retry_at`; enqueue skips stacking jobs) |
+| **Spam Guard Stage 1** | Free heuristics: burst ≥15/5min, daily ≥100/phone, ≥3-of-last-4 near-duplicate texts (unicode-aware bigram Jaccard) |
+| **Spam Guard Stage 2** | DeepSeek referee classifies genuine/spam/abuse/bot_loop ONLY when Stage 1 trips; non-genuine ≥0.6 confidence → AI silenced, `pending_human` |
+| **Fail-Open** | Heuristic and referee errors never mute real leads — cost bounded by daily token budgets |
+| **Verdict Storage** | `customer_conversations.metadata.abuse` — label, confidence, signals, timestamp |
+
+---
+
+## 19. Dual-Provider WhatsApp (Baileys + Meta Cloud API) ✅ COMPLETE (2026-09-09)
+
+| Feature | Description |
+|---------|-------------|
+| **Two Providers, One Pipeline** | Baileys (QR bridge, stateful socket) and Meta Cloud API (signed webhook, stateless) implement the same `MessagingAdapter` — inbound converges on the same `ParsedWhatsAppMessage` |
+| **Meta Onboarding UI** | `/dashboard/whatsapp` → Official API card: connect form (verify→encrypt→register), accounts list with provider badges, webhook setup helper |
+| **LID ≠ Phone** | Privacy Linked IDs (`xxx@lid`) never stored as phones; real numbers resolved from contact-sync `phoneNumber` fields, auto-backfilled onto leads |
+| **Encrypted Credentials** | Meta access tokens / verify tokens / PIN stored AES-256-GCM encrypted (`ENCRYPTION_KEY`) — never plaintext, never echoed |
+| **Signed Webhook** | `POST /webhooks/whatsapp` verifies `X-Hub-Signature-256` HMAC (fail-closed); always 200 after signature OK |
+| **Per-Number Uniqueness** | Partial unique index on `phone_number_id` — one Meta number = one CRM account |
+
+---
+
+### Hardening Wave (2026-08-30)
+
 | Channel | Code | Live state | Remaining |
 |---------|------|------------|-----------|
 | Voice (Sarvam) | ✅ | ✅ LIVE — hooks proven 13/13, zero dispatch failures | Dashboard: on_end Body template + Hook #1 phone chip |

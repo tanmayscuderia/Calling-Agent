@@ -17,6 +17,9 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
 12. **348 unit tests + 21 LLM eval blocks, all green** (recounted 2026-09-09)
 13. **Dual WhatsApp providers live** — official Meta Cloud API + Baileys QR bridge, chosen per account at connect time (see `docs/META_CLOUD_API.md`)
+14. **Usage & Cost dashboard** — LLM tokens/cost (DeepSeek), Sarvam call minutes/cost, per-number activity vs limits, at `/dashboard/usage`
+15. **Reply batching + spam guard** — rapid questions batched into one combined reply (~6s window); two-stage spam referee (heuristics → DeepSeek) silences floods but passes genuine chatty customers
+16. **Per-number limits** — each connected number gets its own daily AI-reply/message caps (defaults 300/400), configured via `whatsapp_accounts.config.limits`
 14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend / redis), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 15. **VPS-ready (2026-09-07)** — Redis-backed shared state behind `REDIS_URL` (memory fallback: rate-limit counters, LLM concurrency semaphore, config/lead/snapshot caches), WhatsApp session persistence volume, memory-capped compose services, and a full deployment runbook: **`docs/DEPLOYMENT.md`** (Hostinger 16 GB VPS, 8 GB stack budget)
 

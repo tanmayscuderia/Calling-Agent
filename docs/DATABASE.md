@@ -322,6 +322,23 @@ WhatsApp connection accounts — **one row per number, per provider** (`baileys`
 
 ---
 
+### `account_usage_daily`
+
+Per-number daily usage counters (migration `20260910_0001`). Powers per-number limits and the Usage & Cost dashboard.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `org_id` | uuid FK → organizations | CASCADE |
+| `account_id` | uuid FK → whatsapp_accounts | CASCADE; **UNIQUE** per `(account_id, usage_date)` |
+| `usage_date` | date | Default `current_date` |
+| `inbound_count` | integer | Messages received on this number today |
+| `outbound_count` | integer | Messages sent from this number today |
+| `ai_replies` | integer | AI replies sent on this number today |
+| `updated_at` | timestamptz | Auto-updated |
+
+---
+
 ### `customer_conversations`
 
 Conversation threads per customer.
