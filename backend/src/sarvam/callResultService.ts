@@ -145,6 +145,21 @@ function nonConnectedOutcome(status: string): string {
   }
 }
 
+/**
+ * Sarvam's APIs return the literal string 'NO_FAILURE_REASON' (and similar
+ * placeholders) when a call had NO failure — treating that as a real failure
+ * produced sessions summarized as "Call failed: NO_FAILURE_REASON". Normalize
+ * placeholders/empty to null so downstream code sees "no failure".
+ */
+export function cleanFailureReason(raw?: string | null): string | null {
+  if (!raw) return null;
+  const t = String(raw).trim();
+  if (!t) return null;
+  if (t.toUpperCase() === 'NONE') return null;
+  if (/^no[_-]?(failure(_reason)?|reason|error)$/i.test(t)) return null;
+  return t;
+}
+
 export async function processCallResultJob(orgId: string, job: CallResultJobPayload): Promise<void> {
   const p = job.payload;
   const sb = supabaseAdmin();
@@ -207,7 +222,9 @@ export async function processCallResultJob(orgId: string, job: CallResultJobPayl
     transcriptRows,
     durationSec: p.duration ?? null,
     agentVariables: p.final_agent_variables,
-    fallbackSummary: p.failure_reason ? `Call failed: ${p.failure_reason}` : null,
+    fallbackSummary: cleanFailureReason(p.failure_reason)
+      ? `Call failed: ${cleanFailureReason(p.failure_reason)}`
+      : null,
     fallbackOutcome: p.status === 'connected' ? null : nonConnectedOutcome(p.status),
     extraPatch,
     persistTurns: true,
@@ -422,9 +439,8 @@ export async function ingestInboundAttempt(
   }
 
   const extraPatch: Record<string, unknown> = { interaction_id: att.interaction_id ?? opts.payload?.interaction_id ?? null };
-  if (att.failure_reason || opts.payload?.failure_reason) {
-    extraPatch.failure_reason = att.failure_reason ?? opts.payload?.failure_reason;
-  }
+  const failureReason = cleanFailureReason(att.failure_reason ?? opts.payload?.failure_reason);
+  if (failureReason) extraPatch.failure_reason = failureReason;
   if (att.audio_url) extraPatch.recording_url = att.audio_url;
 
   await finalizeCall({
@@ -435,12 +451,11 @@ export async function ingestInboundAttempt(
     transcriptRows,
     durationSec: opts.payload?.duration ?? att.duration_in_seconds ?? null,
     agentVariables: opts.payload?.final_agent_variables ?? att.agent_variables ?? null,
-    fallbackSummary:
-      att.failure_reason || opts.payload?.failure_reason
-        ? `Call failed: ${att.failure_reason ?? opts.payload?.failure_reason}`
-        : sarvamStatus === 'connected'
-          ? 'Inbound call to AI agent'
-          : null,
+    fallbackSummary: failureReason
+      ? `Call failed: ${failureReason}`
+      : sarvamStatus === 'connected'
+        ? 'Inbound call to AI agent'
+        : null,
     fallbackOutcome: sarvamStatus === 'connected' ? null : nonConnectedOutcome(sarvamStatus),
     extraPatch,
     persistTurns: true,

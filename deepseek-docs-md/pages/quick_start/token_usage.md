@@ -15,4 +15,16 @@ However, due to the different tokenization methods used by different models, the
 
 You can run the demo tokenizer code in the following zip package to calculate the token usage for your intput/output.
 
-[deepseek\_tokenizer.zip](https://cdn.deepseek.com/api-docs/deepseek_v3_tokenizer.zip)
+[deepseek\_tokenizer.zip](https://cdn.deepseek.com/api-docs/deepseek_v4_tokenizer.zip)
+
+## Calculate image token usage[​](https://api-docs.deepseek.com/quick_start/token_usage#calculate-image-token-usage "Direct link to Calculate image token usage")
+
+You can estimate the number of tokens consumed by an image based on its dimensions. Images are automatically resized before inference, and there is an upper bound on the number of tokens per image; for details, see [Vision](https://api-docs.deepseek.com/guides/vision#token-usage).
+
+This is an estimate only; the actual number of tokens produced during processing may vary slightly, so refer to the usage returned by the API as the source of truth.
+
+#### Image Token Calculator
+
+Width (px)
+
+Height (px)

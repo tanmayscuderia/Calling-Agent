@@ -12,25 +12,25 @@ How DeepSeek is integrated into this project, and where to find specific API det
 | Setting | Value | Source |
 |---------|-------|--------|
 | **Provider** | `deepseek` | `config.ts` → `LLM_PROVIDER` env |
-| **Model** | `deepseek-v4-flash` | Hardcoded in `config.ts` (see below) |
+| **Model** | `deepseek-flash` (DeepSeek-V4.1-Flash) | Hardcoded in `config.ts` (see below) |
 | **Base URL** | `https://api.deepseek.com` | `DEEPSEEK_BASE_URL` env (no `/v1` suffix) |
 | **Endpoint** | `POST /chat/completions` | OpenAI-compatible |
 | **Auth** | `Bearer ${DEEPSEEK_API_KEY}` | Standard Bearer token |
 | **JSON Mode** | `response_format: {type: "json_object"}` | Used in `generateJson()` |
 | **API Key URL** | https://platform.deepseek.com/api_keys | |
 
-> **Model is hardcoded:** The model is locked to `deepseek-v4-flash` in `backend/src/config.ts` (line 50) for maximum speed and lowest cost across all tasks (WhatsApp replies, call summaries, intent extraction). To change it, edit `config.ts` — the `DEEPSEEK_MODEL` env var is **not** read.
+> **Model is hardcoded:** The model is locked to `deepseek-flash` (DeepSeek-V4.1-Flash, released 2026-09-10; the legacy name `deepseek-v4-flash` still routes to it but is retired) in `backend/src/config.ts` for maximum speed and lowest cost across all tasks (WhatsApp replies, call summaries, intent extraction). To change it, edit `config.ts` — the `DEEPSEEK_MODEL` env var is **not** read.
 >
 > ```typescript
 > // backend/src/config.ts (line 46-53)
 > deepseek: {
 >   apiKey: required('DEEPSEEK_API_KEY'),
->   model: 'deepseek-v4-flash',  // ← hardcoded, not env-controlled
+>   model: 'deepseek-flash',  // ← hardcoded, not env-controlled (V4.1-Flash)
 >   baseUrl: process.env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com',
 > },
 > ```
 
-> **Deprecation Notice:** `deepseek-chat` and `deepseek-reasoner` deprecate on **2026/07/24**. We use `deepseek-v4-flash` which is the current model.
+> **Deprecation Notice:** `deepseek-chat` and `deepseek-reasoner` deprecate on **2026/07/24**. We use `deepseek-flash` (DeepSeek-V4.1-Flash, released 2026-09-10) which is the current model — the legacy name `deepseek-v4-flash` still routes to it but is retired.
 > See: [`deepseek-docs-md/pages/updates.md`](../deepseek-docs-md/pages/updates.md)
 
 ---
@@ -69,7 +69,7 @@ await llm.generateText(userPrompt, systemPrompt, {
 
 ```json
 {
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "messages": [
     { "role": "system", "content": "You are a sales assistant..." },
     { "role": "user", "content": "I want a 3BHK in Noida" }

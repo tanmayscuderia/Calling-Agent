@@ -540,7 +540,7 @@ Get conversation + all messages.
       "direction": "outbound",
       "body": "Yes, we have options...",
       "ai_generated": true,
-      "ai_model": "deepseek-v4-flash",
+      "ai_model": "deepseek-flash",
       "created_at": "..."
     }
   ]
@@ -865,7 +865,7 @@ Check LLM provider configuration.
 ```json
 {
   "provider": "deepseek",
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "configured": true
 }
 ```

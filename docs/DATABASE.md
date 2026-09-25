@@ -394,7 +394,7 @@ Individual messages within conversations.
 | `media_url` | text | |
 | `media_mime_type` | text | |
 | `ai_generated` | boolean | Default false |
-| `ai_model` | text | e.g. `deepseek-v4-flash` |
+| `ai_model` | text | e.g. `deepseek-flash` |
 | `ai_confidence` | numeric | |
 | `raw_payload` | jsonb | Full message payload |
 | `metadata` | jsonb | |
@@ -423,7 +423,7 @@ Audit log for every LLM call.
 | `lead_id` | uuid FK → crm_leads | SET NULL |
 | `message_id` | uuid FK → customer_messages | SET NULL |
 | `agent_type` | text | `real_estate_whatsapp`, `calling_agent`, `lead_qualifier`, `knowledge_search`, `other` |
-| `model` | text | e.g. `deepseek-v4-flash` |
+| `model` | text | e.g. `deepseek-flash` |
 | `input_text` | text | |
 | `output_text` | text | |
 | `extracted_intent` | text | |

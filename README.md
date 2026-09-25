@@ -260,3 +260,27 @@ The platform is production-ready with a durable job queue, retry logic, crash re
 **Channel status (2026-09-09):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls. WhatsApp is now **dual-provider**: the official **Meta Cloud API** path is fully built (adapter, signed webhook receiver, onboarding UI, 24h-window guard, encrypted credentials — `docs/META_CLOUD_API.md`) alongside the proven Baileys bridge (753+ messages; currently disabled — re-enable via Dashboard → WhatsApp → QR scan). WhatsApp privacy LIDs are resolved to real phone numbers via contact sync (`docs/ARCHITECTURE.md` → message lifecycle). All channels write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
 
 See **[ROADMAP.md](./docs/ROADMAP.md)** for full details.
+
+## FONT - TRUEFITT & HILL
+.premium-heading {
+  /* 1. The Font Family */
+  font-family: 'Montserrat', 'Gotham', -apple-system, sans-serif;
+  
+  /* 2. All Caps */
+  text-transform: uppercase;
+  
+  /* 3. The Secret Sauce: Generous Letter Spacing */
+  letter-spacing: 0.12em; /* Pushes the letters apart elegantly */
+  
+  /* 4. Font Weight */
+  font-weight: 500; /* Medium weight - not too thin, not too bold */
+  
+  /* 5. Clean Font Smoothing (Crucial for Mac/iOS devices) */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* 6. Optical Balance */
+  line-height: 1.2;
+  color: #1a1a1a; /* A soft, premium off-black rather than harsh #000 */
+}
+

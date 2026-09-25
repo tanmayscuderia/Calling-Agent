@@ -1,21 +1,31 @@
 {
   "source": "https://api-docs.deepseek.com",
-  "generatedAt": "2026-07-08T16:46:33.832Z",
+  "generatedAt": "2026-09-25T07:25:30.073Z",
   "pages": [
     {
-      "title": "Create Chat Completion",
+      "title": "Chat Completions API",
       "url": "https://api-docs.deepseek.com/api/create-chat-completion",
       "relativePath": "api/create-chat-completion.md"
     },
     {
-      "title": "Create FIM Completion (Beta)",
+      "title": "FIM Completion API (Beta)",
       "url": "https://api-docs.deepseek.com/api/create-completion",
       "relativePath": "api/create-completion.md"
     },
     {
-      "title": "DeepSeek API",
-      "url": "https://api-docs.deepseek.com/api/deepseek-api",
-      "relativePath": "api/deepseek-api.md"
+      "title": "Upload File",
+      "url": "https://api-docs.deepseek.com/api/create-file",
+      "relativePath": "api/create-file.md"
+    },
+    {
+      "title": "Responses API",
+      "url": "https://api-docs.deepseek.com/api/create-response",
+      "relativePath": "api/create-response.md"
+    },
+    {
+      "title": "Delete File",
+      "url": "https://api-docs.deepseek.com/api/delete-file",
+      "relativePath": "api/delete-file.md"
     },
     {
       "title": "Get User Balance",
@@ -23,17 +33,22 @@
       "relativePath": "api/get-user-balance.md"
     },
     {
+      "title": "List Files",
+      "url": "https://api-docs.deepseek.com/api/list-files",
+      "relativePath": "api/list-files.md"
+    },
+    {
       "title": "Lists Models",
       "url": "https://api-docs.deepseek.com/api/list-models",
       "relativePath": "api/list-models.md"
     },
     {
-      "title": "FAQ",
-      "url": "https://api-docs.deepseek.com/faq",
-      "relativePath": "faq.md"
+      "title": "Retrieve File",
+      "url": "https://api-docs.deepseek.com/api/retrieve-file",
+      "relativePath": "api/retrieve-file.md"
     },
     {
-      "title": "Anthropic API",
+      "title": "Using the Anthropic API",
       "url": "https://api-docs.deepseek.com/guides/anthropic_api",
       "relativePath": "guides/anthropic_api.md"
     },
@@ -43,14 +58,14 @@
       "relativePath": "guides/chat_prefix_completion.md"
     },
     {
-      "title": "Integrate with AI Tools",
-      "url": "https://api-docs.deepseek.com/guides/coding_agents",
-      "relativePath": "guides/coding_agents.md"
-    },
-    {
       "title": "V3.1-Terminus Comparison Testing",
       "url": "https://api-docs.deepseek.com/guides/comparison_testing",
       "relativePath": "guides/comparison_testing.md"
+    },
+    {
+      "title": "Files API",
+      "url": "https://api-docs.deepseek.com/guides/files_api",
+      "relativePath": "guides/files_api.md"
     },
     {
       "title": "FIM Completion (Beta)",
@@ -73,6 +88,11 @@
       "relativePath": "guides/multi_round_chat.md"
     },
     {
+      "title": "Using the Responses API",
+      "url": "https://api-docs.deepseek.com/guides/responses_api",
+      "relativePath": "guides/responses_api.md"
+    },
+    {
       "title": "Thinking Mode",
       "url": "https://api-docs.deepseek.com/guides/thinking_mode",
       "relativePath": "guides/thinking_mode.md"
@@ -81,6 +101,11 @@
       "title": "Tool Calls",
       "url": "https://api-docs.deepseek.com/guides/tool_calls",
       "relativePath": "guides/tool_calls.md"
+    },
+    {
+      "title": "Vision",
+      "url": "https://api-docs.deepseek.com/guides/vision",
+      "relativePath": "guides/vision.md"
     },
     {
       "title": "Your First API Call",
@@ -163,9 +188,19 @@
       "relativePath": "news/news260424.md"
     },
     {
-      "title": "Integrate with AstrBot",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/astrbot",
-      "relativePath": "quick_start/agent_integrations/astrbot.md"
+      "title": "DeepSeek-V4-Pro GA Release",
+      "url": "https://api-docs.deepseek.com/news/news260813",
+      "relativePath": "news/news260813.md"
+    },
+    {
+      "title": "DeepSeek-V4-Flash-Vision-Exp Release: Multimodal API Now Live",
+      "url": "https://api-docs.deepseek.com/news/news260821",
+      "relativePath": "news/news260821.md"
+    },
+    {
+      "title": "DeepSeek-V4.1-Flash: Smarter, Faster, More Efficient",
+      "url": "https://api-docs.deepseek.com/news/news260910",
+      "relativePath": "news/news260910.md"
     },
     {
       "title": "Integrate with Claude Code",
@@ -173,49 +208,14 @@
       "relativePath": "quick_start/agent_integrations/claude_code.md"
     },
     {
-      "title": "Integrate with GitHub Copilot CLI",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/copilot_cli",
-      "relativePath": "quick_start/agent_integrations/copilot_cli.md"
-    },
-    {
-      "title": "Integrate with Crush",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/crush",
-      "relativePath": "quick_start/agent_integrations/crush.md"
-    },
-    {
-      "title": "Integrate with Deep Code",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/deepcode",
-      "relativePath": "quick_start/agent_integrations/deepcode.md"
-    },
-    {
-      "title": "Integrate with GitHub Copilot",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/github_copilot",
-      "relativePath": "quick_start/agent_integrations/github_copilot.md"
+      "title": "Integrate with Codex",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/codex",
+      "relativePath": "quick_start/agent_integrations/codex.md"
     },
     {
       "title": "Integrate with Hermes Agent",
       "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/hermes",
       "relativePath": "quick_start/agent_integrations/hermes.md"
-    },
-    {
-      "title": "Integrate with Kilo Code",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/kilo_code",
-      "relativePath": "quick_start/agent_integrations/kilo_code.md"
-    },
-    {
-      "title": "Integrate with Langcli",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/langcli",
-      "relativePath": "quick_start/agent_integrations/langcli.md"
-    },
-    {
-      "title": "Integrating nanobot",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/nanobot",
-      "relativePath": "quick_start/agent_integrations/nanobot.md"
-    },
-    {
-      "title": "Using DeepSeek with Oh My Pi",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/oh_my_pi",
-      "relativePath": "quick_start/agent_integrations/oh_my_pi.md"
     },
     {
       "title": "Integrate with OpenClaw",
@@ -228,9 +228,9 @@
       "relativePath": "quick_start/agent_integrations/opencode.md"
     },
     {
-      "title": "Integrate with Pi",
-      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono",
-      "relativePath": "quick_start/agent_integrations/pi_mono.md"
+      "title": "Integrate with Qoder",
+      "url": "https://api-docs.deepseek.com/quick_start/agent_integrations/qoder",
+      "relativePath": "quick_start/agent_integrations/qoder.md"
     },
     {
       "title": "Integrate with Reasonix",

@@ -201,7 +201,7 @@ export interface ChatOptions {
  *
  * DeepSeek docs: https://api-docs.deepseek.com
  * - Base URL: https://api.deepseek.com (no /v1 suffix)
- * - Models: deepseek-v4-flash (fast), deepseek-v4-pro (quality)
+ * - Models: deepseek-flash = V4.1-Flash (fast), deepseek-v4-pro (quality)
  * - JSON mode: response_format: { type: "json_object" }
  * - Thinking: thinking: { type: "enabled" }, reasoning_effort: "high"
  */
@@ -279,10 +279,18 @@ class LlmClient {
       body.response_format = { type: 'json_object' };
     }
 
-    // DeepSeek thinking mode for complex reasoning (extraction, summaries)
-    if (opts.thinking && config.llm.provider === 'deepseek') {
-      body.thinking = { type: 'enabled' };
-      body.reasoning_effort = opts.reasoningEffort ?? 'medium';
+    // DeepSeek thinking mode. V4.1-Flash (deepseek-flash) DEFAULTS to thinking
+    // at effort 'high' — left alone, every WhatsApp reply would reason first
+    // (slower + pricier, and tight max_tokens budgets get eaten by reasoning).
+    // So: explicitly DISABLE unless the caller opts in for complex reasoning
+    // (extraction, summaries), which sets its own effort level.
+    if (config.llm.provider === 'deepseek') {
+      if (opts.thinking) {
+        body.thinking = { type: 'enabled' };
+        body.reasoning_effort = opts.reasoningEffort ?? 'medium';
+      } else {
+        body.thinking = { type: 'disabled' };
+      }
     }
 
     if (opts.maxTokens) {

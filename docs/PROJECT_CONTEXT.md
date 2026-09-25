@@ -35,7 +35,7 @@
 | **Auth** | Supabase Auth + httpOnly cookies (session-based, XSS-proof) |
 | **WhatsApp Bridge** | `@whiskeysockets/baileys` (QR demo tier) + Meta Cloud API v21.0 (official) |
 | **Voice Calling** | Sarvam AI voice agents (real PSTN calls + webhooks; see `docs/SARVAM_CALLING_PLAN.md`) |
-| **LLM** | DeepSeek V4 (default, `deepseek-v4-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
+| **LLM** | DeepSeek V4.1 (default, `deepseek-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
 | **Testing** | Vitest — 348 unit tests + 21 LLM eval blocks |
@@ -239,7 +239,7 @@ llm: {
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: 'https://api.deepseek.com',  // NOTE: no /v1 suffix
-    model: 'deepseek-v4-flash',           // Hardcoded — env var not read
+    model: 'deepseek-flash',              // Hardcoded — env var not read
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
@@ -280,7 +280,7 @@ DeepSeek returns `usage: { prompt_tokens, completion_tokens, total_tokens }` in 
 - Default `max_tokens: 1024` for WhatsApp replies (plenty for short messages)
 - `generateJson` with thinking uses `max_tokens: 4096` (reasoning needs room)
 - Temperature: `0.1` for extraction (deterministic), `0.4` for replies (natural variation)
-- Model `deepseek-v4-flash` chosen for speed + low cost
+- Model `deepseek-flash` (V4.1-Flash) chosen for speed + low cost
 
 ---
 
@@ -560,7 +560,7 @@ npx vitest run tests/evals/
 
 ### DeepSeek gotchas:
 1. **Base URL has NO `/v1`** — DeepSeek uses `https://api.deepseek.com/chat/completions`, not `/v1/chat/completions`
-2. **Model is hardcoded** — `deepseek-v4-flash` is hardcoded in `config.ts`. The `DEEPSEEK_MODEL` env var is NOT read
+2. **Model is hardcoded** — `deepseek-flash` (V4.1-Flash) is hardcoded in `config.ts`. The `DEEPSEEK_MODEL` env var is NOT read
 3. **`reasoning_content` must never reach users** — It's the model's chain-of-thought. Only `content` field is customer-facing. The client checks for empty content and retries
 4. **Thinking mode needs higher maxTokens** — Thinking consumes 2000-3000 tokens. `generateJson` with thinking uses 4096 maxTokens (was 1200, which consumed entirely by reasoning)
 5. **Empty content = rate limit signal** — DeepSeek sometimes returns empty content when overloaded. Client treats this as a 429 and retries

@@ -175,7 +175,7 @@ DEFAULT_ORG_ID=your-org-uuid-from-database
 # ---- LLM Provider ----
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your-deepseek-key
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL=deepseek-flash
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 # ---- AI Behavior ----
@@ -353,7 +353,7 @@ Check the dashboard:
 | `DEFAULT_ORG_ID` | **Yes** | — | Fallback org ID for prototype mode |
 | `LLM_PROVIDER` | No | `deepseek` | `deepseek` or `openai` |
 | `DEEPSEEK_API_KEY` | If deepseek | — | DeepSeek API key |
-| `DEEPSEEK_MODEL` | No | `deepseek-v4-flash` | Model name |
+| `DEEPSEEK_MODEL` | No | `deepseek-flash` | Model name |
 | `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com` | API base URL |
 | `AI_BUSINESS_NAME` | No | `Demo Realty` | Business name in AI prompts |
 | `AI_AUTO_REPLY` | No | `true` | Auto-reply to WhatsApp messages |
