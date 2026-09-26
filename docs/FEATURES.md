@@ -2,6 +2,8 @@
 
 Complete list of every capability the app has, organized by module.
 
+> **Module registry:** `docs/MODULES.md` — the canonical list of modules (live + planned), the per-org enable/disable (`org_modules`) flag architecture for release, and the full spec for the next module: **Task Management for Employees**.
+
 ---
 
 ## 0. Authentication ✅ COMPLETE
@@ -493,7 +495,7 @@ separate silo.
 | Item | What shipped |
 |------|--------------|
 | **Calling guards enforced** | `start-real` now actually enforces what the README promised: IST calling hours (env-toggleable), daily call limits (`checkCallAllowed` was dead code), and a Do-Not-Call registry (`do_not_call` table + `/api/calls/dnc` CRUD). New module: `backend/src/sarvam/callingGuards.ts`. `recordCall` now increments usage counters. |
-| **CI** | `.github/workflows/ci.yml` — backend typecheck + 348 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
+| **CI** | `.github/workflows/ci.yml` — backend typecheck + 370 unit tests (fully mocked, no secrets) + frontend build. **Manual trigger only** (`workflow_dispatch` — Actions tab or `gh workflow run ci.yml`); no push/PR runs. |
 | **Docker** | `backend/Dockerfile` (multi-stage), `frontend/Dockerfile`, `docker-compose.yml` (api + dedicated worker + frontend), `.dockerignore`. |
 | **Migration runner** | `backend/scripts/migrate.ts` + `npm run migrate` — `schema_migrations` table, applies only unapplied files, one transaction each. `--baseline` records legacy files without re-running (protects demo seed from duplication). |
 | **Git hygiene** | `backend/logs/` (Sarvam transcripts with real customer PII) untracked; `.gitignore` covers the whole logs dir. History scrub deferred (security wave). |
@@ -505,3 +507,22 @@ separate silo.
 | **Dual-provider WhatsApp + LID fix (2026-09-09)** | Official Meta Cloud API provider live (adapter, signed webhook, onboarding UI, 24h-window guard, AES-256-GCM credentials — `docs/META_CLOUD_API.md`); WhatsApp LID JIDs no longer stored as fake phones (contact-sync resolution + auto-backfill; legacy rows cleaned via `backend/scripts/fix-lid-phones.ts`); test counts now **348 unit (23 files)**. |
 | **Shared KV layer (2026-09-07)** | `backend/src/kv/` — Redis backend (ioredis) behind `REDIS_URL` for rate-limit counters, LLM concurrency semaphore (10-min crash lease), and lead/snapshot/config caches (version-bump invalidation); permanent memory fallback when unset. The WORKER's cache invalidation now reaches the API process in split topologies. Kafka deliberately rejected — Postgres `job_queue` covers documented scale. |
 | **VPS deployment (2026-09-07)** | Target locked: Hostinger KVM 16 GB (8 GB stack budget). Runbook `docs/DEPLOYMENT.md`: compose memory caps (backend/worker 1.5 GB, frontend 512 MB, redis 512 MB), `wa-sessions` volume (WhatsApp survives redeploys), Caddy TLS, ngrok dropped on VPS. |
+
+---
+
+## 20. Task Management for Employees 📋 PLANNED (next module)
+
+Full spec: **`docs/MODULES.md` §3**. Ships flag-gated (`task_management` in `org_modules`); ROADMAP Phase T.
+
+| Feature | Description |
+|---------|-------------|
+| **Tasks Table** | `tasks` — org-scoped, assignee (org_members), lead/call-session links, status (todo/in_progress/done/blocked/cancelled), priority, due_at, source (manual/ai_call/ai_whatsapp) |
+| **AI Auto-Tasks** | Call outcomes → tasks automatically: callback requested, site visit requested, booking requested (urgent), hot-lead follow-up, 24h-window expiry call task — created in `callFinalizer`/`jobHandler` next to follow-ups |
+| **My Tasks / Team Tasks** | Dashboard page with status columns, due badges, lead links; employee role sees own tasks only |
+| **Assignment** | Manual + round-robin across org members (shared helper with team-assignment workflow) |
+| **API** | `GET/POST /api/tasks`, `PATCH /api/tasks/:id`, `GET /api/tasks/my` — zod, org-scoped, module-gated |
+| **Flag** | `task_management` off → routes 404, nav hidden, auto-task generation skipped; data never deleted |
+
+## 21. Per-Org Module Flags 📋 PLANNED (release architecture)
+
+`org_modules` table + KV-cached `isModuleEnabled(orgId, key)` + `requireModule()` route guards + `GET /api/modules` for frontend nav gating. Full design: **`docs/MODULES.md` §2**. Core CRM/Auth always on; all other modules become flippable per org.

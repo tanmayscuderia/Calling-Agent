@@ -120,6 +120,26 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 - Enforcement point: `processMessageJob` BEFORE the LLM call (per-number limit → `pending_human`). Increments: inbound at enqueue, `ai_replies` after the reply, `outbound` after the send job.
 - **Cost recording**: `llmClient.chat()` captures provider `usage` tokens and computes `costUsd` from `config.llm.pricing` rates → baseAgent sums them into the result → jobHandler persists into `ai_agent_runs.tokens_in/out/cost_usd` + `recordTokenUsage()` → `org_usage_daily`. Sarvam cost is computed at READ time (minutes × `SARVAM_COST_PER_MINUTE`) from `call_sessions.duration_sec` — no separate recording needed. The Usage page (`/dashboard/usage`) reads it all via `GET /api/usage/summary`.
 
+## 8d. LLM — DeepSeek V4.1-Flash (2026-09-14)
+
+- Model is `deepseek-flash` (V4.1-Flash), hardcoded in `config.ts` — the `DEEPSEEK_MODEL` env var is NOT read. Legacy name `deepseek-v4-flash` still routes to V4.1-Flash (retired, billed at Flash price).
+- **MUST** keep `thinking: {type:"disabled"}` as the explicit default in `llmClient` for non-thinking tasks. V4.1-Flash defaults to thinking at effort HIGH — without the explicit disable, every WhatsApp reply reasons first (slow, pricey, and tight max_tokens budgets get eaten → empty content → pointless retries).
+- Opt-in thinking (`opts.thinking`) is for summaries/extraction; set `reasoning_effort` deliberately (low/medium/high).
+- Usage-dashboard cost defaults are PEAK ballparks ($0.30/$1.20 per 1M; off-peak is half) — env-tunable via `LLM_INPUT_COST_PER_1M` / `LLM_OUTPUT_COST_PER_1M`.
+
+## 8e. Sarvam interactions/attempts API placeholders
+
+- Sarvam returns literal placeholder strings, not nulls: `NO_FAILURE_REASON` (no failure), `NO_JOB_ID` (dashboard-placed calls' attempt_id). **MUST** run failure reasons through `cleanFailureReason()` — treating `NO_FAILURE_REASON` as a real failure once produced sessions summarized as "Call failed: NO_FAILURE_REASON".
+- Transcript API roles are `assistant`/`user` — **MUST** map through `speakerOf()` (agent/ai/bot/assistant → Agent); raw `assistant` used to render every line as "Customer:".
+- The **inbound poller** (`sarvam/inboundPoller.ts`) ingests analytics interactions independently of the on_end webhook — it is the safety net that made calls land even while the webhook Body template was misconfigured (literal `{{...}}` placeholders sent verbatim).
+- on_end webhook Body templates do NOT interpolate typed `{{...}}` text — only Params-section chips bind variables. `normalizeSarvamPayload` skips unresolved placeholders so they never reach leads.
+
+## 8f. TypeScript version (5.9.3 workspace vs 6.x/7 editor)
+
+- `backend/tsconfig.json` uses `module: commonjs` + `moduleResolution: "node"` — valid on workspace TS 5.9.3 (CLI: zero errors). VS Code windows on bundled TS 6.x/7-preview show "Option 'moduleResolution=node10' is deprecated".
+- **NEVER** fix that squiggle with `"ignoreDeprecations": "6.0"` — TS 5.9.3 rejects the value (`TS5103`) and breaks the real compile. Fix the editor: select the workspace TS version (pin lives in `.vscode/settings.json`).
+- The real migration (when adopting TS 6/7) is `module`/`moduleResolution: "node16"/"nodenext"` + explicit `.js` extensions on relative imports + restructuring the Baileys ESM import — a deliberate refactor, not a quick patch.
+
 ## 9. Architecture invariants
 
 - **MUST** keep `ParsedWhatsAppMessage` as the only shape business logic sees. Provider-specific parsing lives in `messageParser.ts` (Baileys) / `metaWebhookParser.ts` (Meta) only.
@@ -130,7 +150,7 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 
 ## 10. Dev workflow
 
-- Gates: `cd backend && npx tsc --noEmit` + `npx vitest run` (348 tests, all green). Frontend: `npx tsc --noEmit` (ignore stale `.next/types` noise).
+- Gates: `cd backend && npx tsc --noEmit` + `npx vitest run` (370 tests, all green). Frontend: `npx tsc --noEmit` (ignore stale `.next/types` noise).
 - **NEVER** run `next build` while `next dev` is running — it wipes `.next` and the dev session 404s every chunk (`main-app.js`, `layout.js` 404s + "stuck on loading"). If it happens: stop dev, `rm -rf frontend/.next`, restart dev, hard refresh.
 - Eval tests (`npm run test:evals`) hit the real LLM — opt-in only, never part of the default gate.
 - Migrations: SQL in `supabase/migrations/`, idempotent (`IF NOT EXISTS`), applied via `npm run migrate`, documented in `docs/DATABASE.md`.
@@ -152,3 +172,8 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 | 2026-09-09 | Sales chat went silent after 10 AI replies — `max_ai_replies_per_conversation=10` is a LIFETIME cap, silently blocks instead of erroring | Org limit raised to 100; consider a rolling window (per-day) instead of lifetime if it recurs. Limits are KV-cached 5 min after changing them |
 | 2026-08-30 | Sarvam webhook returned 400 on empty body → 11× retry storm | Tolerant-by-design webhook (audit + 200) |
 | 2026-08-30 | `human_handoff` silently dropped messages | Only `ai_enabled=false` / `blocked` stop the bot; handoff auto-clears |
+| 2026-09-14 | V4.1-Flash defaulted to thinking HIGH — smoke test returned EMPTY content (reasoning ate max_tokens) | `llmClient` sends `thinking:{type:"disabled"}` unless task opts in |
+| 2026-09-14 | Sarvam interactions API `NO_FAILURE_REASON` stored as real failure — session summarized "Call failed: NO_FAILURE_REASON" | `cleanFailureReason()` placeholder normalization |
+| 2026-09-14 | Transcript roles `assistant`/`user` all rendered "Customer:" | `speakerOf()` role regex (agent/ai/assistant/bot) |
+| 2026-09-14 | on_end Body template `{{...}}` sent LITERAL (no interpolation in Body text) | Params-chips config + normalizer skips unresolved placeholders |
+| 2026-09-14 | `"ignoreDeprecations": "6.0"` added for a TS6 editor squiggle → TS 5103 broke 5.9.3 compile | Reverted; editor must use workspace TS 5.9.3 |

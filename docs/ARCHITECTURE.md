@@ -1064,7 +1064,7 @@ Safety checks:
 
 ```
 backend/tests/
-├── unit/                          ← 348 tests across 23 files (no LLM, instant)
+├── unit/                          ← 370 tests across 25 files (no LLM, instant)
 │   ├── phone.test.ts              ← Phone normalization
 │   ├── money.test.ts              ← Budget parsing/formatting
 │   ├── messageParser.test.ts      ← Baileys message parsing
@@ -1105,7 +1105,7 @@ npm run eval
   → Thinking-mode fallback (retry without thinking if empty)
 ```
 
-**Total: 348 unit tests (23 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (recounted 2026-09-09 after dual-provider WhatsApp +36 and spam-guard +11: metaApi, metaEncryption, metaWebhookSignature, metaWebhookParser, spamGuard; earlier docs said 241/290/296/301/331/337 — all stale)
+**Total: 370 unit tests (25 files) + 21 LLM eval blocks (8 suites) — ALL GREEN** (2026-09-14; +22 since the 348 recount: sarvamWebhook ×15, callFinalizer ×4, cleanFailureReason ×3 — webhook normalization, transcript role mapping, failure-placeholder guards)
 
 ---
 

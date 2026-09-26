@@ -78,9 +78,9 @@ This document tracks the evolution from single-org prototype to multi-tenant, mu
 - **Shared animation system** — `animations.ts` (variants) + `MotionPrimitives.tsx` (components)
 
 ### Phase E: Quality Testing ✅
-- **348 unit tests (23 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser, calling guards, validation, metaApi + metaEncryption + metaWebhookSignature + metaWebhookParser, spamGuard
+- **370 unit tests (25 files)** — phone, money, parser, CSV, inventory, agents, prompts, rate limiter, Sarvam call results + tools + query parser + webhook normalization, calling guards, validation, metaApi + metaEncryption + metaWebhookSignature + metaWebhookParser, spamGuard, callFinalizer role mapping
 - **21 LLM eval blocks (8 suites)** — reply quality, extraction accuracy, e2e pipeline, call agent, safety, template-driven, cross-industry
-- **348 unit + 21 eval blocks, ALL GREEN (recounted 2026-09-09 — dual-provider WhatsApp + LID fix +36, spam guard +11)**
+- **370 unit + 21 eval blocks, ALL GREEN (was 348 at the 2026-09-09 recount; +22 from Sarvam webhook/finalizer hardening)**
 - **Eval harness** with rate-limit-safe sequential execution
 - **Safety evals** verifying chain-of-thought never leaks to users
 - **Golden cases** with curated expected outcomes
@@ -142,15 +142,15 @@ write to it — linking already works via normalized phone numbers).
 | Layer | Status | Notes |
 |-------|--------|-------|
 | WhatsApp Bridge | **Production-ready (dual provider)** | Baileys (QR demo tier) **and** official Meta Cloud API live — per-account `provider` choice, same pipeline, 24h-window guard on Meta sends |
-| AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search |
+| AI Agent | Production-ready | Config-driven, multi-industry, grounded inventory search. LLM: **DeepSeek-V4.1-Flash (`deepseek-flash`)** — thinking disabled by default (model default is HIGH), enabled for summaries/extraction |
 | Database | Production-ready | 16 migrations, multi-tenant, idempotent |
-| Voice Calling | Live (Sarvam) | Real PSTN outbound calls + webhook-driven CRM writeback |
+| Voice Calling | Live (Sarvam) | Real PSTN inbound + outbound calls; webhook + **inbound poller safety net**; transcripts role-labeled; tolerant on_end normalization; failure-placeholder normalization |
 | Auth | Production-ready | httpOnly cookies, Supabase Auth, role-based access |
 | Job Queue | Production-ready | Postgres-backed, atomic dequeue, retry, stale recovery; standalone worker process (WORKER_IN_PROCESS=false) |
-| CI / Deploys | Production-ready | GitHub Actions (typecheck + 348 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
+| CI / Deploys | Production-ready | GitHub Actions (typecheck + 370 unit tests + frontend build), Dockerfile + docker-compose, tracked migration runner. **VPS deploy runbook: `docs/DEPLOYMENT.md`** (Hostinger 16 GB target, 8 GB stack budget, Caddy TLS, no ngrok) |
 | Shared KV | Production-ready | Redis-backed shared state behind `REDIS_URL` (`backend/src/kv/`): rate-limit counters, LLM semaphore, config/lead/snapshot caches; memory fallback when unset — the bridge to split api/worker + multi-replica topologies |
 | Frontend | Polished prototype | Framer Motion animations, staggered cards, spring hovers, animated modals; edge auth gate + error boundary + React Query |
-| Testing | Strong | 348 unit tests + 21 LLM eval blocks covering unit + LLM quality |
+| Testing | Strong | 370 unit tests + 21 LLM eval blocks covering unit + LLM quality |
 | Monitoring | Basic | `/api/system/status` endpoint — needs alerting |
 
 ---
@@ -171,11 +171,31 @@ write to it — linking already works via normalized phone numbers).
 - [x] Meta Cloud API WhatsApp adapter — **DONE (2026-09-09)**: official provider live alongside Baileys (adapter + signed webhook + onboarding UI + 24h-window guard + AES-256-GCM credential storage; `docs/META_CLOUD_API.md`). Baileys remains as the instant-demo tier
 - [x] WhatsApp LID phone resolution — **DONE (2026-09-09)**: privacy `@lid` JIDs no longer stored as fake phone numbers; real numbers resolved from contact sync and auto-backfilled (legacy junk rows cleaned via `backend/scripts/fix-lid-phones.ts`)
 - [x] Real voice calling integration — **DONE via Sarvam AI voice agents** (see `docs/SARVAM_CALLING_PLAN.md`): outbound PSTN calls, webhook result processing, LLM call summaries, lead enrichment, auto follow-ups
+- [x] LLM upgraded to DeepSeek-V4.1-Flash — **DONE (2026-09-14)**: `deepseek-flash` everywhere (config/env/docs); thinking explicitly disabled for replies (model default = HIGH), enabled for summaries/extraction; usage pricing defaults updated
+- [x] Sarvam inbound pipeline hardening — **DONE (2026-09-11→14)**: poller safety net proven live; transcript role labels (assistant/user → Agent/Customer); `NO_FAILURE_REASON` placeholder normalized; on_end webhook tolerant of flat Body fields, raw transcripts, unresolved templates, missing status
 - [ ] Frontend redesign — full production design system
 - [ ] WebSocket real-time message updates (no polling)
 - [ ] Notification system (in-app + email alerts for hot leads)
 - [ ] Analytics dashboard (conversion funnels, response times)
 - [ ] Team assignment workflow (round-robin, skill-based routing)
+
+### Phase T: Task Management for Employees (NEXT — release blocker)
+Full spec: **`docs/MODULES.md` §3**. Ships behind the `task_management` module flag.
+- [ ] Migration: `tasks` table (org_id, assignee, lead_id/call_session_id links, status, priority, due_at, source) + indexes
+- [ ] API: `GET/POST /api/tasks`, `PATCH /api/tasks/:id`, `GET /api/tasks/my` — zod + org-scoped
+- [ ] Auto-task generation from AI outcomes (callback / site visit / booking / hot lead) in `callFinalizer` + `jobHandler`
+- [ ] Dashboard "Tasks" page: My Tasks / Team Tasks, status columns, due badges, lead links
+- [ ] Employee role visibility (members see own tasks only)
+- [ ] Round-robin auto-assignment helper (shared with team-assignment workflow)
+
+### Phase M: Per-Org Module Flags (release architecture)
+Full spec: **`docs/MODULES.md` §2**. Lets each org enable/disable modules without code changes.
+- [ ] Migration: `org_modules` table (org_id, module_key, enabled, config jsonb; UNIQUE per org+module)
+- [ ] `backend/src/modules/moduleFlags.ts` — KV-cached `isModuleEnabled(orgId, key)`
+- [ ] `requireModule()` route preHandler on module-scoped routes; worker early-returns
+- [ ] `GET /api/modules` + frontend nav/page gating
+- [ ] Migrate existing implicit toggles (account connect, ai_enabled, Sarvam env) under flags
+
 
 ### Phase G: Scale
 - [ ] Read replicas for dashboard queries
