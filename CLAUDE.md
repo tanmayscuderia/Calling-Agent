@@ -31,12 +31,23 @@
 15. Every table is `org_id`-scoped. Service-role client bypasses RLS — org scoping is OUR job in every query.
 
 ### Dev workflow
-16. Gates before done: `cd backend && npx tsc --noEmit && npx vitest run` (348 tests, all must pass).
+16. Gates before done: `cd backend && npx tsc --noEmit && npx vitest run` (370 tests, all must pass).
 17. **NEVER run `next build` while `next dev` is running** — it wipes `.next` and the dev session 404s on every chunk. Frontend validation = `npx tsc --noEmit` only (stale `.next/types` errors are noise).
 18. Migrations are SQL files in `supabase/migrations/`, idempotent, applied via `npm run migrate`. Update `docs/DATABASE.md` when you add one.
+
+### LLM (DeepSeek V4.1-Flash)
+19. Model is `deepseek-flash` (hardcoded in `config.ts` — the `DEEPSEEK_MODEL` env var is not read). The legacy name `deepseek-v4-flash` still routes to V4.1-Flash but is retired.
+20. **V4.1-Flash defaults to thinking at effort HIGH** — `llmClient` explicitly sends `thinking: {type:"disabled"}` unless a task opts in. Never remove that default or every WhatsApp reply gets slow and pricey.
+
+### Modules
+21. The platform is a set of modules (see `docs/MODULES.md`) moving behind per-org `org_modules` flags for release. New features (next: **Task Management for Employees**) must ship with a `module_key`, a `requireModule()` route guard, and worker early-returns — not hardcoded-on.
+
+### Editor / TS
+22. `backend/tsconfig.json` is correct for workspace TS 5.9.3. VS Code windows on bundled TS 6.x/7-preview show a false deprecation error on `moduleResolution: "node"` — fix by selecting the workspace TS version, **NOT** by adding `"ignoreDeprecations": "6.0"` (TS 5.9.3 rejects it: TS5103).
 
 ## Key docs
 - `docs/RULES.md` — full guardrails + mistakes-we-made list (this file is the TL;DR)
 - `docs/ARCHITECTURE.md` — system map, file map, message lifecycle
+- `docs/MODULES.md` — module registry, per-org flag architecture, Task Management spec
 - `docs/META_CLOUD_API.md` — Meta provider setup + architecture
 - `docs/API_REFERENCE.md` / `docs/DATABASE.md` / `docs/SETUP.md` / `docs/DEPLOYMENT.md`

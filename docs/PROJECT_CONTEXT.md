@@ -20,6 +20,7 @@
 9. Production-grade reliability — durable Postgres job queue, retry with backoff, crash recovery, LLM rate-limit protection, webhook idempotency
 10. Secure login — Supabase Auth with httpOnly cookies (no tokens in JS)
 11. Polished animated UI — Framer Motion route transitions, staggered cards, spring hovers
+12. **Modular architecture** — the platform is organized into independently documented modules (Core CRM, WhatsApp dual-provider, AI Reply Engine, Voice Calling, Inventory, Usage & Cost, Guardrails) moving behind **per-org enable/disable flags** for release; next module: **Task Management for Employees**. Full registry: `docs/MODULES.md`
 
 > **Provider positioning:** WhatsApp runs on two providers — the official **Meta Cloud API** (business tier: verified sends, signed webhooks, free customer-service replies, 24h-window guard) and the **Baileys WhatsApp Web bridge** (QR scan, instant demo). Both implement the same `MessagingAdapter` interface and feed an identical pipeline. See `docs/META_CLOUD_API.md`.
 
@@ -38,7 +39,7 @@
 | **LLM** | DeepSeek V4.1 (default, `deepseek-flash`) / OpenAI (configurable via `LLM_PROVIDER`) |
 | **Voice Demo** | Browser `speechSynthesis` + text input |
 | **Animation** | Framer Motion |
-| **Testing** | Vitest — 348 unit tests + 21 LLM eval blocks |
+| **Testing** | Vitest — 370 unit tests + 21 LLM eval blocks |
 | **Package Manager** | npm (workspace root with `backend/` and `frontend/`) |
 
 ---
@@ -604,7 +605,7 @@ Calling Agent/
 │   │   ├── utils/               # phone, money, logger, email, locationAliases
 │   │   └── whatsapp/            # Baileys bridge + connection manager + parser
 │   └── tests/
-│       ├── unit/                # 348 unit tests (23 files)
+│       ├── unit/                # 370 unit tests (25 files)
 │       ├── evals/               # 21 LLM eval blocks (8 files)
 ├── frontend/
 │   └── src/
@@ -662,4 +663,4 @@ The `MessagingAdapter` interface ensures the Baileys swap requires zero changes 
 
 ---
 
-*Last updated: 2026-09-09. Test count: 348 unit tests (23 files) + 21 LLM eval blocks (8 suites) — all passing. New: **dual-provider WhatsApp** — official Meta Cloud API (adapter, signed webhook receiver, onboarding routes/UI, 24h-window guard, AES-256-GCM credential storage — `docs/META_CLOUD_API.md`) alongside the Baileys QR bridge; WhatsApp privacy **LID JIDs resolved to real phone numbers** via contact sync (junk rows cleaned via `backend/scripts/fix-lid-phones.ts`); **reply batching + two-stage spam guard + per-number limits** shipped (see `docs/RULES.md` §8b/8c). Shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback — counters, LLM semaphore, caches shared across processes), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner.*
+*Last updated: 2026-09-14. Test count: 370 unit tests (25 files) + 21 LLM eval blocks (8 suites) — all passing. Recent hardening (2026-09-11→14): **LLM migrated to DeepSeek-V4.1-Flash (`deepseek-flash`)** — the new model DEFAULTS to thinking at effort HIGH, so `llmClient` now explicitly disables thinking unless a task opts in (verified live: replies are instant, zero reasoning tokens); usage-dashboard pricing defaults updated to V4.1-Flash peak ballparks ($0.30/$1.20 per 1M). **Sarvam inbound pipeline hardened**: the inbound poller (`sarvam/inboundPoller.ts`) is the webhook safety net (calls land even with a misconfigured on_end webhook — proven live); on_end webhook normalization now handles flat Body-template fields, raw `call_transcript` strings (parsed into AI/User turns), numeric-string durations, unresolved `{{...}}` placeholders (skipped, never patched into leads), missing status (inferred `connected` from duration/transcript evidence), and `caller_phone` → lead phone aliasing; **transcript roles fixed** (Sarvam returns `assistant`/`user` → mapped to Agent/Customer) and the `NO_FAILURE_REASON` placeholder no longer masquerades as a failure. Editor note: VS Code windows on newer bundled TS (6.x/7-preview) flag `moduleResolution: "node"` in `backend/tsconfig.json` — use the workspace TS 5.9.3 (`"ignoreDeprecations": "6.0"` is rejected by 5.9.3; the real node16 migration is future work). Previous wave (2026-09-09): **dual-provider WhatsApp** — official Meta Cloud API (adapter, signed webhook receiver, onboarding routes/UI, 24h-window guard, AES-256-GCM credential storage — `docs/META_CLOUD_API.md`) alongside the Baileys QR bridge; WhatsApp privacy **LID JIDs resolved to real phone numbers** via contact sync; **reply batching + two-stage spam guard + per-number limits** shipped (see `docs/RULES.md` §8b/8c). Shared KV layer (`backend/src/kv/`, Redis behind REDIS_URL with memory fallback), WhatsApp session persistence volume, memory-capped compose services. Deploy target locked: Hostinger KVM VPS 16 GB (8 GB stack budget) — runbook `docs/DEPLOYMENT.md` (Caddy TLS, no ngrok on VPS). Sarvam real calling live (S1-S6 complete); zero-mid-call-tool architecture verified on real calls; hardening wave 2026-08-30 enforced guards + zod validation + pagination + CI + Docker + migration runner. Next up: **Task Management for Employees** module + `org_modules` per-org flags — `docs/MODULES.md`.*
