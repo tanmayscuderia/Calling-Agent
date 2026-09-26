@@ -17,6 +17,9 @@ A production-grade platform for AI-powered lead qualification via WhatsApp **and
 11. **Polished animated UI** — Framer Motion route transitions, staggered card entrances, spring hover/tap interactions, animated modals
 12. **348 unit tests + 21 LLM eval blocks, all green** (recounted 2026-09-09)
 13. **Dual WhatsApp providers live** — official Meta Cloud API + Baileys QR bridge, chosen per account at connect time (see `docs/META_CLOUD_API.md`)
+14. **Usage & Cost dashboard** — LLM tokens/cost (DeepSeek), Sarvam call minutes/cost, per-number activity vs limits, at `/dashboard/usage`
+15. **Reply batching + spam guard** — rapid questions batched into one combined reply (~6s window); two-stage spam referee (heuristics → DeepSeek) silences floods but passes genuine chatty customers
+16. **Per-number limits** — each connected number gets its own daily AI-reply/message caps (defaults 300/400), configured via `whatsapp_accounts.config.limits`
 14. **Hardened ops (2026-08-30)** — GitHub Actions CI, Dockerfile + docker-compose (API / worker / frontend / redis), tracked SQL migrations (`npm run migrate`), enforced calling guards (IST hours + Do-Not-Call registry + daily limits), zod request validation on mutating routes
 15. **VPS-ready (2026-09-07)** — Redis-backed shared state behind `REDIS_URL` (memory fallback: rate-limit counters, LLM concurrency semaphore, config/lead/snapshot caches), WhatsApp session persistence volume, memory-capped compose services, and a full deployment runbook: **`docs/DEPLOYMENT.md`** (Hostinger 16 GB VPS, 8 GB stack budget)
 
@@ -257,3 +260,27 @@ The platform is production-ready with a durable job queue, retry logic, crash re
 **Channel status (2026-09-09):** Voice (Sarvam) is live with the zero-mid-call-tool architecture proven on real calls. WhatsApp is now **dual-provider**: the official **Meta Cloud API** path is fully built (adapter, signed webhook receiver, onboarding UI, 24h-window guard, encrypted credentials — `docs/META_CLOUD_API.md`) alongside the proven Baileys bridge (753+ messages; currently disabled — re-enable via Dashboard → WhatsApp → QR scan). WhatsApp privacy LIDs are resolved to real phone numbers via contact sync (`docs/ARCHITECTURE.md` → message lifecycle). All channels write to the same `crm_leads` table (phone-number linking), and the voice agent's lead context reads recent WhatsApp messages. Next: unified lead timeline + Kanban board (Phase U in the roadmap).
 
 See **[ROADMAP.md](./docs/ROADMAP.md)** for full details.
+
+## FONT - TRUEFITT & HILL
+.premium-heading {
+  /* 1. The Font Family */
+  font-family: 'Montserrat', 'Gotham', -apple-system, sans-serif;
+  
+  /* 2. All Caps */
+  text-transform: uppercase;
+  
+  /* 3. The Secret Sauce: Generous Letter Spacing */
+  letter-spacing: 0.12em; /* Pushes the letters apart elegantly */
+  
+  /* 4. Font Weight */
+  font-weight: 500; /* Medium weight - not too thin, not too bold */
+  
+  /* 5. Clean Font Smoothing (Crucial for Mac/iOS devices) */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* 6. Optical Balance */
+  line-height: 1.2;
+  color: #1a1a1a; /* A soft, premium off-black rather than harsh #000 */
+}
+

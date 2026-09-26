@@ -1,4 +1,4 @@
-# Create Chat Completion
+# Chat Completions API
 
 Source: https://api-docs.deepseek.com/api/create-chat-completion
 
@@ -65,9 +65,9 @@ An optional name for the participant. Provides the model information to differen
 
 **model** stringrequired
 
-**Possible values:** \[`deepseek-v4-flash`, `deepseek-v4-pro`\]
+**Possible values:** \[`deepseek-flash`, `deepseek-v4-pro`\]
 
-ID of the model to use.
+ID of the model to use. Use `deepseek-flash` or `deepseek-v4-pro`.
 
 **
 
@@ -91,9 +91,9 @@ If set to `enabled`, then use thinking mode. If set to `disabled`, then use non-
 
 **reasoning\_effort** string
 
-**Possible values:** \[`high`, `max`\]
+**Possible values:** \[`none`, `low`, `high`, `max`\]
 
-Controls the reasoning effort of the model. The default effort is `high` for regular requests; for some complex agent requests (such as Claude Code, OpenCode), effort is automatically set to `max`. For compatibility, `low` and `medium` are mapped to `high`, and `xhigh` is mapped to `max`.
+Controls the thinking mode toggle and the thinking effort. `none` disables thinking mode; `low` / `high` / `max` enable thinking mode. The default effort is `high`. For compatibility with existing software, `minimal` is accepted and mapped to `low`, and `medium` / `xhigh` are accepted and mapped to `high`.
 
 **max\_tokens** integernullable
 
@@ -101,7 +101,7 @@ The maximum number of tokens that can be generated in the chat completion.
 
 The total length of input tokens and generated tokens is limited by the model's context length.
 
-For the value range and default value, please refer to the [documentation](https://api-docs.deepseek.com/quick_start/pricing).
+The value must be between 1 and 384K (393216). When not set, the default is 8K in non-thinking mode, 64K in thinking mode (128K with `reasoning_effort` set to `max`). Please refer to the [Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing) page for details.
 
 **
 
@@ -125,26 +125,16 @@ An object specifying the format that the model must output. Setting to { "type":
 
 Must be one of `text` or `json_object`.
 
-**
-
-stop
-
-**
-
-object
-
-**
+**stop** string | string\[\]
 
 nullable
-
-**
 
 Up to 16 sequences where the API will stop generating further tokens.
 
 oneOf
 
--   MOD1
--   MOD2
+-   Single stop sequence
+-   Stop sequence list
 
 string
 
@@ -162,11 +152,13 @@ object
 
 nullable
 
-Options for streaming response. Only set this when you set `stream: true`.
+Options for streaming response. Must be set together with `stream: true`; if `stream` is not set to `true`, the API returns a `400` error.
 
 **include\_usage** boolean
 
-If set, an additional chunk will be streamed before the `data: [DONE]` message. The `usage` field on this chunk shows the token usage statistics for the entire request, and the `choices` field will always be an empty array. All other chunks will also include a `usage` field, but with a null value.
+If set to `true`, all chunks in the stream will include a `usage` field, whose value is `null` on every chunk except the last one. If omitted or set to `false`, the `usage` field is absent from all chunks except the last one.
+
+Either way, the last chunk before the `data: [DONE]` message carries the token usage statistics for the entire request in its `usage` field. Note that no separate usage-only chunk is emitted: the statistics ride on the last content chunk, whose `choices` array always contains exactly one element that carries no new content and a non-null `finish_reason`.
 
 **temperature** numbernullable
 
@@ -176,7 +168,7 @@ If set, an additional chunk will be streamed before the `data: [DONE]` message. 
 
 What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
 
-We generally recommend altering this or `top_p` but not both.
+We generally recommend altering this or `top_p` but not both. Has no effect in thinking mode.
 
 **top\_p** numbernullable
 
@@ -186,7 +178,7 @@ We generally recommend altering this or `top_p` but not both.
 
 An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top\_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.
 
-We generally recommend altering this or `temperature` but not both.
+The value must be greater than 0 and at most 1. We generally recommend altering this or `temperature` but not both. It only takes effect in thinking mode, where the effective range is 0.95–1.0: values below 0.95 are treated as 0.95. In non-thinking mode it is fixed at 1.0 and the value you pass is ignored.
 
 **
 
@@ -198,7 +190,7 @@ object\[\]
 
 nullable
 
-A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for. A max of 128 functions are supported.
+A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for. Tool names must be unique.
 
 -   Array \[
     
@@ -225,7 +217,7 @@ A description of what the function does, used by the model to choose when and ho
 
 **name** stringrequired
 
-The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
+The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 128.
 
 **
 
@@ -254,19 +246,9 @@ If set to true, the API will use strict-mode for the tool calls to ensure the ou
 -   \]
     
 
-**
-
-tool\_choice
-
-**
-
-object
-
-**
+**tool\_choice** string | object
 
 nullable
-
-**
 
 Controls which (if any) tool is called by the model.
 
@@ -279,6 +261,8 @@ Controls which (if any) tool is called by the model.
 Specifying a particular tool via `{"type": "function", "function": {"name": "my_function"}}` forces the model to call that tool.
 
 `none` is the default when no tools are present. `auto` is the default if tools are present.
+
+`required` and named tool choices are not supported in thinking mode; the API returns a `400` error. Disable thinking mode first to use them.
 
 oneOf
 
@@ -356,9 +340,9 @@ A list of chat completion choices.
 
 **finish\_reason** stringrequired
 
-**Possible values:** \[`stop`, `length`, `content_filter`, `tool_calls`, `insufficient_system_resource`\]
+**Possible values:** \[`stop`, `length`, `content_filter`, `tool_calls`, `insufficient_system_resource`, `aborted`\]
 
-The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `insufficient_system_resource` if the request is interrupted due to insufficient resource of the inference system.
+The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, `insufficient_system_resource` if the request is interrupted due to insufficient resource of the inference system, or `aborted` if the generation was interrupted.
 
 **index** integerrequired
 
@@ -610,6 +594,22 @@ Number of tokens in the generated completion.
 **prompt\_tokens** integerrequired
 
 Number of tokens in the prompt. It equals prompt\_cache\_hit\_tokens + prompt\_cache\_miss\_tokens.
+
+**
+
+prompt\_tokens\_details
+
+**
+
+object
+
+required
+
+Breakdown of tokens used in the prompt.
+
+**cached\_tokens** integer
+
+Number of tokens in the prompt that hit the context cache. Same as `prompt_cache_hit_tokens`.
 
 **prompt\_cache\_hit\_tokens** integerrequired
 

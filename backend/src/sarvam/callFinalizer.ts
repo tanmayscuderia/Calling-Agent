@@ -102,9 +102,17 @@ export interface TranscriptRow {
   text: string;
 }
 
-/** Read the speaker name from either key shape. */
-function speakerOf(t: TranscriptRow): string {
-  return (t.role ?? t.speaker ?? 'customer') as string;
+/**
+ * Map provider role labels to 'agent'/'customer'. Sarvam's transcript API
+ * returns 'assistant'/'user'; webhook transcript chips use 'ai'/'user';
+ * older rows used 'agent'. Anything not clearly the bot is the caller.
+ */
+const AGENT_ROLE_RE = /^(agent\.?|ai|assistant|bot|sarvam)/i;
+
+/** Read the speaker name from either key shape, normalized to agent|customer. */
+function speakerOf(t: TranscriptRow): 'agent' | 'customer' {
+  const raw = String(t.role ?? t.speaker ?? 'customer');
+  return AGENT_ROLE_RE.test(raw.trim()) ? 'agent' : 'customer';
 }
 
 /** Normalize webhook-style rows to CallTurn[] for the summarizer. */

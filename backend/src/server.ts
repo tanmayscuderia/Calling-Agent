@@ -26,6 +26,7 @@ import { sarvamToolsRoutes } from './routes/sarvamTools.routes';
 import { aiRoutes } from './routes/ai.routes';
 import { agentRoutes } from './routes/agent.routes';
 import { membersRoutes } from './routes/members.routes';
+import { usageRoutes } from './routes/usage.routes';
 import systemRoutes from './routes/system.routes';
 
 async function start() {
@@ -67,6 +68,7 @@ async function start() {
   await app.register(aiRoutes);
   await app.register(agentRoutes);
   await app.register(membersRoutes);
+  await app.register(usageRoutes);
   await app.register(systemRoutes);
 
   // Dashboard stats endpoint

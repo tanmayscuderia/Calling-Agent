@@ -14,7 +14,7 @@ import { llm } from '../ai/llmClient';
 import { resolveAccountId } from '../whatsapp/whatsappService';
 import { waManager } from '../whatsapp/connectionManager';
 import { classifyWithReferee } from '../whatsapp/spamGuard';
-import { checkAccountDailyLimit, recordAccountActivity } from '../auth/rateLimiter';
+import { checkAccountDailyLimit, recordAccountActivity, recordTokenUsage } from '../auth/rateLimiter';
 
 // ============================================================
 // Job Handlers — executed by the queue worker
@@ -211,9 +211,15 @@ export async function processMessageJob(orgId: string, payload: MessageJobPayloa
       decision: result.shouldHandoff ? 'handoff' : 'auto_reply',
       confidence: result.matchedProperties[0]?.score ?? null,
       latency_ms: result.latencyMs,
+      tokens_in: (result as any).tokensIn ?? 0,
+      tokens_out: (result as any).tokensOut ?? 0,
+      cost_usd: (result as any).costUsd ?? 0,
     })
     .select()
     .single();
+
+  // Org-level daily usage rollup (KV counters + org_usage_daily via RPC)
+  recordTokenUsage(orgId, (result as any).tokensIn ?? 0, (result as any).tokensOut ?? 0, (result as any).costUsd ?? 0).catch(() => {});
 
   // 6. Save outbound message
   await insertMessage({

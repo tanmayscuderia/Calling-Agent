@@ -144,6 +144,9 @@ Every file, what it does, and what it connects to. Surveyed 2026-09-07
 | `whatsapp/metaWebhookParser.ts` | Meta webhook payload → `ParsedWhatsAppMessage[]` + status events; emits JID-canonical chatIds so downstream never branches on provider | consumed by webhook route |
 | `utils/metaEncryption.ts` | AES-256-GCM encrypt/decrypt for Meta tokens (legacy-CBC read support) | keyed by `ENCRYPTION_KEY` |
 | `utils/metaWebhookSignature.ts` | `X-Hub-Signature-256` HMAC-SHA256 verification — fail-closed without `META_APP_SECRET` | used by webhook route |
+| `whatsapp/spamGuard.ts` | Two-stage spam/abuse guard: Stage 1 free heuristics (burst ≥15/5min, daily ≥100/phone, near-duplicate text), Stage 2 DeepSeek referee (only when Stage 1 trips) → `genuine/spam/abuse/bot_loop` verdict; fail-open | `whatsappService` (enqueue), `jobHandler` (referee before reply) |
+| `crm/usageService.ts` | Usage & cost aggregation: org daily rollup, per-number today counters, per-account 7d AI cost (runs → conversations → account), Sarvam minutes/cost, top conversations vs cap | `GET /api/usage/summary` |
+| `routes/usage.routes.ts` | Usage & Cost dashboard feed | `crm/usageService` |
 
 ### AI brain (processes the queue's jobs)
 

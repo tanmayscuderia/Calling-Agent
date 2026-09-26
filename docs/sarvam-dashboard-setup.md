@@ -23,48 +23,54 @@ evidence: docs/sarvam-tool-failure-evidence.md (Addendum 4). The
 snapshot-variable architecture removes the failing component entirely:
 filtering happens in our SQL at call start; the LLM never dispatches anything.
 
-## ⚠️ PENDING FIXES (dashboard-side — STILL OPEN as of 2026-09-03; 3 live calls on Sep 1 all arrived with empty phone + empty webhook body)
+## ⚠️ PENDING FIXES (dashboard-side)
 
-### Fix 1 — on_end webhook Body template (currently sends EMPTY body)
-Tools → your on_end webhook tool → **Body** section → paste this JSON
-(each chip inserted via the variable picker, NOT typed):
+### Fix 1 — on_end webhook result delivery — ⚠️ Body template DOES NOT interpolate
+**2026-09-11 live-fire finding:** the tool's **Body** text section sends typed
+`{{...}}` placeholders VERBATIM — no variable interpolation (proved on a real
+call: body arrived as literal `"{{attempt_id}}", "{{status}}", …`). Only the
+**Params** section binds chips to real values (same mechanism as Hook #1,
+which resolved `User identifier` live).
 
-```json
-{
-  "attempt_id": "{{attempt_id}}",
-  "status": "{{status}}",
-  "duration": "{{duration}}",
-  "phone": "{{phone}}",
-  "customer_name": "{{customer_name}}",
-  "city": "{{city}}",
-  "location": "{{location}}",
-  "configuration": "{{configuration}}",
-  "budget_min": "{{budget_min}}",
-  "budget_max": "{{budget_max}}",
-  "purpose": "{{purpose}}",
-  "timeline": "{{timeline}}"
-}
-```
+**Working config: Params only (4 chips), Body section EMPTY:**
 
-Chip names differ per dashboard build — pick the closest variable chip for
-each key (e.g. `interaction_id`/`call_id` for attempt identity,
-`disposition`/`outcome` for status). The backend now accepts aliases and
-flat chips either way. Without ANY body template, calls complete but the
-CRM never receives the result.
+| Param key | Chip |
+|---|---|
+| `attempt_id` | Attempt ID |
+| `duration` | Call length in seconds |
+| `phone` | caller_phone |
+| `call_transcript` | Call transcript |
 
-### Fix 2 — Hook #1 (lead-context) phone parameter — CONFIRMED STILL BROKEN (3 calls: Sep 1, 09:17 / 18:59 / 19:35 IST, all hit `?phone=` empty)
+Lead fields (name/city/budget/configuration/timeline) are NOT needed as
+separate params — the backend parses the raw `call_transcript` into turns and
+DeepSeek extracts them post-call (summary, temperature, preferences,
+follow-ups). Missing `status` is inferred as `connected` when
+duration/transcript prove a real call.
+
+Backend safeguards proven live (`normalizeSarvamPayload`): literal `{{...}}`
+placeholders are skipped everywhere (identity, status, lead vars) — a
+misconfigured tool is audited into `sarvam_webhook_events` and acked, never
+corrupts data. Numeric-string `duration` ("94") coerced. Tests:
+`backend/tests/unit/sarvamWebhook.test.ts`.
+
+### Fix 2 — Hook #1 (lead-context) phone parameter — chip renamed in current picker
 The `phone=` query param resolves EMPTY on live calls → 400s.
 
-**Pick exactly this chip: `user_phone_number`** — the PLATFORM's caller-number
-chip (Sarvam docs: "Phone number of the user in E.164 format", populated on
-every attempt).
+**Pick exactly this chip: `User identifier`** — the PLATFORM's caller-number
+field (`user_identifier`, "Phone number of the user in E.164 format",
+populated on every attempt). The old build labelled it `user_phone_number`;
+current dashboard picker shows it as **User identifier** (with
+`User identifier type` = `PHONE_NUMBER` right below it).
 
-⚠️ **THE TRAP (this is what went wrong 3 times):** the agent ALSO has an
-output variable named `phone` (created in Part D). At call start it is EMPTY
-— the LLM only fills it mid-call. If the picker shows both, pick the
-platform/telephony one (`user_phone_number`), NOT the agent variable `phone`.
+⚠️ **THE TRAP (this is what went wrong 3 times):** the picker ALSO shows
+agent output variables (`phone`, and look-alikes `caller_number` /
+`caller_phone` — these sit beside hook/output vars like `user_name`,
+`call_summary`, `lead_context` in the list). Output variables are EMPTY at
+call start — the LLM only fills them mid-call. Pick the platform
+telephony chip (`User identifier`), NOT `caller_number` / `caller_phone` /
+`phone`.
 Symptom of the wrong chip: our log shows `lead-context?phone=` with nothing
-after the `=`.
+after the `=`, or a `lead-context.400` entry.
 
 Steps: Hook #1 (lead-context) → Parameters → phone → delete the wrong chip →
 insert `user_phone_number` via the variable picker (single braces, NOT typed

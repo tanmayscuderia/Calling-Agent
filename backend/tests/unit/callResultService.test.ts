@@ -259,7 +259,7 @@ describe('processCallResultJob — Sarvam webhook → call_sessions', () => {
   });
 });
 // ── sanitizeAgentVariables / suggestOutputVariables ──
-import { sanitizeAgentVariables, suggestOutputVariables } from '../../src/sarvam/callResultService';
+import { sanitizeAgentVariables, suggestOutputVariables, cleanFailureReason } from '../../src/sarvam/callResultService';
 
 describe('sanitizeAgentVariables', () => {
   it('maps known aliases to real columns', () => {
@@ -461,5 +461,26 @@ describe('processCallResultJob — inbound resolution for unknown attempts', () 
     expect(mock.insertCalls['call_sessions']).toBeUndefined();
     expect(summarizeCallMock).not.toHaveBeenCalled();
     expect(mock.updatePatches['sarvam_webhook_events']).toHaveLength(1); // skip path still acks
+  });
+});
+
+describe('cleanFailureReason — Sarvam "no failure" placeholders', () => {
+  it('treats NO_FAILURE_REASON (the analytics placeholder) as no failure', () => {
+    expect(cleanFailureReason('NO_FAILURE_REASON')).toBeNull();
+    expect(cleanFailureReason('no_failure_reason')).toBeNull();
+    expect(cleanFailureReason('No-Reason')).toBeNull();
+  });
+
+  it('treats NONE and empty strings as no failure', () => {
+    expect(cleanFailureReason('NONE')).toBeNull();
+    expect(cleanFailureReason('')).toBeNull();
+    expect(cleanFailureReason('   ')).toBeNull();
+    expect(cleanFailureReason(null)).toBeNull();
+    expect(cleanFailureReason(undefined)).toBeNull();
+  });
+
+  it('keeps REAL failure reasons', () => {
+    expect(cleanFailureReason('Customer hung up')).toBe('Customer hung up');
+    expect(cleanFailureReason('trunk_busy')).toBe('trunk_busy');
   });
 });

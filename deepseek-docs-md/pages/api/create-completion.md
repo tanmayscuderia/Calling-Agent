@@ -1,4 +1,4 @@
-# Create FIM Completion (Beta)
+# FIM Completion API (Beta)
 
 Source: https://api-docs.deepseek.com/api/create-completion
 
@@ -6,7 +6,8 @@ POST
 
 ## /completions
 
-The FIM (Fill-In-the-Middle) Completion API. User must set `base_url="https://api.deepseek.com/beta"` to use this feature.
+FIM (Fill In the Middle) Completion API.  
+User must set `base_url="https://api.deepseek.com/beta"` to use this feature.
 
 ## Request[​](https://api-docs.deepseek.com/api/create-completion#request "Direct link to Request")
 
@@ -24,19 +25,17 @@ required
 
 **model** stringrequired
 
-**Possible values:** \[`deepseek-v4-pro`\]
+**Possible values:** \[`deepseek-flash`, `deepseek-v4-pro`\]
 
-ID of the model to use.
+ID of the model to use. Use `deepseek-flash` or `deepseek-v4-pro`.
 
 **prompt** stringrequired
-
-**Default value:** `Once upon a time,`
 
 The prompt to generate completions for.
 
 **echo** booleannullable
 
-Echo back the prompt in addition to the completion
+Echo back the prompt in addition to the completion. Cannot be used together with `suffix` or `logprobs`.
 
 **logprobs** integernullable
 
@@ -50,19 +49,9 @@ The maximum value for `logprobs` is 20.
 
 The maximum number of tokens that can be generated in the completion.
 
-**
-
-stop
-
-**
-
-object
-
-**
+**stop** string | string\[\]
 
 nullable
-
-**
 
 Up to 16 sequences where the API will stop generating further tokens. The returned text will not contain the stop sequence.
 
@@ -87,11 +76,13 @@ object
 
 nullable
 
-Options for streaming response. Only set this when you set `stream: true`.
+Options for streaming response. Must be set together with `stream: true`; if `stream` is not set to `true`, the API returns a `400` error.
 
 **include\_usage** boolean
 
-If set, an additional chunk will be streamed before the `data: [DONE]` message. The `usage` field on this chunk shows the token usage statistics for the entire request, and the `choices` field will always be an empty array. All other chunks will also include a `usage` field, but with a null value.
+If set to `true`, all chunks in the stream will include a `usage` field, whose value is `null` on every chunk except the last one. If omitted or set to `false`, the `usage` field is absent from all chunks except the last one.
+
+Either way, the last chunk before the `data: [DONE]` message carries the token usage statistics for the entire request in its `usage` field. Note that no separate usage-only chunk is emitted: the statistics ride on the last content chunk, whose `choices` array always contains exactly one element that carries no new content and a non-null `finish_reason`.
 
 **suffix** stringnullable
 
@@ -115,7 +106,7 @@ We generally recommend altering this or `top_p` but not both.
 
 An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top\_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.
 
-We generally recommend altering this or `temperature` but not both.
+The value must be greater than 0 and at most 1. We generally recommend altering this or `temperature` but not both.
 
 **frequency\_penalty** deprecated
 
@@ -163,10 +154,9 @@ The list of completion choices the model generated for the input prompt.
 
 **finish\_reason** stringrequired
 
-**Possible values:** \[`stop`, `length`, `content_filter`, `insufficient_system_resource`\]
+**Possible values:** \[`stop`, `length`, `content_filter`, `insufficient_system_resource`, `aborted`\]
 
-The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached,  
-`content_filter` if content was omitted due to a flag from our content filters, or `insufficient_system_resource` if the request is interrupted due to insufficient resource of the inference system.
+The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `insufficient_system_resource` if the request is interrupted due to insufficient resource of the inference system, or `aborted` if the generation was interrupted.
 
 **index** integerrequired
 
@@ -230,6 +220,22 @@ Number of tokens in the generated completion.
 **prompt\_tokens** integerrequired
 
 Number of tokens in the prompt. It equals prompt\_cache\_hit\_tokens + prompt\_cache\_miss\_tokens.
+
+**
+
+prompt\_tokens\_details
+
+**
+
+object
+
+required
+
+Breakdown of tokens used in the prompt.
+
+**cached\_tokens** integer
+
+Number of tokens in the prompt that hit the context cache. Same as `prompt_cache_hit_tokens`.
 
 **prompt\_cache\_hit\_tokens** integerrequired
 

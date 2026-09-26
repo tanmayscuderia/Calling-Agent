@@ -14,7 +14,7 @@ In [FIM (Fill In the Middle) completion](https://api-docs.deepseek.com/api/creat
 Below is a complete Python code example for FIM completion. In this example, we provide the beginning and the end of a function to calculate the Fibonacci sequence, allowing the model to complete the content in the middle.
 
 ```
-from openai import OpenAIclient = OpenAI(    api_key="<your api key>",    base_url="https://api.deepseek.com/beta",)response = client.completions.create(    model="deepseek-v4-pro",    prompt="def fib(a):",    suffix="    return fib(a-1) + fib(a-2)",    max_tokens=128)print(response.choices[0].text)
+from openai import OpenAIclient = OpenAI(    api_key="<your api key>",    base_url="https://api.deepseek.com/beta",)response = client.completions.create(    model="deepseek-flash",    prompt="def fib(a):",    suffix="    return fib(a-1) + fib(a-2)",    max_tokens=128)print(response.choices[0].text)
 ```
 
 ## Integration With Continue[​](https://api-docs.deepseek.com/guides/fim_completion#integration-with-continue "Direct link to Integration With Continue")

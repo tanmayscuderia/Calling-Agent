@@ -4,6 +4,141 @@ Source: https://api-docs.deepseek.com/updates
 
 * * *
 
+## Date: 2026-09-10[​](https://api-docs.deepseek.com/updates#date-2026-09-10 "Direct link to Date: 2026-09-10")
+
+### DeepSeek-V4.1-Flash Release[​](https://api-docs.deepseek.com/updates#deepseek-v41-flash-release "Direct link to DeepSeek-V4.1-Flash Release")
+
+Today, we officially release the DeepSeek-V4.1-Flash model. It is the smallest model in our new architecture family, with native multimodal visual understanding. The new architecture is designed for a higher capability ceiling, faster inference, higher throughput, and scaling to larger models.
+
+-   GPQA Diamond: 90.9
+-   HLE: 36.8 (39.1\*)
+-   Codeforces (Rating): 3471
+-   MathArena Apex: 65.6
+-   Terminal-Bench 2.1: 90.6
+-   Terminal-Bench 3.0: 30.0
+-   Terminal-Bench 4.0: 31.2
+-   DeepSWE v1.1: 74.2
+-   ProgramBench: 20.3
+-   NL2Repo-Bench: 65.4
+-   CyberGym: 88.1
+-   SEC-Bench Pro: 62.8
+-   ExploitGym: 15.3
+-   HLE (w/tools): 63.9
+-   Automation-Bench: 54.8
+-   Agents' Last Exam: 31.8
+-   Chartography (w/tools): 78.9
+-   BabyVision (w/tools): 89.6
+-   ZeroBench-main (w/tools): 49.0
+
+\* Tested only on the pure-text subset of the HLE benchmark set.
+
+**API changes**
+
+DeepSeek V4.1 Flash is now available on the DeepSeek API with native multimodal support. Change the model name to `deepseek-flash` to call the latest V4.1 Flash model. The previous-generation models V4 Flash and V4 Flash Vision Exp have been retired; for compatibility, the model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are temporarily routed to V4.1 Flash.
+
+In response to user demand, we have decided to continue providing API services for DeepSeek V4 Pro after September 14, 2026, with the billing method remaining unchanged. We will provide further notice should there be any changes. Thank you for your understanding and support!
+
+**API pricing adjustment**
+
+With the release of DeepSeek-V4.1-Flash, API prices have been reduced accordingly. For details, please refer to [Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing).
+
+For more details, please refer to [this documentation](https://api-docs.deepseek.com/news/news260910).
+
+* * *
+
+## Date: 2026-08-21[​](https://api-docs.deepseek.com/updates#date-2026-08-21 "Direct link to Date: 2026-08-21")
+
+### DeepSeek-V4-Flash-Vision-Exp Release[​](https://api-docs.deepseek.com/updates#deepseek-v4-flash-vision-exp-release "Direct link to DeepSeek-V4-Flash-Vision-Exp Release")
+
+Today, the new multimodal vision understanding model DeepSeek-V4-Flash-Vision-Exp is now available on the DeepSeek API platform. This is an experimental model that can be accessed by setting `model='deepseek-v4-flash-vision-exp'`.
+
+-   Terminal Bench 2.1: 83.9
+-   NL2Repo: 57.7
+-   DeepSWE: 59.3
+-   DSBench-Hard: 63.6
+-   AutomationBench (Public): 25.7
+-   ApexBench (Pass@1): 36.5
+-   Agents' Last Exam: 27.3
+-   Chartography: 64.3
+-   ZeroBench (Pass@5): 35.0
+
+\* For the Code Agent text tasks in the public benchmark sets, the DeepSeek family models were tested using the DeepSeek Harness minimal mode as the framework, with the max effort level, topp=0.95, and temperature=1.0; in the ApexBench and Agents' Last Exam evaluations, the text model DeepSeek-V4-Flash ignores the multimodal elements within them.
+
+In terms of pure-text capabilities (agent, reasoning, world knowledge, etc.), DeepSeek-V4-Flash-Vision-Exp is on par with the official DeepSeek-V4-Flash.
+
+On agent benchmarks that require visual understanding, DeepSeek-V4-Flash-Vision-Exp delivers a significant leap over DeepSeek-V4-Flash, bringing its multimodal agent capabilities close to Opus-4.8.
+
+For usage details, please refer to the [Vision guide](https://api-docs.deepseek.com/guides/vision).
+
+* * *
+
+## Date: 2026-08-13[​](https://api-docs.deepseek.com/updates#date-2026-08-13 "Direct link to Date: 2026-08-13")
+
+### DeepSeek-V4-Pro Update[​](https://api-docs.deepseek.com/updates#deepseek-v4-pro-update "Direct link to DeepSeek-V4-Pro Update")
+
+The GA release of DeepSeek-V4-Pro has been rolled out on the APP, Web, and API. The API calling method remains unchanged — simply set the model name to `deepseek-v4-pro` to use the latest version.
+
+**Significantly enhanced Agent capabilities**
+
+The GA version of DeepSeek V4 Pro greatly enhances agent capabilities, with particularly significant performance improvements in production environments.
+
+-   HLE (wo / w tools): 42.7/60.0
+-   Terminal Bench 2.1: 87.9
+-   NL2Repo: 61.5
+-   Cybergym: 83.3
+-   DeepSWE: 62.7
+-   Toolathlon-Verified: 74.1
+-   Agents' Last Exam: 25.7
+-   AutomationBench (Public): 31.8
+-   DSBench-FullStack: 71.1
+-   DSBench-Hard: 67.2
+
+**Native support for the Responses API**
+
+The DeepSeek API now natively supports the OpenAI Responses API format and is specifically adapted for Codex. Users can refer to the [official documentation](https://api-docs.deepseek.com/quick_start/agent_integrations/codex) and complete the Codex configuration with a one-click configuration script.
+
+**More flexible thinking effort control**
+
+The thinking modes of V4-Pro and V4-Flash now support three thinking effort levels: low / high / max. In real-world usage, users can flexibly choose based on task complexity: use low for simple tasks, high for daily Agent tasks, and max for more complex scenarios. For setup instructions, please refer to the official API documentation: [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode).
+
+**API Pricing Adjustment**
+
+With the official release of the DeepSeek V4 model family, we will [update and adjust API pricing](https://api-docs.deepseek.com/quick_start/pricing). To allocate resources more reasonably, we will adopt peak/off-peak pricing, with off-peak prices set at half of the peak-hour prices, encouraging users to schedule their tasks based on actual usage. The new prices will take effect at 16:00 (UTC Time) on August 16, 2026.
+
+For more details, please refer to [this documentation](https://api-docs.deepseek.com/news/news260813).
+
+* * *
+
+## Date: 2026-07-31[​](https://api-docs.deepseek.com/updates#date-2026-07-31 "Direct link to Date: 2026-07-31")
+
+### DeepSeek-V4-Flash Update[​](https://api-docs.deepseek.com/updates#deepseek-v4-flash-update "Direct link to DeepSeek-V4-Flash Update")
+
+The official release of the DeepSeek-V4-Flash API is now in public beta. The API calling method remains unchanged — simply set the model name to `deepseek-v4-flash` to use the latest version.
+
+**Significantly enhanced agent capabilities, with benchmark results far exceeding V4-Pro-Preview:**
+
+-   Terminal Bench 2.1: 82.7
+-   NL2Repo: 54.2
+-   Cybergym: 76.7
+-   DeepSWE: 54.4
+-   Toolathlon verified: 70.3
+-   Agent Last Exam: 25.2
+-   Automation Bench (Public): 25.1
+-   DSBench-FullStack: 68.7
+-   DSBench-Hard: 59.6
+
+Note 1: For the Code Agent tasks in the public benchmark sets, the official DeepSeek-V4-Flash was tested using the DeepSeek Harness minimal mode (to be released soon) as the framework, with the max effort level, topp=0.95, and temperature=1.0  
+Note 2: DSBench-FullStack is an internal full-stack development test set, and DSBench-Hard is an internal Coding Agent hard-problem test set
+
+**The official V4-Flash natively supports the Responses API format and is specifically adapted for Codex. For the specific configuration, please refer to the [documentation](https://api-docs.deepseek.com/quick_start/agent_integrations/codex).**  
+  
+**DeepSeek-V4-Flash-0731 keeps the same model architecture and size as DeepSeek-V4-Flash-Preview, and was only re-post-trained.**  
+  
+**Note: This update only upgrades the DeepSeek-V4-Flash API. The DeepSeek-V4-Pro API and the APP/WEB models are unchanged.**  
+**The official release of DeepSeek-V4-Pro will follow soon.**  
+
+* * *
+
 ## Date: 2026-04-24[​](https://api-docs.deepseek.com/updates#date-2026-04-24 "Direct link to Date: 2026-04-24")
 
 ### DeepSeek-V4[​](https://api-docs.deepseek.com/updates#deepseek-v4 "Direct link to DeepSeek-V4")

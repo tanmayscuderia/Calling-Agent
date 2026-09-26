@@ -118,6 +118,7 @@ provider adapter → ParsedWhatsAppMessage → enqueueIncomingMessage()
 - Optional per-number overrides: `whatsapp_accounts.config.limits = { "max_ai_replies_per_day": 200, "max_messages_per_day": 300 }`.
 - **MUST** fail open — if `account_usage_daily` is missing/unreachable, allow the send (counters are cost control, not security).
 - Enforcement point: `processMessageJob` BEFORE the LLM call (per-number limit → `pending_human`). Increments: inbound at enqueue, `ai_replies` after the reply, `outbound` after the send job.
+- **Cost recording**: `llmClient.chat()` captures provider `usage` tokens and computes `costUsd` from `config.llm.pricing` rates → baseAgent sums them into the result → jobHandler persists into `ai_agent_runs.tokens_in/out/cost_usd` + `recordTokenUsage()` → `org_usage_daily`. Sarvam cost is computed at READ time (minutes × `SARVAM_COST_PER_MINUTE`) from `call_sessions.duration_sec` — no separate recording needed. The Usage page (`/dashboard/usage`) reads it all via `GET /api/usage/summary`.
 
 ## 9. Architecture invariants
 

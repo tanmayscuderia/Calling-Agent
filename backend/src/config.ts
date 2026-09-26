@@ -45,11 +45,21 @@ export const config = {
     },
     deepseek: {
       apiKey: required('DEEPSEEK_API_KEY'),
-      // LOCKED to deepseek-v4-flash for maximum speed across all tasks.
-      // v4-pro is not used — flash is fast and cheap for WhatsApp replies.
-      model: 'deepseek-v4-flash',
+      // LOCKED to deepseek-flash (DeepSeek-V4.1-Flash) for maximum speed at
+      // the lowest cost across all tasks. v4-pro is not used. The legacy name
+      // 'deepseek-v4-flash' still routes to V4.1-Flash, but 'deepseek-flash'
+      // is the canonical model name (2026-09-10 release).
+      model: 'deepseek-flash',
       // DeepSeek base URL has no /v1 suffix per docs
       baseUrl: process.env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com',
+    },
+    // Cost estimation rates (USD per 1M tokens) — env-tunable, used by the
+    // usage dashboard. Defaults are deepseek-flash PEAK ballparks (off-peak
+    // is half: $0.15/$0.60); set LLM_INPUT_COST_PER_1M /
+    // LLM_OUTPUT_COST_PER_1M to your real rates.
+    pricing: {
+      inputCostPer1M: Number(process.env.LLM_INPUT_COST_PER_1M ?? 0.3),
+      outputCostPer1M: Number(process.env.LLM_OUTPUT_COST_PER_1M ?? 1.2),
     },
   },
 
@@ -72,6 +82,9 @@ export const config = {
     // used to build the webhook URL we register with Sarvam.
     publicUrl: required('PUBLIC_BASE_URL', 'http://localhost:4000'),
     baseUrl: process.env.SARVAM_BASE_URL ?? 'https://apps.sarvam.ai',
+    // Sarvam agent-call rate in INR per minute for the usage dashboard.
+    // 0 = unconfigured (dashboard shows minutes only, cost hidden).
+    costPerMinuteInr: Number(process.env.SARVAM_COST_PER_MINUTE ?? 0),
     // Calling hours guard (IST). Outside this window start-real rejects.
     callingHoursStart: Number(process.env.SARVAM_CALLING_HOURS_START ?? 9),
     callingHoursEnd: Number(process.env.SARVAM_CALLING_HOURS_END ?? 21),

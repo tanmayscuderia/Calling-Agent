@@ -1,4 +1,4 @@
-# Anthropic API
+# Using the Anthropic API
 
 Source: https://api-docs.deepseek.com/guides/anthropic_api
 
@@ -10,7 +10,7 @@ With simple configuration, you can integrate the capabilities of DeepSeek into t
 
 ## Use DeepSeek in Claude Code[​](https://api-docs.deepseek.com/guides/anthropic_api#use-deepseek-in-claude-code "Direct link to Use DeepSeek in Claude Code")
 
-Please refer to [Integrate with AI Tools](https://api-docs.deepseek.com/guides/coding_agents).
+Please refer to [Integrate with Claude Code](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code).
 
 ## Invoke DeepSeek Model via Anthropic API[​](https://api-docs.deepseek.com/guides/anthropic_api#invoke-deepseek-model-via-anthropic-api "Direct link to Invoke DeepSeek Model via Anthropic API")
 
@@ -29,10 +29,10 @@ export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropicexport ANTHROPIC_API
 3.  Invoke the API
 
 ```
-import anthropicclient = anthropic.Anthropic()message = client.messages.create(    model="deepseek-v4-pro",    max_tokens=1000,    system="You are a helpful assistant.",    messages=[        {            "role": "user",            "content": [                {                    "type": "text",                    "text": "Hi, how are you?"                }            ]        }    ])print(message.content)
+import anthropicclient = anthropic.Anthropic()message = client.messages.create(    model="deepseek-flash",    max_tokens=1000,    system="You are a helpful assistant.",    messages=[        {            "role": "user",            "content": [                {                    "type": "text",                    "text": "Hi, how are you?"                }            ]        }    ])print(message.content)
 ```
 
-**Note:** When you pass an unsupported model name to DeepSeek's Anthropic API, the API backend will automatically map it to the `deepseek-v4-flash` model.
+**Note:** When you pass an unsupported model name to DeepSeek's Anthropic API, the API backend will automatically map it to the `deepseek-flash` model.
 
 * * *
 
@@ -40,8 +40,10 @@ import anthropicclient = anthropic.Anthropic()message = client.messages.create( 
 
 When you use the Anthropic API, we map the Claude model names you pass in:
 
--   Models starting with claude-opus are mapped to deepseek-v4-pro
--   Models starting with claude-haiku or claude-sonnet are mapped to deepseek-v4-flash
+-   Models starting with claude-opus are mapped to `deepseek-v4-pro`
+-   Models starting with claude-haiku or claude-sonnet are mapped to `deepseek-flash`
+
+The claude-opus mapping points to `deepseek-v4-pro`, which is billed at the V4 Pro price.
 
 With this mapping, when using the developer mode of the new Claude Desktop APP, you can bypass the APP's model name restrictions by simply changing the base\_url and api\_key to connect to DeepSeek models.
 
@@ -49,11 +51,13 @@ With this mapping, when using the developer mode of the new Claude Desktop APP, 
 
 ## Anthropic API Compatibility Details[​](https://api-docs.deepseek.com/guides/anthropic_api#anthropic-api-compatibility-details "Direct link to Anthropic API Compatibility Details")
 
+This section lists the compatibility details of the DeepSeek API with the Anthropic API. For the full Anthropic API format definition, please refer to the [official Anthropic API reference](https://platform.claude.com/docs/en/api/python/beta/messages/create).
+
 ### HTTP Header[​](https://api-docs.deepseek.com/guides/anthropic_api#http-header "Direct link to HTTP Header")
 
 | Field | Support Status |
 | --- | --- |
-| anthropic-beta | Ignored |
+| anthropic-beta | Ignored for `/messages`; required (`files-api-2025-04-14`) for Files API endpoints — see [Files API](https://api-docs.deepseek.com/guides/files_api#anthropic-compatible-files-api) |
 | anthropic-version | Ignored |
 | x-api-key | Fully Supported |
 
@@ -75,7 +79,7 @@ Please refer to [Rate Limit & Isolation](https://api-docs.deepseek.com/quick_sta
 | thinking | Supported (`budget_tokens` is ignored) |
 | output\_config | Only `effort` is supported |
 | top\_k | Ignored |
-| top\_p | Fully Supported |
+| top\_p | Only takes effect in thinking mode (with a lower bound of `0.95`); in non-thinking mode it is fixed at `1.0` |
 
 ### Tool Fields[​](https://api-docs.deepseek.com/guides/anthropic_api#tool-fields "Direct link to Tool Fields")
 
@@ -105,7 +109,7 @@ Please refer to [Rate Limit & Isolation](https://api-docs.deepseek.com/quick_sta
 | array, type="text" | text | Fully Supported |
 | cache\_control | Ignored |
 | citations | Ignored |
-| array, type="image" |  | Not Supported |
+| array, type="image" | source | Supported. `source.type` can be base64 (media types: jpeg, png, gif, webp), url, or file (the file variant requires the header `anthropic-beta: files-api-2025-04-14`) |
 | array, type = "document" |  | Not Supported |
 | array, type = "search\_result" |  | Not Supported |
 | array, type = "thinking" |  | Supported |

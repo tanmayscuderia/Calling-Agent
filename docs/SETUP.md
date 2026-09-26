@@ -175,7 +175,7 @@ DEFAULT_ORG_ID=your-org-uuid-from-database
 # ---- LLM Provider ----
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your-deepseek-key
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL=deepseek-flash
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 # ---- AI Behavior ----
@@ -353,7 +353,7 @@ Check the dashboard:
 | `DEFAULT_ORG_ID` | **Yes** | — | Fallback org ID for prototype mode |
 | `LLM_PROVIDER` | No | `deepseek` | `deepseek` or `openai` |
 | `DEEPSEEK_API_KEY` | If deepseek | — | DeepSeek API key |
-| `DEEPSEEK_MODEL` | No | `deepseek-v4-flash` | Model name |
+| `DEEPSEEK_MODEL` | No | `deepseek-flash` | Model name |
 | `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com` | API base URL |
 | `AI_BUSINESS_NAME` | No | `Demo Realty` | Business name in AI prompts |
 | `AI_AUTO_REPLY` | No | `true` | Auto-reply to WhatsApp messages |
@@ -364,6 +364,9 @@ Check the dashboard:
 | `ENCRYPTION_KEY` | If Meta Cloud API | — | 64 hex chars; AES-256-GCM key encrypting Meta access tokens at rest |
 | `META_WEBHOOK_VERIFY_TOKEN` | No | — | Fallback `hub.verify_token` for the Meta webhook GET handshake |
 | `META_API_VERSION` | No | `v21.0` | Graph API version pin |
+| `LLM_INPUT_COST_PER_1M` | No | `0.27` | DeepSeek input price (USD/1M tok) for the Usage & Cost page |
+| `LLM_OUTPUT_COST_PER_1M` | No | `1.10` | DeepSeek output price (USD/1M tok) |
+| `SARVAM_COST_PER_MINUTE` | No | `0` | Sarvam call rate (INR/min) — cost shown on Usage page when set |
 | `COOKIE_SECRET` | **Yes** | — | Cookie signing secret (32+ chars) |
 | `FRONTEND_ORIGIN` | **Yes** | `http://localhost:3000` | Frontend URL for CORS |
 | `SARVAM_API_KEY` | No | — | Enables real AI calls (`/api/calls/start-real`); leave empty to disable |
