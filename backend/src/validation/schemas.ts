@@ -62,9 +62,42 @@ export const followupCreateSchema = z
     note: z.string().max(2000).optional(),
     due_date: z.string().max(40).optional(),
     due_at: z.string().max(40).optional(),
+    // Tasks-panel extensions (validated against agent_configs.task_types in app layer)
+    title: z.string().min(1).max(300).optional(),
+    type: z.string().min(1).max(60).optional(),
+    priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+    source: z.enum(['manual', 'ai_call', 'ai_whatsapp']).optional(),
+    assigned_to: z.string().uuid().nullish(),
+    call_session_id: z.string().uuid().nullish(),
+    scheduled_at: z.string().max(40).optional(),
   })
   .passthrough()
   .refine((b) => Object.keys(b).length > 0, { message: 'empty followup body' });
+
+export const followupUpdateSchema = z
+  .object({
+    title: z.string().min(1).max(300).optional(),
+    notes: z.string().max(4000).optional(),
+    type: z.string().min(1).max(60).optional(),
+    priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+    status: z.enum(['pending', 'completed', 'missed', 'cancelled']).optional(),
+    assigned_to: z.string().uuid().nullable().optional(),
+    scheduled_at: z.string().max(40).nullable().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'empty followup patch' });
+
+export const followupQuerySchema = z.object({
+  status: z.enum(['pending', 'completed', 'missed', 'cancelled']).optional(),
+  assigneeId: z.string().uuid().optional(),
+  leadId: z.string().uuid().optional(),
+  type: z.string().max(60).optional(),
+  source: z.enum(['manual', 'ai_call', 'ai_whatsapp']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  dueFrom: z.string().max(40).optional(),
+  dueTo: z.string().max(40).optional(),
+  search: z.string().max(120).optional(),
+  limit: z.string().max(6).optional(),
+});
 
 // ── Calls ────────────────────────────────────────────────────────
 export const startCallSchema = z.object({

@@ -18,7 +18,7 @@
 | 8 | **Inventory Manager** — CSV upload, generic schema, structured search | ✅ Live | Dashboard → Inventory | `inventory` module flag |
 | 9 | **Usage & Cost Dashboard** — LLM tokens/cost, call minutes/cost, per-number limits | ✅ Live | `/dashboard/usage` | `usage` module flag |
 | 10 | **Guardrails** — reply batching (~6s), two-stage spam referee, per-number daily limits, DNC + IST calling hours | ✅ Live | Env/config tuned | Part of `ai_replies` / `voice_calling` |
-| 11 | **🆕 Task Management for Employees** | 📋 Planned (next) | — | `task_management` module flag |
+| 11 | **🆕 Task Management for Employees** — Tasks panel, AI auto-tasks, analytics | ✅ Live (2026-09-15) | `/dashboard/followups` (Tasks) | `task_management` module flag (Phase M) |
 | 12 | Notifications (in-app + email for hot leads / assignments) | 📋 Planned | — | `notifications` module flag |
 | 13 | Kanban deal pipelines | 📋 Planned (Phase U) | — | `pipelines` module flag |
 | 14 | Analytics (conversion funnels, response times) | 📋 Planned | — | `analytics` module flag |

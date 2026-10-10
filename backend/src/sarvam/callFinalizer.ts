@@ -17,7 +17,7 @@
  */
 
 import { supabaseAdmin } from '../db/supabase';
-import { getLead, updateLead, createFollowup } from '../crm/leadService';
+import { getLead, updateLead, createFollowup, mapAutoTask } from '../crm/leadService';
 import { summarizeCall, CallTurn } from '../ai/callAgent';
 import { getAgentConfig } from '../ai/agentConfigService';
 import type { AgentConfig } from '../ai/agentTypes';
@@ -245,6 +245,7 @@ export async function finalizeCall(opts: FinalizeCallOptions): Promise<{
   // 4. Lead enrichment + follow-ups (connected calls with a summary only).
   if (leadId && summaryData) {
     const leadPatch: Record<string, any> = {};
+    let leadRow: any = null; // fetched below when name/metadata handling runs — reused by auto-task title
     if (summaryData.lead_temperature) leadPatch.temperature = summaryData.lead_temperature;
 
     // Transcript extraction — whitelisted against the org's qualifying_fields
@@ -286,6 +287,7 @@ export async function finalizeCall(opts: FinalizeCallOptions): Promise<{
     }
     if (wantsName || extracted.metadata) {
       const lead = await getLead(orgId, leadId).catch(() => null);
+      leadRow = lead;
       if (lead) {
         if (wantsName && !lead.full_name) {
           leadPatch.full_name = titleCase(summaryData.caller_name.trim());
@@ -308,18 +310,39 @@ export async function finalizeCall(opts: FinalizeCallOptions): Promise<{
       });
     }
 
-    if (
-      summaryData.outcome === 'callback_requested' ||
-      summaryData.outcome === 'site_visit_requested' ||
-      summaryData.outcome === 'booking_requested'
-    ) {
+    // ── Auto-task from outcome — template-driven ──
+    // agent_configs.auto_task_rules maps AI outcomes to industry task types
+    // (site_visit → campus_visit for education, test_drive for automotive, …).
+    // Fallback = the legacy 3-outcome mapping when the org has no rules yet.
+    const rules: any[] = (cfg as any)?.auto_task_rules?.length
+      ? (cfg as any).auto_task_rules
+      : [
+          { outcome: 'callback_requested', type: 'call', title: 'Callback requested', priority: 'high', due_offset_hours: 24 },
+          { outcome: 'site_visit_requested', type: 'site_visit', title: 'Site visit requested', priority: 'urgent', due_offset_hours: 48 },
+          { outcome: 'booking_requested', type: 'meeting', title: 'Booking requested', priority: 'urgent', due_offset_hours: 24 },
+        ];
+    const autoTask = mapAutoTask(
+      summaryData.outcome,
+      rules,
+      leadRow?.full_name ?? summaryData.caller_name,
+      callSessionId
+    );
+    if (autoTask) {
+      const dueAt = summaryData.next_follow_up_at
+        ? new Date(summaryData.next_follow_up_at).toISOString()
+        : new Date(Date.now() + autoTask.due_offset_hours * 3_600_000).toISOString();
       await createFollowup(orgId, leadId, {
-        type: summaryData.outcome === 'site_visit_requested' ? 'site_visit' : 'call',
-        title: summaryData.outcome === 'site_visit_requested' ? 'Site visit requested' : 'Callback requested',
+        type: autoTask.type,
+        title: autoTask.title,
         notes: summaryData?.summary ?? '',
-        scheduled_at: summaryData?.next_follow_up_at ?? null,
+        priority: autoTask.priority,
+        source: 'ai_call',
+        call_session_id: autoTask.call_session_id ?? callSessionId ?? null,
+        scheduled_at: dueAt,
         status: 'pending',
-      }).catch(() => {});
+      }).catch((e) => {
+        logger.warn({ callSessionId, err: (e as Error)?.message }, '[CallFinalizer] auto-task creation failed');
+      });
     }
   }
 

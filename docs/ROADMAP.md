@@ -179,12 +179,12 @@ write to it — linking already works via normalized phone numbers).
 - [ ] Analytics dashboard (conversion funnels, response times)
 - [ ] Team assignment workflow (round-robin, skill-based routing)
 
-### Phase T: Task Management for Employees (NEXT — release blocker)
+### Phase T: Task Management for Employees ✅ DONE (2026-09-15)
 Full spec: **`docs/MODULES.md` §3**. Ships behind the `task_management` module flag.
-- [ ] Migration: `tasks` table (org_id, assignee, lead_id/call_session_id links, status, priority, due_at, source) + indexes
-- [ ] API: `GET/POST /api/tasks`, `PATCH /api/tasks/:id`, `GET /api/tasks/my` — zod + org-scoped
-- [ ] Auto-task generation from AI outcomes (callback / site visit / booking / hot lead) in `callFinalizer` + `jobHandler`
-- [ ] Dashboard "Tasks" page: My Tasks / Team Tasks, status columns, due badges, lead links
+- [x] Migration: `20260915_0001_task_panel.sql` — `lead_followups` upgraded (priority/source/created_by/call_session_id), template-driven types, industry seeds
+- [x] API: `GET/POST /api/followups` + `PATCH /api/followups/:id` + `GET /api/followups/analytics` — zod + org-scoped (built on lead_followups rather than a new table — see MODULES.md note)
+- [x] Auto-task generation from AI outcomes — config-driven via `agent_configs.auto_task_rules` + `mapAutoTask()` in `callFinalizer`
+- [x] Dashboard "Tasks" page (upgraded Follow-ups): stat cards, My Tasks / All Tasks tabs, employee/type/source/status filters, assign + complete inline, analytics strip
 - [ ] Employee role visibility (members see own tasks only)
 - [ ] Round-robin auto-assignment helper (shared with team-assignment workflow)
 

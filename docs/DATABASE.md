@@ -19,6 +19,7 @@ All tables, columns, relationships, and indexes.
 > - `20260109_0001_sarvam_fixes.sql` — CHECK value fixes (`job_queue.job_type`, `call_sessions.status/provider`), re-asserts 0008
 > - `20260909_0001_meta_cloud_provider.sql` — Meta Cloud API dual-provider: `whatsapp_accounts.phone_number_id` (partially UNIQUE) + `waba_id` + org/provider index
 > - `20260910_0001_account_usage_daily.sql` — per-number daily counters (`account_usage_daily`, UNIQUE per account+day) for per-number limits
+> - `20260915_0001_task_panel.sql` — Tasks panel: `lead_followups` +`priority`/`source`/`created_by`/`call_session_id`, `type` CHECK relaxed (template-driven via `agent_configs.task_types`), `auto_task_rules` (13 industry seeds), new indexes
 >
 > **Already have a live DB?** `supabase/run_missing_migrations.sql` replays every missing piece idempotently.
 
@@ -276,15 +277,19 @@ Properties recommended to a lead.
 
 ### `lead_followups`
 
-Scheduled follow-up tasks.
+**The Tasks system** (Tasks panel + AI auto-tasks). Every follow-up is a task: lead-linked, employee-assigned, source-tagged. Task `type` values are **template-driven** — seeded per industry in `agent_configs.task_types` (real estate: `site_visit`/`loan_followup`; education: `campus_visit`; automotive: `test_drive`; …) and validated in the app layer, not by a SQL CHECK.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | uuid PK | |
 | `org_id` | uuid FK → organizations | CASCADE |
 | `lead_id` | uuid FK → crm_leads | CASCADE |
-| `assigned_to` | uuid FK → organization_members | |
-| `type` | text | `call`, `whatsapp`, `site_visit`, `email`, `meeting`, `other` |
+| `assigned_to` | uuid FK → organization_members | Employee assignment |
+| `type` | text | Template-driven — see `agent_configs.task_types` |
+| `priority` | text | `low`, `medium` (default), `high`, `urgent` — app-validated |
+| `source` | text | `manual`, `ai_call`, `ai_whatsapp` — CHECK enforced |
+| `created_by` | uuid FK → organization_members | |
+| `call_session_id` | uuid FK → call_sessions | SET NULL — links an AI-generated task to its call |
 | `title` | text | |
 | `notes` | text | |
 | `scheduled_at` | timestamptz | |
@@ -293,6 +298,8 @@ Scheduled follow-up tasks.
 | `metadata` | jsonb | |
 | `created_at` | timestamptz | Default `now()` |
 | `updated_at` | timestamptz | Auto-updated |
+
+Indexes: `(org_id, assigned_to, status)`, `(org_id, source)`, partial `(org_id, priority) WHERE status = 'pending'`. AI-created tasks: `source='ai_call'`, built from `agent_configs.auto_task_rules` (outcome → type/title/priority/due-offset) in `callFinalizer` via `mapAutoTask()`.
 
 ---
 
@@ -528,7 +535,9 @@ Per-organization AI agent configuration. Each org configures its own persona, qu
 | `system_prompt_override` | text | If set, replaces auto-generated prompt |
 | `qualifying_fields` | jsonb | Array of {key, label, type, options, required_for_qualified} |
 | `intent_types` | jsonb | Array of {key, label} |
-| `status_pipeline` | jsonb | Array of {key, label} |
+| `status_pipeline` | jsonb |
+| `task_types` | jsonb | Template-driven task type list (`{key,label,icon}`) — seeded per industry, editable per org |
+| `auto_task_rules` | jsonb | AI outcome → task rules (`{outcome,type,title,priority,due_offset_hours}`) used by `callFinalizer` | Array of {key, label} |
 | `inventory_enabled` | boolean | Default true |
 | `inventory_table` | text | Table to search (e.g. `real_estate_units`, `generic_inventory_items`) |
 | `inventory_schema` | jsonb | Configurable UI schema: `{item_label, item_label_plural, table, search_fields}` — drives the dashboard Inventory and Upload page labels per industry |

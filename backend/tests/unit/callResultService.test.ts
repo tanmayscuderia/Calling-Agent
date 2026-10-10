@@ -68,11 +68,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../src/db/supabase', () => ({ supabaseAdmin: () => mock.sb }));
 vi.mock('../../src/ai/callAgent', () => ({ summarizeCall: summarizeCallMock }));
-vi.mock('../../src/crm/leadService', () => ({
-  updateLead: updateLeadMock,
-  createFollowup: createFollowupMock,
-  findOrCreateLead: findOrCreateLeadMock,
-}));
+vi.mock('../../src/crm/leadService', async () => {
+  const actual = await vi.importActual<typeof import('../../src/crm/leadService')>('../../src/crm/leadService');
+  return {
+    updateLead: updateLeadMock,
+    createFollowup: createFollowupMock,
+    findOrCreateLead: findOrCreateLeadMock,
+    // callFinalizer now maps AI outcomes → tasks via this pure helper — keep the REAL one
+    // so the mock stays thin and the rule-matching logic is exercised elsewhere (taskPanel.test.ts).
+    mapAutoTask: actual.mapAutoTask,
+  };
+});
 vi.mock('../../src/sarvam/sarvamClient', () => ({
   listAttempts: listAttemptsMock,
 }));

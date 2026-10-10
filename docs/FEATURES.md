@@ -510,9 +510,9 @@ separate silo.
 
 ---
 
-## 20. Task Management for Employees 📋 PLANNED (next module)
+## 20. Task Management for Employees ✅ COMPLETE (2026-09-15)
 
-Full spec: **`docs/MODULES.md` §3**. Ships flag-gated (`task_management` in `org_modules`); ROADMAP Phase T.
+Built on the existing `lead_followups` table (upgraded — priority/source/created_by/call_session_id columns, template-driven task types). Auto-task rules are config-driven per industry (`agent_configs.auto_task_rules`); task types seeded for all 13 industries and editable per org. Analytics strip: workload by employee, tasks by type, source split, 30-day created-vs-completed trend. The `task_management` module flag (MODULES §2) wraps it in a later pass.
 
 | Feature | Description |
 |---------|-------------|
